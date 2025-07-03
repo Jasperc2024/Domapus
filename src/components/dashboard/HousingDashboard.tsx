@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
 import { MapView } from "./MapView";
 import { Sidebar } from "./Sidebar";
 import { Legend } from "./Legend";
 import { LastUpdated } from "./LastUpdated";
+import { Footer } from "./Footer";
+import { TopBar } from "./TopBar";
+import { SponsorBanner } from "./SponsorBanner";
 
 interface ZipData {
   zipCode: string;
@@ -26,6 +29,33 @@ export function HousingDashboard() {
   const [searchZip, setSearchZip] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showSponsorBanner, setShowSponsorBanner] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string>("");
+
+  useEffect(() => {
+    // Show sponsor banner after 10 seconds
+    const timer = setTimeout(() => {
+      setShowSponsorBanner(true);
+    }, 10000);
+
+    // Load real data and get last updated date
+    fetch('/data/zip_data.json')
+      .then(response => response.json())
+      .then(data => {
+        // Find the most recent period_end date
+        const dates = Object.values(data).map((zip: any) => zip.period_end).filter(Boolean);
+        if (dates.length > 0) {
+          const latestDate = dates.sort().pop();
+          setLastUpdated(latestDate);
+        }
+      })
+      .catch(() => {
+        // Fallback to default date if file doesn't exist yet
+        setLastUpdated("2024-06-28");
+      });
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleZipSelect = (zipData: ZipData) => {
     setSelectedZip(zipData);
@@ -48,27 +78,17 @@ export function HousingDashboard() {
   };
 
   return (
-    <div className="w-full h-screen bg-dashboard-bg overflow-hidden">
+    <div className="w-full h-screen bg-dashboard-bg overflow-hidden flex flex-col">
       {/* Top Navigation Bar */}
-      <div className="flex items-center justify-between p-4 bg-dashboard-panel border-b border-dashboard-border">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-dashboard-text-primary">
-            U.S. Housing Market Dashboard
-          </h1>
-          <MetricSelector 
-            selectedMetric={selectedMetric}
-            onMetricChange={setSelectedMetric}
-          />
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          <SearchBox onSearch={handleSearch} />
-          <LastUpdated />
-        </div>
-      </div>
+      <TopBar 
+        selectedMetric={selectedMetric}
+        onMetricChange={setSelectedMetric}
+        onSearch={handleSearch}
+        lastUpdated={lastUpdated}
+      />
 
       {/* Main Content Area */}
-      <div className="flex h-full">
+      <div className="flex flex-1 relative">
         {/* Sidebar */}
         <Sidebar
           isOpen={sidebarOpen}
@@ -85,7 +105,7 @@ export function HousingDashboard() {
           }`}
         >
           {/* Map View */}
-          <div className="absolute inset-4">
+          <div className="absolute inset-4 bottom-20">
             <MapView
               selectedMetric={selectedMetric}
               onZipSelect={handleZipSelect}
@@ -94,7 +114,7 @@ export function HousingDashboard() {
           </div>
 
           {/* Legend - Bottom Right */}
-          <div className="absolute bottom-4 right-4 w-72">
+          <div className="absolute bottom-24 right-4 w-72">
             <Legend selectedMetric={selectedMetric} />
           </div>
 
@@ -113,6 +133,14 @@ export function HousingDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <Footer />
+
+      {/* Sponsor Banner */}
+      {showSponsorBanner && (
+        <SponsorBanner onClose={() => setShowSponsorBanner(false)} />
+      )}
     </div>
   );
 }

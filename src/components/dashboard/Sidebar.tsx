@@ -115,11 +115,36 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
             <Button variant="outline" className="w-full" disabled>
               Compare to Neighboring ZIPs
             </Button>
-            <Button variant="outline" className="w-full" disabled>
-              View Historical Trends
-            </Button>
-            <Button variant="outline" className="w-full" disabled>
-              Export Data
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => {
+                // Export the map view as image
+                const mapElement = document.querySelector('.bg-gradient-to-br') as HTMLElement;
+                if (mapElement) {
+                  const canvas = document.createElement('canvas');
+                  const ctx = canvas.getContext('2d');
+                  if (ctx) {
+                    canvas.width = mapElement.offsetWidth;
+                    canvas.height = mapElement.offsetHeight;
+                    // This is a simplified export - in a real app you'd use html2canvas
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#334155';
+                    ctx.font = '16px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('U.S. Housing Market Map Export', canvas.width / 2, canvas.height / 2);
+                    
+                    // Download the canvas as image
+                    const link = document.createElement('a');
+                    link.download = `housing-map-${new Date().toISOString().split('T')[0]}.png`;
+                    link.href = canvas.toDataURL();
+                    link.click();
+                  }
+                }
+              }}
+            >
+              Export Map
             </Button>
           </div>
 
