@@ -36,7 +36,7 @@ export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }
           className="hidden sm:flex"
         >
           <a 
-            href="https://github.com/your-username/housing-dashboard" 
+            href="https://github.com/Jasperc2024/Domapus" 
             target="_blank" 
             rel="noopener noreferrer"
             className="flex items-center space-x-2"
