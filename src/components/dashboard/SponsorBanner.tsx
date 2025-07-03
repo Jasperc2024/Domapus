@@ -36,7 +36,7 @@ export function SponsorBanner({ onClose }: SponsorBannerProps) {
             className="bg-pink-600 hover:bg-pink-700 text-white"
           >
             <a 
-              href="https://github.com/sponsors/your-username" 
+              href="https://buymeacoffee.com/jasperc" 
               target="_blank" 
               rel="noopener noreferrer"
             >
