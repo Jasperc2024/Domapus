@@ -52,6 +52,25 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				dashboard: {
+					bg: 'hsl(var(--dashboard-bg))',
+					panel: 'hsl(var(--dashboard-panel))',
+					border: 'hsl(var(--dashboard-border))',
+					'text-primary': 'hsl(var(--dashboard-text-primary))',
+					'text-secondary': 'hsl(var(--dashboard-text-secondary))'
+				},
+				data: {
+					low: 'hsl(var(--data-low))',
+					'medium-low': 'hsl(var(--data-medium-low))',
+					medium: 'hsl(var(--data-medium))',
+					'medium-high': 'hsl(var(--data-medium-high))',
+					high: 'hsl(var(--data-high))'
+				},
+				map: {
+					hover: 'hsl(var(--map-hover))',
+					selected: 'hsl(var(--map-selected))',
+					border: 'hsl(var(--map-border))'
+				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
