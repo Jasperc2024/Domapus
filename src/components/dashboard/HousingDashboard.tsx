@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
 import { MapView } from "./MapView";
-import { Sidebar } from "./Sidebar";
+import React, { Suspense, useState, useEffect } from "react";
+const Sidebar = React.lazy(() => import("./Sidebar"));
 import { Legend } from "./Legend";
 import { LastUpdated } from "./LastUpdated";
 import { Footer } from "./Footer";
@@ -90,13 +91,15 @@ export function HousingDashboard() {
       {/* Main Content Area */}
       <div className="flex flex-1 relative">
         {/* Sidebar */}
-        <Sidebar
-          isOpen={sidebarOpen}
-          isCollapsed={sidebarCollapsed}
-          zipData={selectedZip}
-          onClose={closeSidebar}
-          onToggleCollapse={toggleSidebarCollapse}
-        />
+        <Suspense fallback={<div className="p-4 text-sm text-muted">Loading sidebar...</div>}>
+          <Sidebar
+            isOpen={sidebarOpen}
+            isCollapsed={sidebarCollapsed}
+            zipData={selectedZip}
+            onClose={closeSidebar}
+            onToggleCollapse={toggleSidebarCollapse}
+          />
+        </Suspense>
 
         {/* Map and Legend Container */}
         <div 
