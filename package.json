@@ -1,3 +1,12 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:2a2bdc824b78a2289bbc9f6a07ba611290ea92139eb8fdd3032628ca898c40c5
-size 2756
+{
+  ...
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:dev": "vite build --mode development",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "deploy": "gh-pages -d dist"
+  },
+  ...
+}
