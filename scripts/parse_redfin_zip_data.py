@@ -12,6 +12,10 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
+import logging
+
+# Configure logging
+logging.basicConfig(filename='data_pipeline.log', level=logging.ERROR)
 
 def download_redfin_data(url, timeout=300):
     """Download the Redfin data file with error handling."""
@@ -197,8 +201,9 @@ def main():
             print(json.dumps({sample_zip: output_data[sample_zip]}, indent=2))
             
     except Exception as e:
-        print(f"Error processing data: {e}")
-        raise
+    logging.error(f"Error processing data: {e}")
+    print(f"Error processing data: {e}")
+    raise
 
 if __name__ == "__main__":
     main()
