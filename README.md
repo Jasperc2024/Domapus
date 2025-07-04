@@ -1,6 +1,6 @@
 # Domapus
 
-A responsive, interactive dashboard that visualizes housing market trends across the United States down to the ZIP code level. Built on Redfin's public data, this tool offers detailed metrics, a clean interface, and automated monthly updates — all open-source and ad-free.
+A responsive, interactive dashboard that visualizes housing market data across the United States down to the ZIP code level. Built on Redfin's public data, this tool offers detailed metrics, a clean interface, and automated monthly updates — all open-source and ad-free.
 
 > 🌐 **Live Demo**: [https://jasperc2024.github.io/Domapus/](https://jasperc2024.github.io/Domapus/)
 
