@@ -32,19 +32,20 @@ jobs:
       run: |
         python scripts/parse_redfin_zip_data.py
 
-    - name: Check if zip_data.json changed
+    - name: Check if zip_data.json is new or changed
       id: check_changes
       run: |
-        git fetch
-        if git diff --quiet HEAD -- public/data/zip_data.json; then
-          echo "No changes detected."
-          echo "changes=false" >> $GITHUB_OUTPUT
-        else
-          echo "Changes detected."
+        if [ ! -f public/data/zip_data.json ]; then
+          echo "zip_data.json does not exist. It will be committed."
           echo "changes=true" >> $GITHUB_OUTPUT
-        fi
+        elif ! git diff --quiet HEAD -- public/data/zip_data.json; then
+          echo "zip_data.json has changes. It will be committed."
+          echo "changes=true" >> $GITHUB_OUTPUT
+        else
+          echo "No changes in zip_data.json."
+          echo "changes=false" >> $GITHUB_OUTPUT
 
-    - name: Commit and push if changed
+    - name: Commit and push if changed or missing
       if: steps.check_changes.outputs.changes == 'true'
       run: |
         git config --local user.email "action@github.com"
