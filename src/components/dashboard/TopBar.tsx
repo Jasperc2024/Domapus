@@ -55,7 +55,7 @@ export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }
           className="hidden sm:flex bg-pink-600 hover:bg-pink-700 text-white"
         >
           <a 
-            href="https://github.com/sponsors/your-username" 
+            href="https://buymeacoffee.com/JasperC" 
             target="_blank" 
             rel="noopener noreferrer"
             aria-label="Support this project by sponsoring"
