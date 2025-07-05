@@ -153,8 +153,8 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
           <Card className="border-dashboard-border bg-muted/30">
             <CardContent className="p-3">
               <p className="text-xs text-dashboard-text-secondary">
-                Data sourced from multiple MLS systems and public records. 
-                Last updated: June 28, 2024
+                Data sourced from Redfin Data Center. 
+                Last updated: July 1, 2025
               </p>
             </CardContent>
           </Card>
