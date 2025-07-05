@@ -17,16 +17,24 @@ import logging
 # Configure logging
 logging.basicConfig(filename='data_pipeline.log', level=logging.ERROR)
 
-def download_redfin_data(url, timeout=300):
-    """Download the Redfin data file with error handling."""
+# --- REPLACE your original download_redfin_data with this ---
+def download_redfin_data_to_file(url, dest_path, timeout=300):
+    """Download large file in streaming mode and save to disk."""
     try:
-        print(f"Downloading data from {url}...")
-        response = requests.get(url, timeout=timeout, stream=True)
-        response.raise_for_status()
-        return response.content
+        print(f"Downloading data from {url} ...")
+        with requests.get(url, stream=True, timeout=timeout) as r:
+            r.raise_for_status()
+            with open(dest_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+        print(f"Download finished: {dest_path}")
+        return True
     except requests.exceptions.RequestException as e:
         print(f"Error downloading data: {e}")
-        return None
+        return False
+
+# Keep your extract_zip_code, clean_and_convert_data, format_data_for_output functions as is
 
 def extract_zip_code(region_str):
     """Extract ZIP code from REGION column."""
@@ -158,52 +166,47 @@ def format_data_for_output(df):
 def main():
     """Main processing function."""
     url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/zip_code_market_tracker.tsv000.gz"
+    temp_file = "zip_code_market_tracker.tsv000.gz"
     
-    # Download data
-    data = download_redfin_data(url)
-    if data is None:
+    # Download data to file
+    success = download_redfin_data_to_file(url, temp_file)
+    if not success:
         print("Failed to download data. Exiting gracefully.")
         return
     
     try:
-        # Decompress and read TSV
-        print("Decompressing and parsing data...")
-        decompressed = gzip.decompress(data)
-        
-        # Read TSV into pandas
-        from io import StringIO
-        df = pd.read_csv(StringIO(decompressed.decode('utf-8')), sep='\t')
+        print("Decompressing and parsing data from file...")
+        with gzip.open(temp_file, 'rt', encoding='utf-8') as f:
+            df = pd.read_csv(f, sep='\t')
         
         print(f"Loaded {len(df)} rows from Redfin data")
         
-        # Clean and convert data
         df_clean = clean_and_convert_data(df)
         print(f"Processed {len(df_clean)} ZIP codes")
         
-        # Format for output
         output_data = format_data_for_output(df_clean)
         
-        # Ensure output directory exists
         output_dir = Path("public/data")
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Write JSON file
         output_file = output_dir / "zip_data.json"
         with open(output_file, 'w') as f:
             json.dump(output_data, f, indent=2)
         
         print(f"Successfully wrote {len(output_data)} ZIP codes to {output_file}")
         
-        # Print sample for verification
         if output_data:
             sample_zip = list(output_data.keys())[0]
             print(f"\nSample data for ZIP {sample_zip}:")
             print(json.dumps({sample_zip: output_data[sample_zip]}, indent=2))
-            
     except Exception as e:
         logging.error(f"Error processing data: {e}")
         print(f"Error processing data: {e}")
         raise
+    finally:
+        # Clean up the large downloaded file after processing
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
 
 if __name__ == "__main__":
     main()
