@@ -201,9 +201,9 @@ def main():
             print(json.dumps({sample_zip: output_data[sample_zip]}, indent=2))
             
     except Exception as e:
-    logging.error(f"Error processing data: {e}")
-    print(f"Error processing data: {e}")
-    raise
+        logging.error(f"Error processing data: {e}")
+        print(f"Error processing data: {e}")
+        raise
 
 if __name__ == "__main__":
     main()
