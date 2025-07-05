@@ -6,7 +6,7 @@ interface LastUpdatedProps {
 
 export function LastUpdated({ lastUpdated }: LastUpdatedProps) {
   const formatDate = (dateStr: string) => {
-    if (!dateStr) return "June 28, 2024";
+    if (!dateStr) return "July 1, 2025"; // Default date if no lastUpdated provided
     
     try {
       const date = new Date(dateStr);
@@ -16,7 +16,7 @@ export function LastUpdated({ lastUpdated }: LastUpdatedProps) {
         day: 'numeric'
       });
     } catch {
-      return "June 28, 2024";
+      return "July 1, 2025"; // Fallback if date parsing fails
     }
   };
 
