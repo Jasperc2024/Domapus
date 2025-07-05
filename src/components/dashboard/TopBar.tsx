@@ -39,9 +39,10 @@ export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }
             href="https://github.com/Jasperc2024/Domapus" 
             target="_blank" 
             rel="noopener noreferrer"
+            aria-label="View project on GitHub"
             className="flex items-center space-x-2"
           >
-            <Github className="h-4 w-4" />
+            <Github className="h-4 w-4" aria-hidden="true" />
             <span>GitHub</span>
           </a>
         </Button>
@@ -57,9 +58,10 @@ export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }
             href="https://github.com/sponsors/your-username" 
             target="_blank" 
             rel="noopener noreferrer"
+            aria-label="Support this project by sponsoring"
             className="flex items-center space-x-2"
           >
-            <Heart className="h-4 w-4" />
+            <Heart className="h-4 w-4" aria-hidden="true" />
             <span>Sponsor</span>
           </a>
         </Button>
