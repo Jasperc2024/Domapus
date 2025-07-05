@@ -1,0 +1,55 @@
+{
+  "type": "FeatureCollection",
+  "name": "us-zip-codes",
+  "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "ZCTA5CE10": "90210",
+        "GEOID10": "90210",
+        "CLASSFP10": "B5",
+        "MTFCC10": "G6350",
+        "FUNCSTAT10": "S",
+        "ALAND10": 14843071,
+        "AWATER10": 0,
+        "INTPTLAT10": "+34.1030442",
+        "INTPTLON10": "-118.4104684"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-118.43, 34.09],
+          [-118.41, 34.09],
+          [-118.41, 34.11],
+          [-118.43, 34.11],
+          [-118.43, 34.09]
+        ]]
+      }
+    },
+    {
+      "type": "Feature", 
+      "properties": {
+        "ZCTA5CE10": "10001",
+        "GEOID10": "10001",
+        "CLASSFP10": "B5",
+        "MTFCC10": "G6350",
+        "FUNCSTAT10": "S",
+        "ALAND10": 1864149,
+        "AWATER10": 0,
+        "INTPTLAT10": "+40.7505045",
+        "INTPTLON10": "-073.9934387"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-73.995, 40.748],
+          [-73.992, 40.748],
+          [-73.992, 40.753],
+          [-73.995, 40.753],
+          [-73.995, 40.748]
+        ]]
+      }
+    }
+  ]
+}

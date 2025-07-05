@@ -4,6 +4,7 @@ import { SearchBox } from "./SearchBox";
 import { MapView } from "./MapView";
 import React, { Suspense } from "react";
 const Sidebar = React.lazy(() => import("./Sidebar"));
+const Sidebar = React.lazy(() => import("./Sidebar").then(module => ({ default: module.Sidebar })));
 import { Legend } from "./Legend";
 import { LastUpdated } from "./LastUpdated";
 import { Footer } from "./Footer";

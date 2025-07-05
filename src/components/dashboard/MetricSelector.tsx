@@ -35,7 +35,7 @@ export function MetricSelector({ selectedMetric, onMetricChange }: MetricSelecto
         Visualization Metric
       </label>
       <Select value={selectedMetric} onValueChange={onMetricChange}>
-        <SelectTrigger className="w-64">
+        <SelectTrigger className="w-64" aria-label="Select visualization metric">
           <SelectValue placeholder="Select a metric" />
         </SelectTrigger>
         <SelectContent>

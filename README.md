@@ -47,9 +47,9 @@ A responsive, interactive dashboard that visualizes housing market data across t
 
 The dashboard stays current through an automated monthly pipeline:
 
-1. 🗓 **Schedule**: Third full week of each month, Redfin releases ZIP-level data
+1. 🗓 **Schedule**: Redfin releases new data monthly
 2. 📥 **Download**: TSV.gz file retrieved from Redfin’s public S3 bucket
-3. 🧹 **Cleanup**: Drops all Type IDs, MOM/YOY fields (or retains if needed), and unused metadata
+3. 🧹 **Cleanup**: Drops all unused metadata
 4. 🔄 **Parse**: Converts data to structured `zip_data.json` for frontend use
 5. 🚀 **Deploy**: GitHub Action commits new data and refreshes the site
 
@@ -163,6 +163,5 @@ If you’d like to help improve the dashboard or support the developer:
 ## 🔗 Useful Links
 
 - 🌍 Live Website: [https://jasperc2024.github.io/Domapus/](https://jasperc2024.github.io/Domapus/)
-- 🧪 Lovable Builder: [https://lovable.dev/projects/d6dcb301-9712-4f2a-9f31-d8b6d509bcb7](https://lovable.dev/projects/d6dcb301-9712-4f2a-9f31-d8b6d509bcb7)
 - 📁 GitHub Repo: [https://github.com/Jasperc2024/Domapus](https://github.com/Jasperc2024/Domapus)
 ```
