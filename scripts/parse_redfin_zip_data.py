@@ -168,45 +168,69 @@ def main():
     url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/zip_code_market_tracker.tsv000.gz"
     temp_file = "zip_code_market_tracker.tsv000.gz"
     
-    # Download data to file
-    success = download_redfin_data_to_file(url, temp_file)
-    if not success:
-        print("Failed to download data. Exiting gracefully.")
-        return
+    output_dir = Path("public/data")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / "zip_data.json"
     
-    try:
-        print("Decompressing and parsing data from file...")
-        with gzip.open(temp_file, 'rt', encoding='utf-8') as f:
-            df = pd.read_csv(f, sep='\t')
+    # Flag to decide if update needed
+    need_update = False
+    
+    # Step 1: If zip_data.json does NOT exist, must generate
+    if not output_file.exists():
+        print(f"{output_file} does not exist. Will generate new data.")
+        need_update = True
+    else:
+        print(f"{output_file} exists. Will download and compare for changes.")
+        need_update = True  # We still download and compare later
+    
+    if need_update:
+        # Download data to file
+        success = download_redfin_data_to_file(url, temp_file)
+        if not success:
+            print("Failed to download data. Exiting gracefully.")
+            return
         
-        print(f"Loaded {len(df)} rows from Redfin data")
-        
-        df_clean = clean_and_convert_data(df)
-        print(f"Processed {len(df_clean)} ZIP codes")
-        
-        output_data = format_data_for_output(df_clean)
-        
-        output_dir = Path("public/data")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
-        output_file = output_dir / "zip_data.json"
-        with open(output_file, 'w') as f:
-            json.dump(output_data, f, indent=2)
-        
-        print(f"Successfully wrote {len(output_data)} ZIP codes to {output_file}")
-        
-        if output_data:
-            sample_zip = list(output_data.keys())[0]
-            print(f"\nSample data for ZIP {sample_zip}:")
-            print(json.dumps({sample_zip: output_data[sample_zip]}, indent=2))
-    except Exception as e:
-        logging.error(f"Error processing data: {e}")
-        print(f"Error processing data: {e}")
-        raise
-    finally:
-        # Clean up the large downloaded file after processing
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
+        try:
+            print("Decompressing and parsing data from file...")
+            with gzip.open(temp_file, 'rt', encoding='utf-8') as f:
+                df = pd.read_csv(f, sep='\t')
+            
+            print(f"Loaded {len(df)} rows from Redfin data")
+            
+            df_clean = clean_and_convert_data(df)
+            print(f"Processed {len(df_clean)} ZIP codes")
+            
+            output_data = format_data_for_output(df_clean)
+            
+            # Compare with existing file if it exists
+            if output_file.exists():
+                with open(output_file, 'r') as f_existing:
+                    existing_data = json.load(f_existing)
+                
+                if existing_data == output_data:
+                    print("No changes detected compared to existing zip_data.json. Skipping overwrite.")
+                else:
+                    with open(output_file, 'w') as f_out:
+                        json.dump(output_data, f_out, indent=2)
+                    print(f"Data updated and written to {output_file}")
+            else:
+                # File did not exist, so write it
+                with open(output_file, 'w') as f_out:
+                    json.dump(output_data, f_out, indent=2)
+                print(f"Successfully wrote new data to {output_file}")
+            
+            if output_data:
+                sample_zip = list(output_data.keys())[0]
+                print(f"\nSample data for ZIP {sample_zip}:")
+                print(json.dumps({sample_zip: output_data[sample_zip]}, indent=2))
+        except Exception as e:
+            logging.error(f"Error processing data: {e}")
+            print(f"Error processing data: {e}")
+            raise
+        finally:
+            # Clean up the large downloaded file after processing
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
 
 if __name__ == "__main__":
     main()
