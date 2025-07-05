@@ -175,7 +175,7 @@ def main():
     # Flag to decide if update needed
     need_update = False
     if not output_file.exists():
-    need_update = True
+        need_update = True
     
     # Step 1: If zip_data.json does NOT exist, must generate
     if not output_file.exists():
