@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
 import { MapView } from "./MapView";
-import React, { Suspense, useState, useEffect } from "react";
+import React, { Suspense } from "react";
 const Sidebar = React.lazy(() => import("./Sidebar"));
 import { Legend } from "./Legend";
 import { LastUpdated } from "./LastUpdated";
@@ -52,7 +52,7 @@ export function HousingDashboard() {
       })
       .catch(() => {
         // Fallback to default date if file doesn't exist yet
-        setLastUpdated("2024-06-28");
+        setLastUpdated("2025-07-01");
       });
 
     return () => clearTimeout(timer);
