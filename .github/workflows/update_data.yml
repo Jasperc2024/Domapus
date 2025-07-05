@@ -1,5 +1,9 @@
 name: Update Redfin ZIP Data
 
+permissions:
+  contents: write
+  issues: write
+
 on:
   schedule:
     # Run on Thursday of the 3rd full week of each month at 10:00 AM UTC
