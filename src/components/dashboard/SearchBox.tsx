@@ -29,9 +29,10 @@ export function SearchBox({ onSearch }: SearchBoxProps) {
             onChange={(e) => setSearchValue(e.target.value)}
             className="pl-10 w-48"
             maxLength={5}
+            aria-label="Search for ZIP code"
           />
         </div>
-        <Button type="submit" variant="outline" size="sm">
+        <Button type="submit" variant="outline" size="sm" aria-label="Search for ZIP code">
           Search
         </Button>
       </form>
