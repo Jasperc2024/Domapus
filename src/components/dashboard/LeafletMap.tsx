@@ -80,11 +80,15 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     if (!mapRef.current) return;
 
     const leafletMap = L.map(mapRef.current, {
-      center: [39.8283, -98.5795], // Center of USA
+      center: [39.0, -96.0], // Center of continental USA
       zoom: 4,
+      minZoom: 3,
+      maxZoom: 12,
       scrollWheelZoom: true,
       dragging: true,
       zoomControl: true,
+      maxBounds: [[-85, -180], [85, 180]], // Limit map bounds
+      maxBoundsViscosity: 1.0, // Prevent dragging outside bounds
     });
 
     // Add tile layer

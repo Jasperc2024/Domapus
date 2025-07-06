@@ -9,7 +9,7 @@ const Sidebar = React.lazy(() =>
 );
 import { Legend } from "./Legend";
 import { LastUpdated } from "./LastUpdated";
-import { Footer } from "./Footer";
+
 import { TopBar } from "./TopBar";
 import { SponsorBanner } from "./SponsorBanner";
 
@@ -111,7 +111,7 @@ export function HousingDashboard() {
           }`}
         >
           {/* Map View */}
-          <div className="absolute inset-4 bottom-20">
+          <div className="absolute inset-4 bottom-4">
             <LeafletMap
               selectedMetric={selectedMetric}
               onZipSelect={handleZipSelect}
@@ -120,7 +120,7 @@ export function HousingDashboard() {
           </div>
 
           {/* Legend - Bottom Right */}
-          <div className="absolute bottom-24 right-4 w-72">
+          <div className="absolute bottom-8 right-4 w-72">
             <Legend selectedMetric={selectedMetric} />
           </div>
 
@@ -140,8 +140,6 @@ export function HousingDashboard() {
         </div>
       </div>
 
-      {/* Footer */}
-      <Footer />
 
       {/* Sponsor Banner */}
       {showSponsorBanner && (
