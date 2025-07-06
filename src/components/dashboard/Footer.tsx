@@ -16,11 +16,6 @@ export function Footer() {
             . All data is publicly available and provided as-is for informational and educational purposes only.
           </p>
           
-          <p>
-            <strong>Disclaimer:</strong> This website is not affiliated with or endorsed by Redfin Corporation. 
-            While efforts are made to keep the data accurate and current, we cannot guarantee completeness or reliability. 
-            For official real estate information, consult licensed professionals or Redfin directly.
-          </p>
         </div>
       </div>
     </footer>
