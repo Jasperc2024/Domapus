@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
 import { MapView } from "./MapView";
+import { LeafletMap } from "./LeafletMap";
 import React, { Suspense } from "react";
 const Sidebar = React.lazy(() =>
   import("./Sidebar").then((module) => ({ default: module.Sidebar }))
@@ -111,7 +112,7 @@ export function HousingDashboard() {
         >
           {/* Map View */}
           <div className="absolute inset-4 bottom-20">
-            <MapView
+            <LeafletMap
               selectedMetric={selectedMetric}
               onZipSelect={handleZipSelect}
               searchZip={searchZip}
