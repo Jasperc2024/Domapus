@@ -152,7 +152,7 @@ def main():
     
     try:
         print("Decompressing and parsing data...")
-        buffer = BytesIO(data)  # >>> STREAM BUFFER
+        buffer = BytesIO(data)
         with gzip.GzipFile(fileobj=buffer) as f:
             df = pd.read_csv(f, sep='\t')
         
@@ -165,17 +165,31 @@ def main():
         output_dir = Path("public/data")
         output_dir.mkdir(parents=True, exist_ok=True)
         output_file = output_dir / "zip_data.json"
+
+        # === Smart write logic: skip if unchanged ===
+        existing_data = {}
+        if output_file.exists():
+            try:
+                with open(output_file, 'r') as f:
+                    existing_data = json.load(f)
+            except Exception as e:
+                print(f"Warning: Failed to read existing JSON file for comparison: {e}")
         
+        if existing_data == output_data:
+            print("No changes detected in ZIP data. Skipping write.")
+            return
+
+        # === Write new JSON output ===
         with open(output_file, 'w') as f:
             json.dump(output_data, f, indent=2)
         
         if not output_file.exists():
-            print(f"ERROR: Failed to create output file at {output_file}")  # >>> SAFEGUARD
+            print(f"ERROR: Failed to create output file at {output_file}")
         else:
             print(f"Successfully wrote {len(output_data)} ZIP codes to {output_file}")
         
         if output_data:
-            sample_zip = random.choice(list(output_data.keys()))  # >>> RANDOM SAMPLE
+            sample_zip = random.choice(list(output_data.keys()))
             print(f"\nSample data for ZIP {sample_zip}:")
             print(json.dumps({sample_zip: output_data[sample_zip]}, indent=2))
     
@@ -183,13 +197,13 @@ def main():
         logging.error(f"Error processing data: {e}")
         print(f"Error processing data: {e}")
         
-        # >>> ADDITIONAL ERROR LOG DUMP FOR CI DEBUGGING
         if os.path.exists("data_pipeline.log"):
             print("\n=== Error Log ===")
             with open("data_pipeline.log") as log_file:
                 print(log_file.read())
         
         raise
+
 
 if __name__ == "__main__":
     main()
