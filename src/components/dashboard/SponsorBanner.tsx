@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { X, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -6,6 +7,11 @@ interface SponsorBannerProps {
 }
 
 export function SponsorBanner({ onClose }: SponsorBannerProps) {
+  useEffect(() => {
+    const timeout = setTimeout(onClose, 20000);
+    return () => clearTimeout(timeout);
+  }, [onClose]);
+
   return (
     <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4">
       <div className="bg-dashboard-panel border border-dashboard-border rounded-lg shadow-lg p-4">
