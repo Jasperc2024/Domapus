@@ -51,12 +51,12 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     const loadData = async () => {
       try {
         // Load ZIP data
-        const zipResponse = await fetch('/data/zip_data.json');
+        const zipResponse = await fetch('data/zip_data.json');
         const zipJson = await zipResponse.json();
         setZipData(zipJson);
 
         // Load cities mapping
-        const citiesResponse = await fetch('/data/zip-city-mapping.csv');
+        const citiesResponse = await fetch('data/zip-city-mapping.csv');
         const citiesText = await citiesResponse.text();
         const citiesMap: Record<string, string> = {};
         
@@ -105,7 +105,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
 
     const loadGeoJSON = async () => {
       try {
-        const response = await fetch('/data/us-zip-codes.geojson');
+        const response = await fetch('data/us-zip-codes.geojson');
         const geojsonData = await response.json();
 
         // Remove existing layer
@@ -280,7 +280,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
       
       {/* Map Attribution */}
       <div className="absolute bottom-2 right-2 bg-dashboard-panel/90 px-2 py-1 rounded text-xs text-dashboard-text-secondary">
-        Map data © OpenStreetMap contributors
+        Map data © OpenStreetMap
       </div>
     </div>
   );
