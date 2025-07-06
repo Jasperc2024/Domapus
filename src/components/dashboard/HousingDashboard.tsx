@@ -43,7 +43,7 @@ export function HousingDashboard() {
     }, 10000);
 
     // Load real data and get last updated date
-    fetch('/Domapus/data/zip_data.json')
+    fetch('/Domapus/public/data/zip_data.json')
       .then(response => response.json())
       .then(data => {
         // Find the most recent period_end date
