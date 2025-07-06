@@ -13,27 +13,29 @@ import re
 from datetime import datetime
 from pathlib import Path
 import logging
+from io import BytesIO  # >>> ADDED FOR STREAMED GZIP DECOMPRESSION
+import random  # >>> ADDED FOR RANDOM SAMPLE
 
 # Configure logging
 logging.basicConfig(filename='data_pipeline.log', level=logging.ERROR)
 
-def download_redfin_data(url, timeout=300):
-    """Download the Redfin data file with error handling."""
-    try:
-        print(f"Downloading data from {url}...")
-        response = requests.get(url, timeout=timeout, stream=True)
-        response.raise_for_status()
-        return response.content
-    except requests.exceptions.RequestException as e:
-        print(f"Error downloading data: {e}")
-        return None
+def download_redfin_data(url, timeout=300, retries=3):
+    """Download the Redfin data file with retries."""
+    for attempt in range(1, retries + 1):
+        try:
+            print(f"Attempt {attempt}: Downloading data from {url}...")
+            response = requests.get(url, timeout=timeout, stream=True)
+            response.raise_for_status()
+            return response.content
+        except requests.exceptions.RequestException as e:
+            print(f"Download failed (attempt {attempt}): {e}")
+    print("All download attempts failed.")
+    return None
 
 def extract_zip_code(region_str):
     """Extract ZIP code from REGION column."""
     if pd.isna(region_str) or not region_str:
         return None
-    
-    # Match pattern "Zip Code: 12345"
     match = re.search(r'Zip Code:\s*(\d{5})', str(region_str))
     if match:
         return match.group(1)
@@ -41,19 +43,11 @@ def extract_zip_code(region_str):
 
 def clean_and_convert_data(df):
     """Clean and convert the dataframe to the desired format."""
-    # Extract ZIP codes
     df['zip_code'] = df['REGION'].apply(extract_zip_code)
-    
-    # Filter out rows without valid ZIP codes
     df = df.dropna(subset=['zip_code'])
-    
-    # Convert PERIOD_END to datetime for sorting
     df['PERIOD_END'] = pd.to_datetime(df['PERIOD_END'])
-    
-    # Keep only the latest period per ZIP code
     df = df.sort_values('PERIOD_END').groupby('zip_code').tail(1)
     
-    # Column mapping for renaming
     column_mapping = {
         'STATE': 'state',
         'CITY': 'city', 
@@ -105,7 +99,6 @@ def clean_and_convert_data(df):
         'PARENT_METRO_REGION': 'parent_metro'
     }
     
-    # Select and rename columns
     available_columns = [col for col in column_mapping.keys() if col in df.columns]
     df_clean = df[available_columns + ['zip_code']].copy()
     df_clean = df_clean.rename(columns=column_mapping)
@@ -123,7 +116,6 @@ def format_data_for_output(df):
         for column, value in row.items():
             if column == 'zip_code':
                 continue
-                
             if pd.isna(value):
                 data[column] = None
             elif column == 'period_end':
@@ -133,24 +125,18 @@ def format_data_for_output(df):
             elif column in ['state', 'city', 'property_type', 'parent_metro']:
                 data[column] = str(value) if not pd.isna(value) else None
             elif 'pct' in column:
-                # Convert to percentage and round to 1 decimal
                 data[column] = round(float(value) * 100, 1) if not pd.isna(value) else None
             elif column in ['median_sale_price', 'median_list_price']:
-                # Prices as whole numbers
                 data[column] = int(float(value)) if not pd.isna(value) else None
             elif column in ['median_ppsf', 'median_list_ppsf', 'avg_sale_to_list_ratio']:
-                # Ratios and PPSF to 2 decimals
                 data[column] = round(float(value), 2) if not pd.isna(value) else None
             elif column in ['homes_sold', 'inventory', 'new_listings', 'sold_above_list', 'pending_sales']:
-                # Counts as whole numbers
                 data[column] = int(float(value)) if not pd.isna(value) else None
             else:
-                # Default: preserve as float with 2 decimals
                 try:
                     data[column] = round(float(value), 2) if not pd.isna(value) else None
                 except (ValueError, TypeError):
                     data[column] = value
-        
         result[zip_code] = data
     
     return result
@@ -159,50 +145,50 @@ def main():
     """Main processing function."""
     url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/zip_code_market_tracker.tsv000.gz"
     
-    # Download data
     data = download_redfin_data(url)
     if data is None:
         print("Failed to download data. Exiting gracefully.")
         return
     
     try:
-        # Decompress and read TSV
         print("Decompressing and parsing data...")
-        decompressed = gzip.decompress(data)
-        
-        # Read TSV into pandas
-        from io import StringIO
-        df = pd.read_csv(StringIO(decompressed.decode('utf-8')), sep='\t')
+        buffer = BytesIO(data)  # >>> STREAM BUFFER
+        with gzip.GzipFile(fileobj=buffer) as f:
+            df = pd.read_csv(f, sep='\t')
         
         print(f"Loaded {len(df)} rows from Redfin data")
-        
-        # Clean and convert data
         df_clean = clean_and_convert_data(df)
         print(f"Processed {len(df_clean)} ZIP codes")
         
-        # Format for output
         output_data = format_data_for_output(df_clean)
         
-        # Ensure output directory exists
         output_dir = Path("public/data")
         output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Write JSON file
         output_file = output_dir / "zip_data.json"
+        
         with open(output_file, 'w') as f:
             json.dump(output_data, f, indent=2)
         
-        print(f"Successfully wrote {len(output_data)} ZIP codes to {output_file}")
+        if not output_file.exists():
+            print(f"ERROR: Failed to create output file at {output_file}")  # >>> SAFEGUARD
+        else:
+            print(f"Successfully wrote {len(output_data)} ZIP codes to {output_file}")
         
-        # Print sample for verification
         if output_data:
-            sample_zip = list(output_data.keys())[0]
+            sample_zip = random.choice(list(output_data.keys()))  # >>> RANDOM SAMPLE
             print(f"\nSample data for ZIP {sample_zip}:")
             print(json.dumps({sample_zip: output_data[sample_zip]}, indent=2))
-            
+    
     except Exception as e:
         logging.error(f"Error processing data: {e}")
         print(f"Error processing data: {e}")
+        
+        # >>> ADDITIONAL ERROR LOG DUMP FOR CI DEBUGGING
+        if os.path.exists("data_pipeline.log"):
+            print("\n=== Error Log ===")
+            with open("data_pipeline.log") as log_file:
+                print(log_file.read())
+        
         raise
 
 if __name__ == "__main__":
