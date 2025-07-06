@@ -14,10 +14,24 @@ interface TopBarProps {
 export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }: TopBarProps) {
   return (
     <div className="flex items-center justify-between p-4 bg-dashboard-panel border-b border-dashboard-border">
-      <div className="flex items-center space-x-4">
-        <h1 className="text-2xl font-bold text-dashboard-text-primary">
-          U.S. Housing Market Dashboard
-        </h1>
+      <div className="flex items-center space-x-6">
+        {/* Logo and Title */}
+        <div className="flex items-center space-x-3">
+          <img 
+            src="/favicon_io/favicon-32x32.png" 
+            alt="Domapus Logo" 
+            className="h-8 w-8"
+          />
+          <div className="flex flex-col">
+            <h1 className="text-xl font-bold text-dashboard-text-primary leading-tight">
+              Domapus
+            </h1>
+            <p className="text-sm text-dashboard-text-secondary leading-tight">
+              U.S. Housing Market Dashboard
+            </p>
+          </div>
+        </div>
+        
         <MetricSelector 
           selectedMetric={selectedMetric}
           onMetricChange={onMetricChange}
