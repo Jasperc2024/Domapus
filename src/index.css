@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -34,11 +35,11 @@
     --dashboard-text-secondary: 215.4 16.3% 46.9%;
 
     /* Data visualization colors */
-    --data-low: 120 60% 90%;
-    --data-medium-low: 120 60% 70%;
-    --data-medium: 60 100% 85%;
-    --data-medium-high: 30 100% 70%;
-    --data-high: 0 84% 70%;
+    --data-low: 239 84% 90%;
+    --data-medium-low: 239 84% 80%;
+    --data-medium: 239 84% 70%;
+    --data-medium-high: 239 84% 60%;
+    --data-high: 239 84% 50%;
 
     /* Map colors */
     --map-hover: 221.2 83.2% 53.3%;
@@ -85,11 +86,11 @@
     --dashboard-text-secondary: 215 20.2% 65.1%;
 
     /* Data visualization dark colors */
-    --data-low: 120 30% 25%;
-    --data-medium-low: 120 40% 35%;
-    --data-medium: 60 60% 45%;
-    --data-medium-high: 30 70% 55%;
-    --data-high: 0 70% 60%;
+    --data-low: 239 30% 25%;
+    --data-medium-low: 239 40% 35%;
+    --data-medium: 239 60% 45%;
+    --data-medium-high: 239 70% 55%;
+    --data-high: 239 70% 60%;
 
     /* Map dark colors */
     --map-hover: 217.2 91.2% 59.8%;
@@ -121,6 +122,46 @@
 @layer base {
   .focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+/* Leaflet map improvements */
+.leaflet-container {
+  background: hsl(var(--dashboard-bg)) !important;
+}
+
+.leaflet-tile {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: optimize-contrast;
+  image-rendering: crisp-edges;
+  -ms-interpolation-mode: nearest-neighbor;
+}
+
+.leaflet-tile-loaded {
+  opacity: 1 !important;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.leaflet-tile-loading {
+  opacity: 0.3 !important;
+}
+
+.zip-tooltip {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .leaflet-control-container {
+    pointer-events: none;
+  }
+  
+  .leaflet-control {
+    pointer-events: auto;
+  }
+  
+  .leaflet-popup-content-wrapper {
+    border-radius: 8px;
   }
 }
 

@@ -1,8 +1,10 @@
-import { Github, Heart } from "lucide-react";
+
+import { Github, Heart, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
 import { LastUpdated } from "./LastUpdated";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TopBarProps {
   selectedMetric: MetricType;
@@ -12,35 +14,39 @@ interface TopBarProps {
 }
 
 export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }: TopBarProps) {
+  const isMobile = useIsMobile();
+
   return (
-    <div className="flex items-center justify-between p-4 bg-dashboard-panel border-b border-dashboard-border">
-      <div className="flex items-center space-x-6">
+    <div className="flex items-center justify-between p-2 sm:p-4 bg-dashboard-panel border-b border-dashboard-border">
+      <div className="flex items-center space-x-2 sm:space-x-6">
         {/* Logo and Title */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           <img 
             src="favicon-32x32.png" 
             alt="Domapus Logo" 
-            className="h-8 w-8"
+            className="h-6 w-6 sm:h-8 sm:w-8"
           />
           <div className="flex flex-col">
-            <h1 className="text-xl font-bold text-dashboard-text-primary leading-tight">
+            <h1 className="text-lg sm:text-xl font-bold text-dashboard-text-primary leading-tight">
               Domapus
             </h1>
-            <p className="text-sm text-dashboard-text-secondary leading-tight">
+            <p className="text-xs sm:text-sm text-dashboard-text-secondary leading-tight">
               U.S. Housing Market Dashboard
             </p>
           </div>
         </div>
         
-        <MetricSelector 
-          selectedMetric={selectedMetric}
-          onMetricChange={onMetricChange}
-        />
+        {!isMobile && (
+          <MetricSelector 
+            selectedMetric={selectedMetric}
+            onMetricChange={onMetricChange}
+          />
+        )}
       </div>
       
-      <div className="flex items-center space-x-4">
-        <SearchBox onSearch={onSearch} />
-        <LastUpdated lastUpdated={lastUpdated} />
+      <div className="flex items-center space-x-2 sm:space-x-4">
+        {!isMobile && <SearchBox onSearch={onSearch} />}
+        {!isMobile && <LastUpdated lastUpdated={lastUpdated} />}
         
         {/* GitHub Button */}
         <Button 
@@ -80,6 +86,19 @@ export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }
           </a>
         </Button>
       </div>
+
+      {/* Mobile Controls */}
+      {isMobile && (
+        <div className="fixed bottom-4 left-4 right-4 z-[1001] bg-dashboard-panel border border-dashboard-border rounded-lg p-3 shadow-lg">
+          <div className="space-y-3">
+            <MetricSelector 
+              selectedMetric={selectedMetric}
+              onMetricChange={onMetricChange}
+            />
+            <SearchBox onSearch={onSearch} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
