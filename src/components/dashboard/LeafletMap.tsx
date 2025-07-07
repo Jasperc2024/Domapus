@@ -78,7 +78,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     const loadGeoJSON = async () => {
       // Load and add state boundaries first
       try {
-        const stateResponse = await fetch('https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/us-states.geojson');
+        const stateResponse = await fetch('public/data/us-state.geojson');
         const stateData = await stateResponse.json();
         
         // Add state boundaries with labels
