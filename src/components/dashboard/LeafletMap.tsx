@@ -214,10 +214,19 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
           },
         });
 
-        // Add zoom event listener for dynamic styling
+        // Add zoom event listener for dynamic styling - Fix TypeScript error
         map.on('zoomend', () => {
           const zoom = map.getZoom();
-          layer.setStyle((feature) => getZipStyle(feature, zoom));
+          layer.eachLayer((leafletLayer) => {
+            // Type guard to ensure the layer has setStyle method
+            if ('setStyle' in leafletLayer && typeof leafletLayer.setStyle === 'function') {
+              const pathLayer = leafletLayer as L.Path;
+              const feature = (pathLayer as any).feature;
+              if (feature) {
+                pathLayer.setStyle(getZipStyle(feature, zoom));
+              }
+            }
+          });
         });
 
         layer.addTo(map);
