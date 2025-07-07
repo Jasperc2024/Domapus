@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -17,6 +16,10 @@ interface ZipData {
   zipCode: string;
   state: string;
   city?: string;
+  county?: string;
+  latitude?: number;
+  longitude?: number;
+  parent_metro?: string;
   medianSalePrice: number;
   medianListPrice: number;
   medianDOM: number;
@@ -46,8 +49,9 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
   const [map, setMap] = useState<L.Map | null>(null);
   const [geojsonLayer, setGeojsonLayer] = useState<L.GeoJSON | null>(null);
   const [zipData, setZipData] = useState<Record<string, any>>({});
-  const [citiesData, setCitiesData] = useState<Record<string, string>>({});
+  const [citiesData, setCitiesData] = useState<Record<string, any>>({});
   const [colorScale, setColorScale] = useState<any>(null);
+  const [isInteractive, setIsInteractive] = useState(false);
 
   // Load data
   useEffect(() => {
@@ -58,15 +62,28 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
         const zipJson = await zipResponse.json();
         setZipData(zipJson);
 
-        // Load cities mapping
+        // Load enhanced cities mapping with coordinates and county
         const citiesResponse = await fetch('data/zip-city-mapping.csv');
         const citiesText = await citiesResponse.text();
-        const citiesMap: Record<string, string> = {};
+        const citiesMap: Record<string, any> = {};
         
         citiesText.split('\n').slice(1).forEach(line => {
-          const [zip, city] = line.split(',');
-          if (zip && city) {
-            citiesMap[zip.trim()] = city.trim();
+          const parts = line.split(',');
+          if (parts.length >= 2) {
+            const zip = parts[0]?.trim();
+            const city = parts[1]?.trim();
+            const county = parts[2]?.trim();
+            const lat = parts[3] ? parseFloat(parts[3].trim()) : undefined;
+            const lng = parts[4] ? parseFloat(parts[4].trim()) : undefined;
+            
+            if (zip && city) {
+              citiesMap[zip] = {
+                city,
+                county: county || undefined,
+                latitude: lat,
+                longitude: lng
+              };
+            }
           }
         });
         setCitiesData(citiesMap);
@@ -88,18 +105,58 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
 
-    // Create D3 color scale
+    // Create D3 color scale with better color scheme
     const scale = scaleLinear<string>()
       .domain([minValue, maxValue])
-      .range(['#eff6ff', '#1e40af']); // Light blue to dark blue
+      .range(['#fee5d9', '#de2d26']); // Light orange to dark red
 
     setColorScale(() => scale);
   }, [zipData, selectedMetric]);
 
-  // Initialize map
+  // Initialize map with static background first
   useEffect(() => {
     if (!mapRef.current) return;
 
+    // Show static map image initially
+    if (!isInteractive) {
+      mapRef.current.innerHTML = `
+        <div style="
+          width: 100%; 
+          height: 100%; 
+          background: url('https://tiles.stadiamaps.com/tiles/stamen_toner_lite/4/7/5.png') center/cover;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          position: relative;
+        ">
+          <div style="
+            background: rgba(255,255,255,0.9);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          ">
+            <div style="font-size: 18px; font-weight: bold; margin-bottom: 8px;">Interactive Map</div>
+            <div style="color: #666;">Click to activate</div>
+          </div>
+        </div>
+      `;
+      
+      const clickHandler = () => {
+        setIsInteractive(true);
+      };
+      
+      mapRef.current.addEventListener('click', clickHandler);
+      
+      return () => {
+        if (mapRef.current) {
+          mapRef.current.removeEventListener('click', clickHandler);
+        }
+      };
+    }
+
+    // Initialize interactive map
     const leafletMap = L.map(mapRef.current, {
       center: [39.0, -96.0], // Center of continental USA
       zoom: 4,
@@ -110,17 +167,24 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
       zoomControl: true,
       maxBounds: [[-85, -180], [85, 180]], // Limit map bounds
       maxBoundsViscosity: 1.0,
-      preferCanvas: true, // Better performance
+      preferCanvas: true, // Better performance with Canvas renderer
       worldCopyJump: false,
+      renderer: L.canvas({ // Use Canvas renderer for better performance
+        padding: 0.5,
+        pane: 'overlayPane'
+      })
     });
 
-    // Add tile layer with better performance settings
+    // Add tile layer with aggressive caching
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 18,
-      keepBuffer: 2,
+      keepBuffer: 4, // Increased buffer for smoother panning
       updateWhenZooming: false,
       updateWhenIdle: true,
+      crossOrigin: true,
+      // Enable browser caching
+      detectRetina: true,
     }).addTo(leafletMap);
 
     setMap(leafletMap);
@@ -128,7 +192,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     return () => {
       leafletMap.remove();
     };
-  }, []);
+  }, [isInteractive]);
 
   // Dynamic styling based on zoom level
   const getZipStyle = (feature: any, zoom: number) => {
@@ -138,16 +202,16 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     
     return {
       fillColor,
-      weight: zoom > 10 ? 1 : zoom > 8 ? 0.5 : 0.2,
+      weight: zoom > 10 ? 1 : zoom > 8 ? 0.5 : 0.1,
       color: zoom > 10 ? '#ffffff' : zoom > 8 ? '#ffffff' : 'transparent',
-      fillOpacity: 0.7,
-      opacity: zoom > 8 ? 0.8 : 0.3,
+      fillOpacity: 0.8,
+      opacity: zoom > 8 ? 0.8 : 0.2,
     };
   };
 
   // Load GeoJSON and add interactivity
   useEffect(() => {
-    if (!map || !colorScale) return;
+    if (!map || !colorScale || !isInteractive) return;
 
     const loadGeoJSON = async () => {
       try {
@@ -165,12 +229,12 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
             const zipCode = feature.properties?.ZCTA5CE10;
             if (zipCode && zipData[zipCode]) {
               const data = zipData[zipCode];
-              const city = citiesData[zipCode] || data.city || 'Unknown';
+              const cityData = citiesData[zipCode] || {};
               
               // Add hover effect
               layer.on({
                 mouseover: (e) => {
-                  const target = e.target;
+                  const target = e.target as L.Path;
                   const currentZoom = map.getZoom();
                   target.setStyle({
                     weight: currentZoom > 8 ? 3 : 2,
@@ -188,7 +252,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
                     .setContent(`
                       <div class="p-2 bg-white rounded shadow-lg border">
                         <div class="font-semibold text-sm">${zipCode}</div>
-                        <div class="text-xs text-gray-600">${city}</div>
+                        <div class="text-xs text-gray-600">${cityData.city || 'Unknown'}</div>
                         <div class="text-xs mt-1">${getMetricDisplay(data, selectedMetric)}</div>
                       </div>
                     `)
@@ -196,7 +260,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
                 },
                 mouseout: (e) => {
                   const target = e.target as L.Path;
-                  layer.setStyle(getZipStyle(feature, map.getZoom()));
+                  target.setStyle(getZipStyle(feature, map.getZoom()));
                   map.closePopup();
                 },
                 click: () => {
@@ -204,7 +268,11 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
                     const enhancedData = {
                       ...zipData[zipCode],
                       zipCode,
-                      city: citiesData[zipCode] || zipData[zipCode].city || 'Unknown',
+                      city: cityData.city || zipData[zipCode].city || 'Unknown',
+                      county: cityData.county,
+                      latitude: cityData.latitude,
+                      longitude: cityData.longitude,
+                      parent_metro: zipData[zipCode].parent_metro,
                     };
                     onZipSelect(enhancedData);
                   }
@@ -214,16 +282,15 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
           },
         });
 
-        // Add zoom event listener for dynamic styling - Fix TypeScript error
+        // Add zoom event listener for dynamic styling
         map.on('zoomend', () => {
           const zoom = map.getZoom();
           layer.eachLayer((leafletLayer) => {
-            // Type guard to ensure the layer has setStyle method
-            if ('setStyle' in leafletLayer && typeof leafletLayer.setStyle === 'function') {
-              const pathLayer = leafletLayer as L.Path;
-              const feature = (pathLayer as any).feature;
-              if (feature) {
-                pathLayer.setStyle(getZipStyle(feature, zoom));
+            // Type guard to check if layer is a Path with setStyle method
+            if (leafletLayer instanceof L.Path) {
+              const pathLayer = leafletLayer as L.Path & { feature?: any };
+              if (pathLayer.feature) {
+                pathLayer.setStyle(getZipStyle(pathLayer.feature, zoom));
               }
             }
           });
@@ -237,11 +304,11 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     };
 
     loadGeoJSON();
-  }, [map, zipData, citiesData, selectedMetric, onZipSelect, colorScale]);
+  }, [map, zipData, citiesData, selectedMetric, onZipSelect, colorScale, isInteractive]);
 
   // Handle search with zoom functionality
   useEffect(() => {
-    if (!map || !geojsonLayer || !searchZip) return;
+    if (!map || !geojsonLayer || !searchZip || !isInteractive) return;
 
     let found = false;
     geojsonLayer.eachLayer((layer: any) => {
@@ -249,28 +316,36 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
       if (zipCode === searchZip) {
         found = true;
         const bounds = layer.getBounds();
-        map.fitBounds(bounds, { maxZoom: 10 });
+        map.fitBounds(bounds, { maxZoom: 10, padding: [20, 20] });
         
         // Highlight the searched ZIP
-        layer.setStyle({
-          color: '#ef4444',
-          weight: 3,
-          fillOpacity: 0.8,
-        });
-        
-        // Reset style after 3 seconds
-        setTimeout(() => {
-          layer.setStyle(getZipStyle(layer.feature, map.getZoom()));
-        }, 3000);
+        if (layer instanceof L.Path) {
+          layer.setStyle({
+            color: '#ef4444',
+            weight: 3,
+            fillOpacity: 0.8,
+          });
+          
+          // Reset style after 3 seconds
+          setTimeout(() => {
+            if (layer instanceof L.Path) {
+              layer.setStyle(getZipStyle(layer.feature, map.getZoom()));
+            }
+          }, 3000);
+        }
 
         // Show popup for searched ZIP
         if (zipData[zipCode]) {
           const data = zipData[zipCode];
-          const city = citiesData[zipCode] || data.city || 'Unknown';
+          const cityData = citiesData[zipCode] || {};
           const enhancedData = {
             ...data,
             zipCode,
-            city,
+            city: cityData.city || data.city || 'Unknown',
+            county: cityData.county,
+            latitude: cityData.latitude,
+            longitude: cityData.longitude,
+            parent_metro: data.parent_metro,
           };
           onZipSelect(enhancedData);
         }
@@ -280,7 +355,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     if (!found) {
       console.log(`ZIP code ${searchZip} not found in map data`);
     }
-  }, [map, geojsonLayer, searchZip, zipData, citiesData, onZipSelect]);
+  }, [map, geojsonLayer, searchZip, zipData, citiesData, onZipSelect, isInteractive]);
 
   const getMetricValue = (data: any, metric: string): number => {
     switch (metric) {
