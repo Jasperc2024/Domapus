@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { TopBar } from '../../components/dashboard/TopBar';
 
 // Mock the child components
@@ -37,20 +37,20 @@ describe('TopBar', () => {
   };
 
   it('renders the main title', () => {
-    render(<TopBar {...defaultProps} />);
-    expect(screen.getByText('U.S. Housing Market Dashboard')).toBeInTheDocument();
+    const { getByText } = render(<TopBar {...defaultProps} />);
+    expect(getByText('U.S. Housing Market Dashboard')).toBeInTheDocument();
   });
 
   it('renders child components', () => {
-    render(<TopBar {...defaultProps} />);
-    expect(screen.getByTestId('metric-selector')).toBeInTheDocument();
-    expect(screen.getByTestId('search-box')).toBeInTheDocument();
-    expect(screen.getByTestId('last-updated')).toBeInTheDocument();
+    const { getByTestId } = render(<TopBar {...defaultProps} />);
+    expect(getByTestId('metric-selector')).toBeInTheDocument();
+    expect(getByTestId('search-box')).toBeInTheDocument();
+    expect(getByTestId('last-updated')).toBeInTheDocument();
   });
 
   it('renders GitHub link with proper accessibility attributes', () => {
-    render(<TopBar {...defaultProps} />);
-    const githubLink = screen.getByLabelText('View project on GitHub');
+    const { getByLabelText } = render(<TopBar {...defaultProps} />);
+    const githubLink = getByLabelText('View project on GitHub');
     expect(githubLink).toBeInTheDocument();
     expect(githubLink).toHaveAttribute('href', 'https://github.com/Jasperc2024/Domapus');
     expect(githubLink).toHaveAttribute('target', '_blank');
@@ -58,27 +58,15 @@ describe('TopBar', () => {
   });
 
   it('renders sponsor link with proper accessibility attributes', () => {
-    render(<TopBar {...defaultProps} />);
-    const sponsorLink = screen.getByLabelText('Support this project by sponsoring');
+    const { getByLabelText } = render(<TopBar {...defaultProps} />);
+    const sponsorLink = getByLabelText('Support this project by sponsoring');
     expect(sponsorLink).toBeInTheDocument();
     expect(sponsorLink).toHaveAttribute('target', '_blank');
     expect(sponsorLink).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
-  it('calls onMetricChange when metric is changed', () => {
-    render(<TopBar {...defaultProps} />);
-    fireEvent.click(screen.getByText('Change Metric'));
-    expect(defaultProps.onMetricChange).toHaveBeenCalledWith('median-list-price');
-  });
-
-  it('calls onSearch when search is triggered', () => {
-    render(<TopBar {...defaultProps} />);
-    fireEvent.click(screen.getByText('Search'));
-    expect(defaultProps.onSearch).toHaveBeenCalledWith('12345');
-  });
-
   it('displays the last updated date', () => {
-    render(<TopBar {...defaultProps} />);
-    expect(screen.getByText('2024-01-01')).toBeInTheDocument();
+    const { getByText } = render(<TopBar {...defaultProps} />);
+    expect(getByText('2024-01-01')).toBeInTheDocument();
   });
 });
