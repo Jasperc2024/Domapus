@@ -1,5 +1,5 @@
 
-import { X, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, MapPin, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,10 @@ interface ZipData {
   zipCode: string;
   state: string;
   city?: string;
+  county?: string;
+  latitude?: number;
+  longitude?: number;
+  parent_metro?: string;
   // Current values
   median_sale_price?: number;
   median_list_price?: number;
@@ -78,6 +82,8 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
       case 'ratio':
         const ratioPercent = numValue * 100;
         return ratioPercent % 1 === 0 ? `${ratioPercent.toFixed(0)}%` : `${ratioPercent.toFixed(1)}%`;
+      case 'coordinate':
+        return numValue.toFixed(4);
       default:
         return numValue % 1 === 0 ? numValue.toFixed(0) : numValue.toString();
     }
@@ -89,7 +95,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
     const isPositive = numValue > 0;
     const isZero = numValue === 0;
     return {
-      formatted: `${isPositive ? '+' : ''}${numValue.toFixed(1)}%`,
+      formatted: `${isPositive ? '+' : ''}${numValue % 1 === 0 ? numValue.toFixed(0) : numValue.toFixed(1)}%`,
       isPositive,
       isZero
     };
@@ -209,7 +215,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
       yoyKey: null,
       value: zipData.price_drops
     }
-  ].filter(metric => metric.value !== null && metric.value !== undefined);
+  ].filter(metric => metric.value !== null && metric.value !== undefined && metric.value !== 0);
 
   return (
     <div 
@@ -263,6 +269,54 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
                 <Badge variant="outline" className="text-lg px-3 py-1">
                   {zipData.zipCode}
                 </Badge>
+              </div>
+
+              {/* Location Metadata */}
+              <Card className="border-dashboard-border mb-4">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center">
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Location Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {zipData.city && (
+                    <div className="flex justify-between">
+                      <span className="text-dashboard-text-secondary">City:</span>
+                      <span className="font-medium">{zipData.city}</span>
+                    </div>
+                  )}
+                  {zipData.county && (
+                    <div className="flex justify-between">
+                      <span className="text-dashboard-text-secondary">County:</span>
+                      <span className="font-medium">{zipData.county}</span>
+                    </div>
+                  )}
+                  {zipData.parent_metro && (
+                    <div className="flex justify-between">
+                      <span className="text-dashboard-text-secondary">Metro Area:</span>
+                      <span className="font-medium">{zipData.parent_metro}</span>
+                    </div>
+                  )}
+                  {zipData.latitude && zipData.longitude && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-dashboard-text-secondary">Latitude:</span>
+                        <span className="font-medium">{formatValue(zipData.latitude, 'coordinate')}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-dashboard-text-secondary">Longitude:</span>
+                        <span className="font-medium">{formatValue(zipData.longitude, 'coordinate')}</span>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Market Data Header */}
+              <div className="flex items-center mb-3">
+                <Building className="h-4 w-4 mr-2" />
+                <h3 className="text-sm font-medium text-dashboard-text-primary">Market Data</h3>
               </div>
 
               {/* All Available Metrics */}
