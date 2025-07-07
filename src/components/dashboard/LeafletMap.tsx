@@ -167,7 +167,10 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
           // Reset style after 3 seconds
           setTimeout(() => {
             if (layer instanceof L.Path && colorScale) {
-              layer.setStyle(getZipStyle(layer.feature, map.getZoom(), colorScale, zipData, selectedMetric));
+              const pathLayer = layer as L.Path & { feature?: any };
+              if (pathLayer.feature) {
+                pathLayer.setStyle(getZipStyle(pathLayer.feature, map.getZoom(), colorScale, zipData, selectedMetric));
+              }
             }
           }, 3000);
         }
