@@ -1,8 +1,8 @@
+
 import { X, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MapExport } from "../MapExport";
 import { ZipComparison } from "./ZipComparison";
 import { useState } from "react";
@@ -26,16 +26,20 @@ interface ZipData {
   pending_sales?: number;
   months_of_supply?: number;
   price_drops?: number;
-  // YoY percentage changes
-  median_sale_price_yoy_pct?: number;
-  median_list_price_yoy_pct?: number;
-  median_dom_yoy_pct?: number;
-  inventory_yoy_pct?: number;
-  new_listings_yoy_pct?: number;
-  homes_sold_yoy_pct?: number;
-  avg_sale_to_list_yoy_pct?: number;
-  sold_above_list_yoy_pct?: number;
-  off_market_in_two_weeks_yoy_pct?: number;
+  // Monthly changes
+  median_sale_price_mom?: number;
+  median_list_price_mom?: number;
+  median_dom_mom?: number;
+  inventory_mom?: number;
+  new_listings_mom?: number;
+  homes_sold_mom?: number;
+  // YoY changes
+  median_sale_price_yoy?: number;
+  median_list_price_yoy?: number;
+  median_dom_yoy?: number;
+  inventory_yoy?: number;
+  new_listings_yoy?: number;
+  homes_sold_yoy?: number;
   // Legacy fields for backward compatibility
   medianSalePrice?: number;
   medianListPrice?: number;
@@ -62,27 +66,32 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
   const formatValue = (value: any, type: string): string => {
     if (value === null || value === undefined) return 'N/A';
     
+    const numValue = Number(value);
     switch (type) {
       case 'price':
-        return `$${Number(value).toLocaleString()}`;
+        return `$${numValue.toLocaleString()}`;
       case 'days':
-        return `${value} days`;
+        return `${numValue} days`;
       case 'percentage':
-        return `${Number(value).toFixed(1)}%`;
+        // Display as integer if it's a whole number
+        return numValue % 1 === 0 ? `${numValue.toFixed(0)}%` : `${numValue.toFixed(1)}%`;
       case 'ratio':
-        return `${(Number(value) * 100).toFixed(1)}%`;
+        const ratioPercent = numValue * 100;
+        return ratioPercent % 1 === 0 ? `${ratioPercent.toFixed(0)}%` : `${ratioPercent.toFixed(1)}%`;
       default:
-        return value.toString();
+        return numValue % 1 === 0 ? numValue.toFixed(0) : numValue.toString();
     }
   };
 
-  const formatYoYChange = (value: any): { formatted: string; isPositive: boolean } => {
-    if (value === null || value === undefined) return { formatted: 'N/A', isPositive: false };
+  const formatChange = (value: any): { formatted: string; isPositive: boolean; isZero: boolean } => {
+    if (value === null || value === undefined) return { formatted: 'N/A', isPositive: false, isZero: true };
     const numValue = Number(value);
-    const isPositive = numValue >= 0;
+    const isPositive = numValue > 0;
+    const isZero = numValue === 0;
     return {
       formatted: `${isPositive ? '+' : ''}${numValue.toFixed(1)}%`,
-      isPositive
+      isPositive,
+      isZero
     };
   };
 
@@ -92,69 +101,79 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
       key: 'median_sale_price', 
       label: 'Median Sale Price', 
       type: 'price', 
-      yoyKey: 'median_sale_price_yoy_pct',
+      momKey: 'median_sale_price_mom',
+      yoyKey: 'median_sale_price_yoy',
       value: zipData.median_sale_price || zipData.medianSalePrice
     },
     { 
       key: 'median_list_price', 
       label: 'Median List Price', 
       type: 'price', 
-      yoyKey: 'median_list_price_yoy_pct',
+      momKey: 'median_list_price_mom',
+      yoyKey: 'median_list_price_yoy',
       value: zipData.median_list_price || zipData.medianListPrice
     },
     { 
       key: 'median_dom', 
       label: 'Median Days on Market', 
       type: 'days', 
-      yoyKey: 'median_dom_yoy_pct',
+      momKey: 'median_dom_mom',
+      yoyKey: 'median_dom_yoy',
       value: zipData.median_dom || zipData.medianDOM
     },
     { 
       key: 'inventory', 
       label: 'Inventory', 
       type: 'number', 
-      yoyKey: 'inventory_yoy_pct',
+      momKey: 'inventory_mom',
+      yoyKey: 'inventory_yoy',
       value: zipData.inventory
     },
     { 
       key: 'new_listings', 
       label: 'New Listings', 
       type: 'number', 
-      yoyKey: 'new_listings_yoy_pct',
+      momKey: 'new_listings_mom',
+      yoyKey: 'new_listings_yoy',
       value: zipData.new_listings
     },
     { 
       key: 'homes_sold', 
       label: 'Homes Sold', 
       type: 'number', 
-      yoyKey: 'homes_sold_yoy_pct',
+      momKey: 'homes_sold_mom',
+      yoyKey: 'homes_sold_yoy',
       value: zipData.homes_sold || zipData.homesSold
     },
     { 
       key: 'avg_sale_to_list_ratio', 
       label: 'Sale-to-List Ratio', 
       type: 'ratio', 
-      yoyKey: 'avg_sale_to_list_yoy_pct',
+      momKey: null,
+      yoyKey: null,
       value: zipData.avg_sale_to_list_ratio || zipData.saleToListRatio
     },
     { 
       key: 'sold_above_list', 
       label: '% Sold Above List', 
       type: 'percentage', 
-      yoyKey: 'sold_above_list_yoy_pct',
+      momKey: null,
+      yoyKey: null,
       value: zipData.sold_above_list || zipData.homesSoldAboveList
     },
     { 
       key: 'off_market_in_two_weeks', 
       label: '% Off Market in 2 Weeks', 
       type: 'percentage', 
-      yoyKey: 'off_market_in_two_weeks_yoy_pct',
+      momKey: null,
+      yoyKey: null,
       value: zipData.off_market_in_two_weeks || zipData.offMarket2Weeks
     },
     { 
       key: 'median_ppsf', 
       label: 'Median Price per Sq Ft', 
       type: 'price', 
+      momKey: null,
       yoyKey: null,
       value: zipData.median_ppsf
     },
@@ -162,6 +181,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
       key: 'median_list_ppsf', 
       label: 'Median List Price per Sq Ft', 
       type: 'price', 
+      momKey: null,
       yoyKey: null,
       value: zipData.median_list_ppsf
     },
@@ -169,6 +189,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
       key: 'pending_sales', 
       label: 'Pending Sales', 
       type: 'number', 
+      momKey: null,
       yoyKey: null,
       value: zipData.pending_sales
     },
@@ -176,6 +197,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
       key: 'months_of_supply', 
       label: 'Months of Supply', 
       type: 'number', 
+      momKey: null,
       yoyKey: null,
       value: zipData.months_of_supply
     },
@@ -183,6 +205,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
       key: 'price_drops', 
       label: 'Price Drops', 
       type: 'number', 
+      momKey: null,
       yoyKey: null,
       value: zipData.price_drops
     }
@@ -202,7 +225,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
               ZIP Code Details
             </h2>
             <p className="text-sm text-dashboard-text-secondary">
-              {zipData.zipCode}, {zipData.state}
+              {zipData.zipCode}
             </p>
             {zipData.city && (
               <p className="text-xs text-dashboard-text-secondary">
@@ -234,104 +257,62 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
               />
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto">
-              <Tabs defaultValue="metrics" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mx-4 mt-4">
-                  <TabsTrigger value="metrics">Current Data</TabsTrigger>
-                  <TabsTrigger value="trends">YoY Trends</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="metrics" className="p-4 space-y-3">
-                  {/* Location Badge */}
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Badge variant="outline" className="text-lg px-3 py-1">
-                      {zipData.zipCode}
-                    </Badge>
-                    <span className="text-dashboard-text-secondary">{zipData.state}</span>
-                  </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {/* Location Badge */}
+              <div className="flex items-center space-x-2 mb-4">
+                <Badge variant="outline" className="text-lg px-3 py-1">
+                  {zipData.zipCode}
+                </Badge>
+              </div>
 
-                  {/* All Available Metrics */}
-                  <div className="space-y-3">
-                    {allMetrics.map((metric, index) => (
-                      <Card key={index} className="border-dashboard-border">
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <p className="text-sm text-dashboard-text-secondary font-medium">
-                                {metric.label}
-                              </p>
-                              <p className="text-xl font-bold text-dashboard-text-primary mt-1">
-                                {formatValue(metric.value, metric.type)}
-                              </p>
-                            </div>
-                            {metric.yoyKey && zipData[metric.yoyKey as keyof ZipData] && (
-                              <div className="flex flex-col items-end">
-                                {(() => {
-                                  const yoyChange = formatYoYChange(zipData[metric.yoyKey as keyof ZipData]);
-                                  return (
-                                    <>
-                                      <Badge 
-                                        variant={yoyChange.isPositive ? 'default' : 'destructive'}
-                                        className="text-xs flex items-center space-x-1"
-                                      >
-                                        {yoyChange.isPositive ? 
-                                          <TrendingUp className="h-3 w-3" /> : 
-                                          <TrendingDown className="h-3 w-3" />
-                                        }
-                                        <span>{yoyChange.formatted}</span>
-                                      </Badge>
-                                      <span className="text-xs text-dashboard-text-secondary mt-1">vs last year</span>
-                                    </>
-                                  );
-                                })()}
-                              </div>
+              {/* All Available Metrics */}
+              <div className="space-y-3">
+                {allMetrics.map((metric, index) => {
+                  const momChange = metric.momKey ? formatChange(zipData[metric.momKey as keyof ZipData]) : null;
+                  const yoyChange = metric.yoyKey ? formatChange(zipData[metric.yoyKey as keyof ZipData]) : null;
+                  
+                  return (
+                    <Card key={index} className="border-dashboard-border">
+                      <CardContent className="p-4">
+                        <div className="space-y-2">
+                          <p className="text-sm text-dashboard-text-secondary font-medium">
+                            {metric.label}
+                          </p>
+                          <p className="text-xl font-bold text-dashboard-text-primary">
+                            {formatValue(metric.value, metric.type)}
+                          </p>
+                          
+                          {/* Changes */}
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            {momChange && !momChange.isZero && (
+                              <span className={`flex items-center ${
+                                momChange.isPositive ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {momChange.isPositive ? 
+                                  <TrendingUp className="h-3 w-3 mr-1" /> : 
+                                  <TrendingDown className="h-3 w-3 mr-1" />
+                                }
+                                {momChange.formatted} vs last month
+                              </span>
+                            )}
+                            {yoyChange && !yoyChange.isZero && (
+                              <span className={`flex items-center ${
+                                yoyChange.isPositive ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {yoyChange.isPositive ? 
+                                  <TrendingUp className="h-3 w-3 mr-1" /> : 
+                                  <TrendingDown className="h-3 w-3 mr-1" />
+                                }
+                                {yoyChange.formatted} vs last year
+                              </span>
                             )}
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="trends" className="p-4 space-y-3">
-                  {/* YoY Trends */}
-                  <div className="space-y-3">
-                    {allMetrics.filter(m => m.yoyKey && zipData[m.yoyKey as keyof ZipData]).map((metric, index) => {
-                      const yoyChange = formatYoYChange(zipData[metric.yoyKey as keyof ZipData]);
-                      return (
-                        <Card key={index} className="border-dashboard-border">
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <p className="text-sm text-dashboard-text-secondary font-medium">
-                                  {metric.label}
-                                </p>
-                                <p className="text-lg font-bold text-dashboard-text-primary mt-1">
-                                  {formatValue(metric.value, metric.type)}
-                                </p>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                {yoyChange.isPositive ? 
-                                  <TrendingUp className="h-5 w-5 text-green-500" /> : 
-                                  <TrendingDown className="h-5 w-5 text-red-500" />
-                                }
-                                <div className="text-right">
-                                  <div className={`text-lg font-bold ${yoyChange.isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                                    {yoyChange.formatted}
-                                  </div>
-                                  <div className="text-xs text-dashboard-text-secondary">
-                                    YoY Change
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </TabsContent>
-              </Tabs>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
           )}
 

@@ -1,9 +1,10 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, X, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 interface ZipData {
   zipCode: string;
@@ -91,17 +92,19 @@ export function ZipComparison({ currentZip, onClose }: ZipComparisonProps) {
   const formatValue = (value: any, type: string): string => {
     if (value === null || value === undefined) return 'N/A';
     
+    const numValue = Number(value);
     switch (type) {
       case 'price':
-        return `$${Number(value).toLocaleString()}`;
+        return `$${numValue.toLocaleString()}`;
       case 'days':
-        return `${value} days`;
+        return `${numValue} days`;
       case 'percentage':
-        return `${Number(value).toFixed(1)}%`;
+        return numValue % 1 === 0 ? `${numValue.toFixed(0)}%` : `${numValue.toFixed(1)}%`;
       case 'ratio':
-        return `${(Number(value) * 100).toFixed(1)}%`;
+        const ratioPercent = numValue * 100;
+        return ratioPercent % 1 === 0 ? `${ratioPercent.toFixed(0)}%` : `${ratioPercent.toFixed(1)}%`;
       default:
-        return value.toString();
+        return numValue % 1 === 0 ? numValue.toFixed(0) : numValue.toString();
     }
   };
 
@@ -110,17 +113,6 @@ export function ZipComparison({ currentZip, onClose }: ZipComparisonProps) {
     const diff = Number(current) - Number(compare);
     if (Math.abs(diff) < 0.01) return 'same';
     return diff > 0 ? 'higher' : 'lower';
-  };
-
-  const ComparisonIcon = ({ comparison }: { comparison: 'higher' | 'lower' | 'same' }) => {
-    switch (comparison) {
-      case 'higher':
-        return <TrendingUp className="h-4 w-4 text-green-500" />;
-      case 'lower':
-        return <TrendingDown className="h-4 w-4 text-red-500" />;
-      default:
-        return <Minus className="h-4 w-4 text-muted-foreground" />;
-    }
   };
 
   const metrics = [
@@ -175,18 +167,18 @@ export function ZipComparison({ currentZip, onClose }: ZipComparisonProps) {
                 {currentZip.zipCode}
               </Badge>
               <div className="text-xs text-dashboard-text-secondary">
-                {currentZip.city}, {currentZip.state}
+                {currentZip.city}
               </div>
             </div>
             <div className="text-center text-xs text-dashboard-text-secondary">
-              Comparison
+              vs
             </div>
             <div className="text-center">
               <Badge variant="outline" className="mb-1">
                 {compareZip.zipCode}
               </Badge>
               <div className="text-xs text-dashboard-text-secondary">
-                {compareZip.city}, {compareZip.state}
+                {compareZip.city}
               </div>
             </div>
           </div>
@@ -201,22 +193,27 @@ export function ZipComparison({ currentZip, onClose }: ZipComparisonProps) {
               return (
                 <Card key={metric.key} className="border-dashboard-border">
                   <CardContent className="p-3">
-                    <div className="grid grid-cols-3 gap-2 items-center">
-                      <div className="text-right">
-                        <div className="font-medium text-sm">
+                    <div className="text-center mb-2">
+                      <span className="text-xs text-dashboard-text-secondary font-medium">
+                        {metric.label}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center">
+                        <div className={`font-medium text-sm ${
+                          comparison === 'higher' ? 'text-green-600' : 
+                          comparison === 'lower' ? 'text-red-600' : 
+                          'text-dashboard-text-primary'
+                        }`}>
                           {formatValue(currentValue, metric.type)}
                         </div>
                       </div>
                       <div className="text-center">
-                        <div className="flex items-center justify-center space-x-2">
-                          <ComparisonIcon comparison={comparison} />
-                          <span className="text-xs text-dashboard-text-secondary">
-                            {metric.label}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-left">
-                        <div className="font-medium text-sm">
+                        <div className={`font-medium text-sm ${
+                          comparison === 'lower' ? 'text-green-600' : 
+                          comparison === 'higher' ? 'text-red-600' : 
+                          'text-dashboard-text-primary'
+                        }`}>
                           {formatValue(compareValue, metric.type)}
                         </div>
                       </div>

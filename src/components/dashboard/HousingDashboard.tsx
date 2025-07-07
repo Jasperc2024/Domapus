@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
@@ -69,7 +70,6 @@ export function HousingDashboard() {
 
   const handleSearch = (zipCode: string) => {
     setSearchZip(zipCode);
-    // In a real implementation, this would zoom the map to the ZIP code
   };
 
   const closeSidebar = () => {
@@ -104,14 +104,14 @@ export function HousingDashboard() {
           />
         </Suspense>
 
-        {/* Map and Legend Container */}
+        {/* Map Container - Full size with proper positioning */}
         <div 
           className={`flex-1 relative transition-all duration-300 ${
             sidebarOpen ? (sidebarCollapsed ? 'ml-16' : 'ml-96') : 'ml-0'
           }`}
         >
-          {/* Map View */}
-          <div className="absolute inset-4 bottom-4">
+          {/* Map View - Full container */}
+          <div className="absolute inset-0">
             <LeafletMap
               selectedMetric={selectedMetric}
               onZipSelect={handleZipSelect}
@@ -119,13 +119,13 @@ export function HousingDashboard() {
             />
           </div>
 
-          {/* Legend - Bottom Right */}
-          <div className="absolute bottom-8 right-4 w-72">
+          {/* Legend - Bottom Right with proper z-index */}
+          <div className="absolute bottom-4 right-4 w-72 z-[1000] pointer-events-auto">
             <Legend selectedMetric={selectedMetric} />
           </div>
 
-          {/* Status Indicators */}
-          <div className="absolute top-4 right-4 flex flex-col space-y-2">
+          {/* Status Indicators - Top Right with proper z-index */}
+          <div className="absolute top-4 right-4 flex flex-col space-y-2 z-[1000] pointer-events-auto">
             {searchZip && (
               <div className="bg-primary text-primary-foreground px-3 py-2 rounded-lg shadow-lg text-sm">
                 Searching for: {searchZip}
@@ -133,17 +133,18 @@ export function HousingDashboard() {
             )}
             {selectedZip && (
               <div className="bg-accent text-accent-foreground px-3 py-2 rounded-lg shadow-lg text-sm">
-                Selected: {selectedZip.zipCode}, {selectedZip.state}
+                Selected: {selectedZip.zipCode}
               </div>
             )}
           </div>
         </div>
       </div>
 
-
-      {/* Sponsor Banner */}
+      {/* Sponsor Banner with high z-index */}
       {showSponsorBanner && (
-        <SponsorBanner onClose={() => setShowSponsorBanner(false)} />
+        <div className="z-[2000]">
+          <SponsorBanner onClose={() => setShowSponsorBanner(false)} />
+        </div>
       )}
     </div>
   );
