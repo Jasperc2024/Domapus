@@ -113,48 +113,9 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     setColorScale(() => scale);
   }, [zipData, selectedMetric]);
 
-  // Initialize map with static background first
+  // Initialize map
   useEffect(() => {
     if (!mapRef.current) return;
-
-    // Show static map image initially
-    if (!isInteractive) {
-      mapRef.current.innerHTML = `
-        <div style="
-          width: 100%; 
-          height: 100%; 
-          background: url('https://tiles.stadiamaps.com/tiles/stamen_toner_lite/4/7/5.png') center/cover;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          position: relative;
-        ">
-          <div style="
-            background: rgba(255,255,255,0.9);
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-          ">
-            <div style="font-size: 18px; font-weight: bold; margin-bottom: 8px;">Interactive Map</div>
-            <div style="color: #666;">Click to activate</div>
-          </div>
-        </div>
-      `;
-      
-      const clickHandler = () => {
-        setIsInteractive(true);
-      };
-      
-      mapRef.current.addEventListener('click', clickHandler);
-      
-      return () => {
-        if (mapRef.current) {
-          mapRef.current.removeEventListener('click', clickHandler);
-        }
-      };
-    }
 
     // Initialize interactive map
     const leafletMap = L.map(mapRef.current, {
