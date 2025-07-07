@@ -1,11 +1,26 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricType, METRICS } from "./MetricSelector";
+import { useEffect, useState } from "react";
 
 interface LegendProps {
   selectedMetric: MetricType;
 }
 
 export function Legend({ selectedMetric }: LegendProps) {
+  const [zipCount, setZipCount] = useState<number>(0);
+
+  useEffect(() => {
+    // Load ZIP data to get actual count
+    fetch('data/zip_data.json')
+      .then(response => response.json())
+      .then(data => {
+        setZipCount(Object.keys(data).length);
+      })
+      .catch(() => {
+        setZipCount(3247); // Fallback to default
+      });
+  }, []);
+
   // Mock data ranges for different metrics
   const getMetricRange = (metric: MetricType) => {
     switch (metric) {
@@ -45,7 +60,9 @@ export function Legend({ selectedMetric }: LegendProps) {
         <div className="space-y-3">
           {/* Color Scale */}
           <div className="relative">
-            <div className="h-4 rounded-lg bg-gradient-to-r from-data-low via-data-medium-low via-data-medium via-data-medium-high to-data-high"></div>
+            <div className="h-4 rounded-lg" style={{
+              background: 'linear-gradient(to right, #497eaf, #5fa4ca, #b4d4ec, #ffecd4, #fac790, #e97000)'
+            }}></div>
             <div className="flex justify-between text-xs text-dashboard-text-secondary mt-1">
               <span>{range.min}</span>
               <span>{range.max}</span>
@@ -53,32 +70,36 @@ export function Legend({ selectedMetric }: LegendProps) {
           </div>
 
           {/* Legend Labels */}
-          <div className="grid grid-cols-5 gap-1 text-xs">
+          <div className="grid grid-cols-6 gap-1 text-xs">
             <div className="text-center">
-              <div className="w-3 h-3 bg-data-low rounded mx-auto mb-1"></div>
+              <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: '#497eaf' }}></div>
               <span className="text-dashboard-text-secondary">Low</span>
             </div>
             <div className="text-center">
-              <div className="w-3 h-3 bg-data-medium-low rounded mx-auto mb-1"></div>
-              <span className="text-dashboard-text-secondary">Med-Low</span>
+              <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: '#5fa4ca' }}></div>
+              <span className="text-dashboard-text-secondary">Low-Med</span>
             </div>
             <div className="text-center">
-              <div className="w-3 h-3 bg-data-medium rounded mx-auto mb-1"></div>
+              <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: '#b4d4ec' }}></div>
               <span className="text-dashboard-text-secondary">Medium</span>
             </div>
             <div className="text-center">
-              <div className="w-3 h-3 bg-data-medium-high rounded mx-auto mb-1"></div>
+              <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: '#ffecd4' }}></div>
               <span className="text-dashboard-text-secondary">Med-High</span>
             </div>
             <div className="text-center">
-              <div className="w-3 h-3 bg-data-high rounded mx-auto mb-1"></div>
+              <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: '#fac790' }}></div>
               <span className="text-dashboard-text-secondary">High</span>
+            </div>
+            <div className="text-center">
+              <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: '#e97000' }}></div>
+              <span className="text-dashboard-text-secondary">Highest</span>
             </div>
           </div>
 
           {/* Data Points Count */}
           <div className="text-xs text-dashboard-text-secondary text-center pt-2 border-t border-dashboard-border">
-            Showing 3,247 ZIP codes
+            Showing {zipCount.toLocaleString()} ZIP codes
           </div>
         </div>
       </CardContent>

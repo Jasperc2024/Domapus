@@ -34,12 +34,12 @@
     --dashboard-text-primary: 222.2 84% 4.9%;
     --dashboard-text-secondary: 215.4 16.3% 46.9%;
 
-    /* Data visualization colors */
-    --data-low: 239 84% 90%;
-    --data-medium-low: 239 84% 80%;
-    --data-medium: 239 84% 70%;
-    --data-medium-high: 239 84% 60%;
-    --data-high: 239 84% 50%;
+    /* Data visualization colors - Updated to match map */
+    --data-low: 210 40% 75%; /* #497eaf equivalent */
+    --data-medium-low: 199 45% 70%; /* #5fa4ca equivalent */
+    --data-medium: 214 60% 82%; /* #b4d4ec equivalent */
+    --data-medium-high: 48 100% 93%; /* #ffecd4 equivalent */
+    --data-high: 27 85% 60%; /* #e97000 equivalent */
 
     /* Map colors */
     --map-hover: 221.2 83.2% 53.3%;
@@ -85,12 +85,12 @@
     --dashboard-text-primary: 210 40% 98%;
     --dashboard-text-secondary: 215 20.2% 65.1%;
 
-    /* Data visualization dark colors */
-    --data-low: 239 30% 25%;
-    --data-medium-low: 239 40% 35%;
-    --data-medium: 239 60% 45%;
-    --data-medium-high: 239 70% 55%;
-    --data-high: 239 70% 60%;
+    /* Data visualization dark colors - Updated to match map */
+    --data-low: 210 30% 35%; /* Darker #497eaf equivalent */
+    --data-medium-low: 199 35% 40%; /* Darker #5fa4ca equivalent */
+    --data-medium: 214 40% 45%; /* Darker #b4d4ec equivalent */
+    --data-medium-high: 48 60% 50%; /* Darker #ffecd4 equivalent */
+    --data-high: 27 75% 40%; /* Darker #e97000 equivalent */
 
     /* Map dark colors */
     --map-hover: 217.2 91.2% 59.8%;
@@ -173,6 +173,16 @@
   
   .animate-slide-up {
     animation: slide-up 0.3s ease-out;
+  }
+  
+  .no-data-pattern {
+    background-image: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.3) 2px,
+      rgba(255, 255, 255, 0.3) 4px
+    );
   }
 }
 

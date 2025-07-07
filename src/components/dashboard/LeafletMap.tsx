@@ -27,10 +27,34 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
 
-    // Create D3 color scale with light green to dark blue
+    // Create D3 color scale with specified colors
     const scale = scaleLinear<string>()
       .domain([minValue, maxValue])
-      .range(['#d4edda', '#1e3a8a']); // Light green to dark blue
+      .range(['#497eaf', '#e97000']) // Blue to orange
+      .interpolate(() => (t) => {
+        const colors = ['#497eaf', '#5fa4ca', '#b4d4ec', '#ffecd4', '#fac790', '#e97000'];
+        const index = Math.floor(t * (colors.length - 1));
+        const nextIndex = Math.min(index + 1, colors.length - 1);
+        const localT = (t * (colors.length - 1)) - index;
+        
+        // Simple linear interpolation between two colors
+        const hex1 = colors[index];
+        const hex2 = colors[nextIndex];
+        
+        const r1 = parseInt(hex1.slice(1, 3), 16);
+        const g1 = parseInt(hex1.slice(3, 5), 16);
+        const b1 = parseInt(hex1.slice(5, 7), 16);
+        
+        const r2 = parseInt(hex2.slice(1, 3), 16);
+        const g2 = parseInt(hex2.slice(3, 5), 16);
+        const b2 = parseInt(hex2.slice(5, 7), 16);
+        
+        const r = Math.round(r1 + (r2 - r1) * localT);
+        const g = Math.round(g1 + (g2 - g1) * localT);
+        const b = Math.round(b1 + (b2 - b1) * localT);
+        
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+      });
 
     setColorScale(() => scale);
   }, [zipData, selectedMetric]);
@@ -52,6 +76,54 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     if (!map || !colorScale || !isInteractive) return;
 
     const loadGeoJSON = async () => {
+      // Load and add state boundaries first
+      try {
+        const stateResponse = await fetch('https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/us-states.geojson');
+        const stateData = await stateResponse.json();
+        
+        // Add state boundaries with labels
+        L.geoJSON(stateData, {
+          style: {
+            color: '#666666',
+            weight: 2,
+            fillOpacity: 0,
+            opacity: 0.8,
+            dashArray: '5,5'
+          },
+          onEachFeature: (feature, layer) => {
+            if (feature.properties?.NAME) {
+              // Add state labels at the center of each state
+              const geoLayer = layer as any;
+              if (geoLayer.getBounds) {
+                const bounds = geoLayer.getBounds();
+                const center = bounds.getCenter();
+              
+              L.marker(center, {
+                icon: L.divIcon({
+                  className: 'state-label',
+                  html: `<div style="
+                    background: rgba(255, 255, 255, 0.9);
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    color: #333;
+                    text-align: center;
+                    border: 1px solid #ccc;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                  ">${feature.properties.NAME}</div>`,
+                  iconSize: [80, 20],
+                  iconAnchor: [40, 10]
+                })
+              }).addTo(map);
+              }
+            }
+          }
+        }).addTo(map);
+      } catch (error) {
+        console.warn('Could not load state boundaries:', error);
+      }
+      // Load ZIP code boundaries
       try {
         const response = await fetch('data/us-zip-codes.geojson');
         const geojsonData = await response.json();

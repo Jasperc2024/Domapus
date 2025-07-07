@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
-import { MapView } from "./MapView";
 import { LeafletMap } from "./LeafletMap";
 import React, { Suspense } from "react";
 const Sidebar = React.lazy(() =>
@@ -12,7 +11,6 @@ import { Legend } from "./Legend";
 import { LastUpdated } from "./LastUpdated";
 
 import { TopBar } from "./TopBar";
-import { SponsorBanner } from "./SponsorBanner";
 
 interface ZipData {
   zipCode: string;
@@ -34,15 +32,9 @@ export function HousingDashboard() {
   const [searchZip, setSearchZip] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showSponsorBanner, setShowSponsorBanner] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
   useEffect(() => {
-    // Show sponsor banner after 10 seconds
-    const timer = setTimeout(() => {
-      setShowSponsorBanner(true);
-    }, 10000);
-
     // Load real data and get last updated date
     fetch(import.meta.env.BASE_URL + 'data/zip_data.json')
       .then(response => response.json())
@@ -58,8 +50,6 @@ export function HousingDashboard() {
         // Fallback to default date if file doesn't exist yet
         setLastUpdated("2025-07-01");
       });
-
-    return () => clearTimeout(timer);
   }, []);
 
   const handleZipSelect = (zipData: ZipData) => {
@@ -139,13 +129,6 @@ export function HousingDashboard() {
           </div>
         </div>
       </div>
-
-      {/* Sponsor Banner with high z-index */}
-      {showSponsorBanner && (
-        <div className="z-[2000]">
-          <SponsorBanner onClose={() => setShowSponsorBanner(false)} />
-        </div>
-      )}
     </div>
   );
 }
