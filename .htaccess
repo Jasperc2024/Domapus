@@ -1,0 +1,35 @@
+# Enable compression for GitHub Pages
+<IfModule mod_mime.c>
+  AddType application/javascript .js.gz
+  AddType text/css .css.gz
+  AddType application/json .json.gz
+  AddType image/svg+xml .svg.gz
+  AddType text/html .html.gz
+</IfModule>
+
+<IfModule mod_headers.c>
+  # Serve gzip compressed files
+  <FilesMatch "\.(js|css|json|svg|html)\.gz$">
+    Header set Content-Encoding gzip
+  </FilesMatch>
+  
+  # Serve brotli compressed files
+  <FilesMatch "\.(js|css|json|svg|html)\.br$">
+    Header set Content-Encoding br
+  </FilesMatch>
+</IfModule>
+
+# Rewrite rules for compressed files
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  
+  # Check for brotli support and serve .br files
+  RewriteCond %{HTTP:Accept-Encoding} br
+  RewriteCond %{REQUEST_FILENAME}\.br -f
+  RewriteRule ^(.*)$ $1.br [L]
+  
+  # Check for gzip support and serve .gz files
+  RewriteCond %{HTTP:Accept-Encoding} gzip
+  RewriteCond %{REQUEST_FILENAME}\.gz -f
+  RewriteRule ^(.*)$ $1.gz [L]
+</IfModule>
