@@ -1,0 +1,44 @@
+
+import L from 'leaflet';
+
+// Fix for default markers in Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+export const createMap = (container: HTMLElement): L.Map => {
+  const leafletMap = L.map(container, {
+    center: [39.8283, -98.5795], // More zoomed in default center
+    zoom: 5, // More zoomed in default zoom
+    minZoom: 3,
+    maxZoom: 12,
+    scrollWheelZoom: true,
+    dragging: true,
+    zoomControl: true,
+    maxBounds: [[-85, -180], [85, 180]],
+    maxBoundsViscosity: 1.0,
+    preferCanvas: true,
+    worldCopyJump: false,
+    renderer: L.canvas({
+      padding: 0.5,
+      pane: 'overlayPane'
+    })
+  });
+
+  // Add Carto Positron tile layer with aggressive caching
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 18,
+    keepBuffer: 4,
+    updateWhenZooming: false,
+    updateWhenIdle: true,
+    crossOrigin: true,
+    detectRetina: true,
+  }).addTo(leafletMap);
+
+  return leafletMap;
+};
