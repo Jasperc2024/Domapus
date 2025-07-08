@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricType, METRICS } from "./MetricSelector";
 import { useEffect, useState } from "react";
+import { getMetricValue, getMetricDisplay } from "./map/utils";
 
 interface LegendProps {
   selectedMetric: MetricType;
@@ -8,46 +9,53 @@ interface LegendProps {
 
 export function Legend({ selectedMetric }: LegendProps) {
   const [zipCount, setZipCount] = useState<number>(0);
+  const [metricValues, setMetricValues] = useState<number[]>([]);
 
   useEffect(() => {
-    // Load ZIP data to get actual count
+    // Load ZIP data to get actual count and values
     fetch('data/zip_data.json')
       .then(response => response.json())
       .then(data => {
         setZipCount(Object.keys(data).length);
+        
+        // Get all values for the selected metric
+        const values = Object.values(data)
+          .map((zipData: any) => getMetricValue(zipData, selectedMetric))
+          .filter(v => v > 0)
+          .sort((a, b) => a - b);
+        
+        setMetricValues(values);
       })
       .catch(() => {
         setZipCount(3247); // Fallback to default
+        setMetricValues([]);
       });
-  }, []);
+  }, [selectedMetric]);
 
-  // Mock data ranges for different metrics
-  const getMetricRange = (metric: MetricType) => {
-    switch (metric) {
-      case "median-sale-price":
-        return { min: "$200K", max: "$2M+" };
-      case "median-list-price":
-        return { min: "$210K", max: "$2.1M+" };
-      case "median-dom":
-        return { min: "15 days", max: "90+ days" };
-      case "inventory":
-        return { min: "50", max: "500+" };
-      case "new-listings":
-        return { min: "10", max: "200+" };
-      case "homes-sold":
-        return { min: "20", max: "300+" };
-      case "sale-to-list-ratio":
-        return { min: "85%", max: "105%" };
-      case "homes-sold-above-list":
-        return { min: "0%", max: "40%" };
-      case "off-market-2-weeks":
-        return { min: "5%", max: "50%" };
-      default:
-        return { min: "Low", max: "High" };
+  // Calculate actual metric range from data
+  const getLegendValues = () => {
+    if (metricValues.length === 0) {
+      return { min: "No data", max: "No data", quintiles: [] };
     }
+    
+    const min = metricValues[0];
+    const max = metricValues[metricValues.length - 1];
+    
+    // Calculate quintiles (5 equal parts)
+    const quintiles = [];
+    for (let i = 0; i <= 4; i++) {
+      const index = Math.floor((metricValues.length - 1) * (i / 4));
+      quintiles.push(metricValues[index]);
+    }
+    
+    return {
+      min: getMetricDisplay({ [selectedMetric.replace('-', '_')]: min }, selectedMetric),
+      max: getMetricDisplay({ [selectedMetric.replace('-', '_')]: max }, selectedMetric),
+      quintiles: quintiles.map(val => getMetricDisplay({ [selectedMetric.replace('-', '_')]: val }, selectedMetric))
+    };
   };
 
-  const range = getMetricRange(selectedMetric);
+  const { min, max, quintiles } = getLegendValues();
 
   return (
     <Card className="bg-dashboard-panel border-dashboard-border shadow-sm">
@@ -64,37 +72,22 @@ export function Legend({ selectedMetric }: LegendProps) {
               background: 'linear-gradient(to right, #497eaf, #5fa4ca, #b4d4ec, #ffecd4, #fac790, #e97000)'
             }}></div>
             <div className="flex justify-between text-xs text-dashboard-text-secondary mt-1">
-              <span>{range.min}</span>
-              <span>{range.max}</span>
+              <span>{min}</span>
+              <span>{max}</span>
             </div>
           </div>
 
           {/* Legend Labels */}
-          <div className="grid grid-cols-6 gap-1 text-xs">
-            <div className="text-center">
-              <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: '#497eaf' }}></div>
-              <span className="text-dashboard-text-secondary">Low</span>
-            </div>
-            <div className="text-center">
-              <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: '#5fa4ca' }}></div>
-              <span className="text-dashboard-text-secondary">Low-Med</span>
-            </div>
-            <div className="text-center">
-              <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: '#b4d4ec' }}></div>
-              <span className="text-dashboard-text-secondary">Medium</span>
-            </div>
-            <div className="text-center">
-              <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: '#ffecd4' }}></div>
-              <span className="text-dashboard-text-secondary">Med-High</span>
-            </div>
-            <div className="text-center">
-              <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: '#fac790' }}></div>
-              <span className="text-dashboard-text-secondary">High</span>
-            </div>
-            <div className="text-center">
-              <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: '#e97000' }}></div>
-              <span className="text-dashboard-text-secondary">Highest</span>
-            </div>
+          <div className="grid grid-cols-5 gap-1 text-xs">
+            {quintiles.map((value, index) => {
+              const colors = ['#497eaf', '#5fa4ca', '#b4d4ec', '#fac790', '#e97000'];
+              return (
+                <div key={index} className="text-center">
+                  <div className="w-3 h-3 rounded mx-auto mb-1" style={{ backgroundColor: colors[index] }}></div>
+                  <span className="text-dashboard-text-secondary text-[10px]">{value}</span>
+                </div>
+              );
+            })}
           </div>
 
           {/* Data Points Count */}

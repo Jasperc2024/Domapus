@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { scaleLinear } from 'd3-scale';
+import * as topojson from 'topojson-client';
 import { useMapData } from './map/useMapData';
 import { createMap } from './map/MapInitializer';
 import { getMetricValue, getMetricDisplay, getZipStyle } from './map/utils';
@@ -71,62 +72,38 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     };
   }, [isInteractive]);
 
-  // Load GeoJSON and add interactivity
+  // Load map layers and add interactivity
   useEffect(() => {
     if (!map || !colorScale || !isInteractive) return;
 
-    const loadGeoJSON = async () => {
-      // Load and add state boundaries first
+    const loadMapLayers = async () => {
+      // Load and add US land layer first (bottom layer)
       try {
-        const stateResponse = await fetch('public/data/us-state.geojson');
-        const stateData = await stateResponse.json();
+        const landResponse = await fetch('data/us_land.geojson');
+        const landData = await landResponse.json();
         
-        // Add state boundaries with labels
-        L.geoJSON(stateData, {
+        L.geoJSON(landData, {
           style: {
-            color: '#666666',
-            weight: 2,
-            fillOpacity: 0,
-            opacity: 0.8,
-            dashArray: '5,5'
+            color: '#cccccc',
+            weight: 1,
+            fillColor: '#f5f5f5',
+            fillOpacity: 0.5,
+            opacity: 0.8
           },
-          onEachFeature: (feature, layer) => {
-            if (feature.properties?.NAME) {
-              // Add state labels at the center of each state
-              const geoLayer = layer as any;
-              if (geoLayer.getBounds) {
-                const bounds = geoLayer.getBounds();
-                const center = bounds.getCenter();
-              
-              L.marker(center, {
-                icon: L.divIcon({
-                  className: 'state-label',
-                  html: `<div style="
-                    background: rgba(255, 255, 255, 0.9);
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    font-size: 12px;
-                    font-weight: bold;
-                    color: #333;
-                    text-align: center;
-                    border: 1px solid #ccc;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                  ">${feature.properties.NAME}</div>`,
-                  iconSize: [80, 20],
-                  iconAnchor: [40, 10]
-                })
-              }).addTo(map);
-              }
-            }
-          }
+          pane: 'overlayPane',
+          interactive: false
         }).addTo(map);
       } catch (error) {
-        console.warn('Could not load state boundaries:', error);
+        console.warn('Could not load US land data:', error);
       }
-      // Load ZIP code boundaries
+
+      // Load ZIP code boundaries (TopoJSON)
       try {
-        const response = await fetch('data/us-zip-codes.geojson');
-        const geojsonData = await response.json();
+        const response = await fetch('data/us-zip-codes.topojson');
+        const topojsonData = await response.json();
+        
+        // Convert TopoJSON to GeoJSON
+        const geojsonData = topojson.feature(topojsonData, topojsonData.objects.zipcodes || Object.values(topojsonData.objects)[0]);
 
         // Remove existing layer
         if (geojsonLayer) {
@@ -135,8 +112,9 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
 
         const layer = L.geoJSON(geojsonData, {
           style: (feature) => getZipStyle(feature, map.getZoom(), colorScale, zipData, selectedMetric),
+          pane: 'overlayPane',
           onEachFeature: (feature, layer) => {
-            const zipCode = feature.properties?.ZCTA5CE10;
+            const zipCode = feature.properties?.ZCTA5CE10 || feature.properties?.GEOID10;
             if (zipCode && zipData[zipCode]) {
               const data = zipData[zipCode];
               const cityData = citiesData[zipCode] || {};
@@ -209,11 +187,81 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
         layer.addTo(map);
         setGeojsonLayer(layer);
       } catch (error) {
-        console.error('Error loading GeoJSON:', error);
+        console.error('Error loading ZIP code data:', error);
+      }
+
+      // Load and add state boundaries with labels (top layer)
+      try {
+        const stateResponse = await fetch('data/us-state.geojson');
+        const stateData = await stateResponse.json();
+        
+        // Add state boundaries
+        const stateLayer = L.geoJSON(stateData, {
+          style: {
+            color: '#666666',
+            weight: 2,
+            fillOpacity: 0,
+            opacity: 0.8,
+            dashArray: '5,5'
+          },
+        });
+        
+        // Add state labels
+        stateData.features.forEach((feature: any) => {
+          if (feature.properties?.NAME && feature.geometry) {
+            // Calculate centroid for label placement
+            const coords = feature.geometry.coordinates;
+            let lat = 0, lng = 0, count = 0;
+            
+            const extractCoords = (coordArray: any) => {
+              coordArray.forEach((item: any) => {
+                if (Array.isArray(item[0])) {
+                  extractCoords(item);
+                } else {
+                  lng += item[0];
+                  lat += item[1];
+                  count++;
+                }
+              });
+            };
+            
+            extractCoords(coords);
+            
+            if (count > 0) {
+              const avgLat = lat / count;
+              const avgLng = lng / count;
+              
+              L.marker([avgLat, avgLng], {
+                icon: L.divIcon({
+                  className: 'state-label',
+                  html: `<div style="
+                    background: rgba(255, 255, 255, 0.9);
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    color: #333;
+                    text-align: center;
+                    border: 1px solid #ccc;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    pointer-events: none;
+                  ">${feature.properties.NAME}</div>`,
+                  iconSize: [80, 20],
+                  iconAnchor: [40, 10]
+                }),
+                interactive: false
+              }).addTo(map);
+            }
+          }
+        });
+        
+        stateLayer.addTo(map);
+      } catch (error) {
+        console.warn('Could not load state boundaries:', error);
       }
     };
 
-    loadGeoJSON();
+    loadMapLayers();
   }, [map, zipData, citiesData, selectedMetric, onZipSelect, colorScale, isInteractive]);
 
   // Handle search with zoom functionality
@@ -222,7 +270,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
 
     let found = false;
     geojsonLayer.eachLayer((layer: any) => {
-      const zipCode = layer.feature?.properties?.ZCTA5CE10;
+      const zipCode = layer.feature?.properties?.ZCTA5CE10 || layer.feature?.properties?.GEOID10;
       if (zipCode === searchZip) {
         found = true;
         const bounds = layer.getBounds();

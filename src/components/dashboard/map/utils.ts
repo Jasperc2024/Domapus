@@ -33,10 +33,9 @@ export const getMetricDisplay = (data: any, metric: string): string => {
 };
 
 export const getZipStyle = (feature: any, zoom: number, colorScale: any, zipData: Record<string, any>, selectedMetric: string) => {
-  const zipCode = feature?.properties?.ZCTA5CE10;
+  const zipCode = feature?.properties?.ZCTA5CE10 || feature?.properties?.GEOID10;
   const value = zipCode && zipData[zipCode] ? getMetricValue(zipData[zipCode], selectedMetric) : 0;
   
-  // If no data, use gray with stripes pattern
   let fillColor;
   if (!zipCode || !zipData[zipCode] || value === 0) {
     fillColor = '#9ca3af'; // Gray for no data
@@ -44,29 +43,29 @@ export const getZipStyle = (feature: any, zoom: number, colorScale: any, zipData
     fillColor = colorScale(value);
   }
   
-  // Always visible outlines - dynamic thickness based on zoom level
+  // Reduced outline thickness - dynamic based on zoom level
   let weight;
-  let opacity = 1; // Always visible
+  let opacity = 0.8; // Visible outlines
   
   if (zoom >= 10) {
-    weight = 2;
-  } else if (zoom >= 8) {
     weight = 1.5;
+  } else if (zoom >= 8) {
+    weight = 1.2;
   } else if (zoom >= 6) {
-    weight = 1;
-  } else if (zoom >= 4) {
     weight = 0.8;
+  } else if (zoom >= 5) {
+    weight = 0.5; // Reduced for default zoom
+  } else if (zoom >= 4) {
+    weight = 0.3;
   } else {
-    weight = 0.5;
+    weight = 0.2;
   }
   
   return {
     fillColor,
     weight,
     color: '#ffffff', // White outline
-    fillOpacity: (!zipCode || !zipData[zipCode] || value === 0) ? 0.3 : 0.8, // Lower opacity for no data
+    fillOpacity: (!zipCode || !zipData[zipCode] || value === 0) ? 0.3 : 0.8,
     opacity,
-    // Add pattern for areas with no data
-    className: (!zipCode || !zipData[zipCode] || value === 0) ? 'no-data-pattern' : '',
   };
 };
