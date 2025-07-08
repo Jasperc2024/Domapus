@@ -33,7 +33,7 @@ export const getMetricDisplay = (data: any, metric: string): string => {
 };
 
 export const getZipStyle = (feature: any, zoom: number, colorScale: any, zipData: Record<string, any>, selectedMetric: string) => {
-  const zipCode = feature?.properties?.ZCTA5CE10 || feature?.properties?.GEOID10;
+  const zipCode = feature?.properties?.ZCTA5CE20 || feature?.properties?.GEOID20;
   const value = zipCode && zipData[zipCode] ? getMetricValue(zipData[zipCode], selectedMetric) : 0;
   
   let fillColor;
