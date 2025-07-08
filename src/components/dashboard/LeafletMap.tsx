@@ -206,54 +206,6 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
           },
         });
         
-        // Add state labels
-        stateData.features.forEach((feature: any) => {
-          if (feature.properties?.NAME && feature.geometry) {
-            // Calculate centroid for label placement
-            const coords = feature.geometry.coordinates;
-            let lat = 0, lng = 0, count = 0;
-            
-            const extractCoords = (coordArray: any) => {
-              coordArray.forEach((item: any) => {
-                if (Array.isArray(item[0])) {
-                  extractCoords(item);
-                } else {
-                  lng += item[0];
-                  lat += item[1];
-                  count++;
-                }
-              });
-            };
-            
-            extractCoords(coords);
-            
-            if (count > 0) {
-              const avgLat = lat / count;
-              const avgLng = lng / count;
-              
-              L.marker([avgLat, avgLng], {
-                icon: L.divIcon({
-                  className: 'state-label',
-                  html: `<div style="
-                    background: rgba(255, 255, 255, 0.9);
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    font-size: 12px;
-                    font-weight: bold;
-                    color: #333;
-                    text-align: center;
-                    border: 1px solid #ccc;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                    pointer-events: none;
-                  ">${feature.properties.NAME}</div>`,
-                  iconSize: [80, 20],
-                  iconAnchor: [40, 10]
-                }),
-                interactive: false
-              }).addTo(map);
-            }
-          }
-        });
         
         stateLayer.addTo(map);
       } catch (error) {
@@ -274,7 +226,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
       if (zipCode === searchZip) {
         found = true;
         const bounds = layer.getBounds();
-        map.fitBounds(bounds, { maxZoom: 10, padding: [20, 20] });
+        map.fitBounds(bounds, { maxZoom: 12, padding: [10, 10] });
         
         // Highlight the searched ZIP
         if (layer instanceof L.Path) {
