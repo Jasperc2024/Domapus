@@ -38,7 +38,7 @@ export function MetricSelector({ selectedMetric, onMetricChange }: MetricSelecto
         <SelectTrigger className="w-64" aria-label="Select visualization metric">
           <SelectValue placeholder="Select a metric" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="z-[9999]">
           {Object.entries(METRICS).map(([key, label]) => (
             <SelectItem key={key} value={key}>
               {label}

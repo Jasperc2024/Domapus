@@ -11,10 +11,10 @@ L.Icon.Default.mergeOptions({
 
 export const createMap = (container: HTMLElement): L.Map => {
   const leafletMap = L.map(container, {
-    center: [39.8283, -98.5795], // More zoomed in default center
-    zoom: 5, // More zoomed in default zoom
-    minZoom: 3,
-    maxZoom: 12,
+    center: [39.8283, -98.5795], // Default center: US center
+    zoom: 5, // Default zoom: 5
+    minZoom: 3, // Min zoom: 3
+    maxZoom: 12, // Max zoom: 12
     scrollWheelZoom: true,
     dragging: true,
     zoomControl: true,
@@ -22,23 +22,28 @@ export const createMap = (container: HTMLElement): L.Map => {
     maxBoundsViscosity: 1.0,
     preferCanvas: true,
     worldCopyJump: false,
+    zoomDelta: 0.5, // Smoother, slower zooming
+    zoomSnap: 0.25, // Allow fractional zoom levels
     renderer: L.canvas({
       padding: 0.5,
       pane: 'overlayPane'
     })
   });
 
-  // Add Carto Positron tile layer with aggressive caching
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  // Add Carto Positron tile layer with synchronous loading
+  const tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
     subdomains: 'abcd',
     maxZoom: 18,
-    keepBuffer: 4,
-    updateWhenZooming: false,
-    updateWhenIdle: true,
+    keepBuffer: 8, // Increased buffer to avoid blank spaces
+    updateWhenZooming: true, // Load tiles while zooming  
+    updateWhenIdle: false, // Don't wait for idle
     crossOrigin: true,
     detectRetina: true,
-  }).addTo(leafletMap);
+    pane: 'tilePane' // Ensure tiles are at bottom
+  });
+  
+  tileLayer.addTo(leafletMap);
 
   return leafletMap;
 };
