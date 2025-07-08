@@ -8,7 +8,7 @@ const gzip = promisify(zlib.gzip);
 const brotli = promisify(zlib.brotliCompress);
 
 const DIST_DIR = path.join(__dirname, '../dist');
-const EXTENSIONS_TO_COMPRESS = ['.js', '.css', '.json', '.geojson', '.svg', '.html'];
+const EXTENSIONS_TO_COMPRESS = ['.js', '.css', '.json', '.geojson', 'topojson', '.svg', '.html'];
 
 async function compressFile(filePath) {
   try {

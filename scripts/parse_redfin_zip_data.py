@@ -13,23 +13,30 @@ import re
 from datetime import datetime
 from pathlib import Path
 import logging
+import sys
 from io import BytesIO  # >>> ADDED FOR STREAMED GZIP DECOMPRESSION
 import random  # >>> ADDED FOR RANDOM SAMPLE
 
-# Configure logging
-logging.basicConfig(filename='data_pipeline.log', level=logging.ERROR)
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("data_pipeline.log"),
+        logging.StreamHandler(sys.stdout)
+    ] 
+)     
 
 def download_redfin_data(url, timeout=300, retries=3):
     """Download the Redfin data file with retries."""
     for attempt in range(1, retries + 1):
         try:
-            print(f"Attempt {attempt}: Downloading data from {url}...")
+            logging.info(f"Attempt {attempt}: Downloading data from {url}...")
             response = requests.get(url, timeout=timeout, stream=True)
             response.raise_for_status()
             return response.content
         except requests.exceptions.RequestException as e:
-            print(f"Download failed (attempt {attempt}): {e}")
-    print("All download attempts failed.")
+            logging.info(f"Download failed (attempt {attempt}): {e}")
+    logging.info("All download attempts failed.")
     return None
 
 def extract_zip_code(region_str):
@@ -147,18 +154,18 @@ def main():
     
     data = download_redfin_data(url)
     if data is None:
-        print("Failed to download data. Exiting gracefully.")
+        logging.info("Failed to download data. Exiting gracefully.")
         return
     
     try:
-        print("Decompressing and parsing data...")
+        logging.info("Decompressing and parsing data...")
         buffer = BytesIO(data)
         with gzip.GzipFile(fileobj=buffer) as f:
             df = pd.read_csv(f, sep='\t')
         
-        print(f"Loaded {len(df)} rows from Redfin data")
+        logging.info(f"Loaded {len(df)} rows from Redfin data")
         df_clean = clean_and_convert_data(df)
-        print(f"Processed {len(df_clean)} ZIP codes")
+        logging.info(f"Processed {len(df_clean)} ZIP codes")
         
         output_data = format_data_for_output(df_clean)
         
@@ -173,10 +180,10 @@ def main():
                 with open(output_file, 'r') as f:
                     existing_data = json.load(f)
             except Exception as e:
-                print(f"Warning: Failed to read existing JSON file for comparison: {e}")
+                logging.info(f"Warning: Failed to read existing JSON file for comparison: {e}")
         
         if existing_data == output_data:
-            print("No changes detected in ZIP data. Skipping write.")
+            logging.info("No changes detected in ZIP data. Skipping write.")
             return
 
         # === Write new JSON output ===
@@ -184,23 +191,23 @@ def main():
             json.dump(output_data, f, indent=2)
         
         if not output_file.exists():
-            print(f"ERROR: Failed to create output file at {output_file}")
+            logging.info(f"ERROR: Failed to create output file at {output_file}")
         else:
-            print(f"Successfully wrote {len(output_data)} ZIP codes to {output_file}")
+            logging.info(f"Successfully wrote {len(output_data)} ZIP codes to {output_file}")
         
         if output_data:
             sample_zip = random.choice(list(output_data.keys()))
-            print(f"\nSample data for ZIP {sample_zip}:")
-            print(json.dumps({sample_zip: output_data[sample_zip]}, indent=2))
+            logging.info(f"\nSample data for ZIP {sample_zip}:")
+            logging.info(json.dumps({sample_zip: output_data[sample_zip]}, indent=2))
     
     except Exception as e:
         logging.error(f"Error processing data: {e}")
-        print(f"Error processing data: {e}")
+        logging.info(f"Error processing data: {e}")
         
         if os.path.exists("data_pipeline.log"):
-            print("\n=== Error Log ===")
+            logging.info("\n=== Error Log ===")
             with open("data_pipeline.log") as log_file:
-                print(log_file.read())
+                logging.info(log_file.read())
         
         raise
 
