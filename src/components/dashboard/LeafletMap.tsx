@@ -99,11 +99,12 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
 
       // Load ZIP code boundaries (TopoJSON)
       try {
-        const response = await fetch('data/us-zip-codes.topojson');
+        const response = await fetch('./data/us-zip-codes.topojson');
         const topojsonData = await response.json();
         
         // Convert TopoJSON to GeoJSON
-        const geojsonData = topojson.feature(topojsonData, topojsonData.objects.zipcodes || Object.values(topojsonData.objects)[0]);
+        const objectName = Object.keys(topojsonData.objects)[0];
+        const geojsonData = topojson.feature(topojsonData, topojsonData.objects[objectName]);
 
         // Remove existing layer
         if (geojsonLayer) {
@@ -114,7 +115,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
           style: (feature) => getZipStyle(feature, map.getZoom(), colorScale, zipData, selectedMetric),
           pane: 'overlayPane',
           onEachFeature: (feature, layer) => {
-            const zipCode = feature.properties?.ZCTA5CE10 || feature.properties?.GEOID10;
+            const zipCode = feature.properties?.ZCTA5CE20 || feature.properties?.GEOID20;
             if (zipCode && zipData[zipCode]) {
               const data = zipData[zipCode];
               const cityData = citiesData[zipCode] || {};
@@ -222,7 +223,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
 
     let found = false;
     geojsonLayer.eachLayer((layer: any) => {
-      const zipCode = layer.feature?.properties?.ZCTA5CE10 || layer.feature?.properties?.GEOID10;
+      const zipCode = layer.feature?.properties?.ZCTA5CE10 || layer.feature?.properties?.GEOID20;
       if (zipCode === searchZip) {
         found = true;
         const bounds = layer.getBounds();
