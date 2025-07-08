@@ -22,7 +22,7 @@ export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }
         {/* Logo and Title */}
         <div className="flex items-center space-x-2 sm:space-x-3">
           <img 
-            src="public/favicon_io/favicon-32x32.png" 
+            src="public/favicon_io/favicon.ico" 
             alt="Domapus Logo" 
             className="h-6 w-6 sm:h-8 sm:w-8"
           />
