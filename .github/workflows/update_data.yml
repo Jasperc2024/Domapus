@@ -30,7 +30,7 @@ jobs:
 
     - name: Run Redfin ZIP Data Parser
       run: |
-        python scripts/parse_redfin_zip_data.py
+        python -u scripts/parse_redfin_zip_data.py
 
     - name: Check if zip_data.json is new or changed
       id: check_changes
