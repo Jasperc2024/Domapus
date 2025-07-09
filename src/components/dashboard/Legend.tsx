@@ -13,7 +13,7 @@ export function Legend({ selectedMetric }: LegendProps) {
 
   useEffect(() => {
     // Load ZIP data to get actual count and values
-    fetch('data/zip_data.json')
+    fetch('data/zip-data.json')
       .then(response => response.json())
       .then(data => {
         setZipCount(Object.keys(data).length);
@@ -27,7 +27,7 @@ export function Legend({ selectedMetric }: LegendProps) {
         setMetricValues(values);
       })
       .catch(() => {
-        setZipCount(3247); // Fallback to default
+        setZipCount(20000); // Fallback to default
         setMetricValues([]);
       });
   }, [selectedMetric]);
