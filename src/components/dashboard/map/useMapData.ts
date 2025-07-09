@@ -7,18 +7,27 @@ export const useMapData = () => {
   const [citiesData, setCitiesData] = useState<Record<string, CityData>>({});
   const [isLoading, setIsLoading] = useState(true);
 
+  // Helper function to decompress .gz files
+  const fetchGzipData = async (url: string, isJson: boolean = true) => {
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' });
+    return isJson ? JSON.parse(decompressed) : decompressed;
+  };
+
+
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
 
         // Load ZIP data from CDN
-        const zipResponse = await fetch('https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip_data.json');
+        const zipResponse = await fetch('https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json.gz');
         const zipJson = await zipResponse.json();
         setZipData(zipJson);
 
         // Load enhanced cities mapping with coordinates and county from CDN
-        const citiesResponse = await fetch('https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-city-mapping.csv');
+        const citiesResponse = await fetch('https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-city-mapping.csv.gz');
         const citiesText = await citiesResponse.text();
         const citiesMap: Record<string, CityData> = {};
         
