@@ -171,7 +171,7 @@ def main():
         
         output_dir = Path("public/data")
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / "zip_data.json"
+        output_file = output_dir / "zip_data.json.gz"
 
         # === Smart write logic: skip if unchanged ===
         existing_data = {}
@@ -186,8 +186,8 @@ def main():
             logging.info("No changes detected in ZIP data. Skipping write.")
             return
 
-        # === Write new JSON output ===
-        with open(output_file, 'w') as f:
+        # === Write compressed JSON output ===
+        with gzip.open(output_file, 'wt', encoding='utf-8') as f:
             json.dump(output_data, f, indent=2)
         
         if not output_file.exists():

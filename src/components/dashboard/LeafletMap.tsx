@@ -100,7 +100,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     const loadMapLayers = async () => {
       // Load and add US land layer first (bottom layer)
       try {
-        const landResponse = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us_land.geojson');
+        const landResponse = await fetch('https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-land.geojson.gz');
         const landData = await landResponse.json();
         
         L.geoJSON(landData, {
@@ -120,14 +120,14 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
 
       // Load ZIP code boundaries (GeoJSON from CDN)
       try {
-        const response = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us-zip-codes.geojson');
+        const response = await fetch('https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz');
         const geojsonData = await response.json();
 
         const layer = L.geoJSON(geojsonData, {
           style: (feature) => getZipStyle(feature, map.getZoom(), colorScale, zipData, selectedMetric),
           pane: 'overlayPane',
           onEachFeature: (feature, layer) => {
-            const zipCode = feature.properties?.ZCTA5CE20 || feature.properties?.GEOID20 || feature.properties?.ZCTA5CE10;
+            const zipCode = feature.properties?.ZCTA5CE20 || feature.properties?.GEOID20 || feature.properties?.ZCTA5CE20;
             if (zipCode && zipData[zipCode]) {
               const data = zipData[zipCode];
               const cityData = citiesData[zipCode] || {};
@@ -197,7 +197,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
 
       // Load and add state boundaries (top layer)
       try {
-        const stateResponse = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us-state.geojson');
+        const stateResponse = await fetch('https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-state.geojson.gz');
         const stateData = await stateResponse.json();
         
         // Add state boundaries
@@ -234,7 +234,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
       if (geojsonLayer) {
         let found = false;
         geojsonLayer.eachLayer((layer: any) => {
-          const zipCode = layer.feature?.properties?.ZCTA5CE10 || layer.feature?.properties?.GEOID20 || layer.feature?.properties?.ZCTA5CE20;
+          const zipCode = layer.feature?.properties?.ZCTA5CE20 || layer.feature?.properties?.GEOID20 || layer.feature?.properties?.ZCTA5CE20;
           if (zipCode === searchZip) {
             found = true;
             

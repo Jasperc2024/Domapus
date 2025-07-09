@@ -35,7 +35,7 @@ export const getMetricDisplay = (data: any, metric: string): string => {
 import { styleCache } from './styleCache';
 
 export const getZipStyle = (feature: any, zoom: number, colorScale: any, zipData: Record<string, any>, selectedMetric: string) => {
-  const zipCode = feature?.properties?.ZCTA5CE20 || feature?.properties?.GEOID20 || feature?.properties?.ZCTA5CE10;
+  const zipCode = feature?.properties?.ZCTA5CE20 || feature?.properties?.GEOID20 || feature?.properties?.ZCTA5CE20;
   const value = zipCode && zipData[zipCode] ? getMetricValue(zipData[zipCode], selectedMetric) : 0;
   
   // Check cache first
