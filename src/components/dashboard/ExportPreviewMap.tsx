@@ -90,7 +90,7 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
 
     const leafletMap = L.map(currentMapRef.current, {
       center: [39.8283, -98.5795],
-      zoom: 4,
+      zoom: 5,
       minZoom: 3,
       maxZoom: 12,
       scrollWheelZoom: false,
@@ -121,14 +121,14 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
 
     const loadZipCodes = async () => {
       try {
-        const response = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us-zip-codes.geojson.gz');
+        const response = await fetch('https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz');
         const arrayBuffer = await response.arrayBuffer();
         const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' });
         const geojsonData = JSON.parse(decompressed);
 
         const layer = L.geoJSON(geojsonData, {
           style: (feature) => {
-            const zipCode = feature?.properties?.ZCTA5CE20 || feature?.properties?.GEOID20 || feature?.properties?.ZCTA5CE10;
+            const zipCode = feature?.properties?.ZCTA5CE20 || feature?.properties?.GEOID20 || feature?.properties?.ZCTA5CE20;
             
             // Filter based on export options
             if (exportOptions.regionScope === 'state' && exportOptions.selectedState) {
@@ -189,7 +189,7 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
         if (pathLayer.feature) {
           const zipCode = pathLayer.feature.properties?.ZCTA5CE20 || 
                          pathLayer.feature.properties?.GEOID20 || 
-                         pathLayer.feature.properties?.ZCTA5CE10;
+                         pathLayer.feature.properties?.ZCTA5CE20;
           
           // Filter based on export options
           if (exportOptions.regionScope === 'state' && exportOptions.selectedState) {
