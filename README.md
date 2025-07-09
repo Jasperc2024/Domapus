@@ -1,6 +1,6 @@
 ![App Icon](https://jasperc2024.github.io/Domapus/public/favicon_io/android-chrome-512x512.png)
-# Domapus
 
+#Domapus
 An interactive dashboard that visualizes U.S. housing market data down to the ZIP code level. 
 
 Built on Redfin's public data, this tool offers detailed metrics, a clean interface, and automated monthly updates — all open-source and ad-free.
