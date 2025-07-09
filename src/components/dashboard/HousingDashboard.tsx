@@ -36,7 +36,7 @@ export function HousingDashboard() {
 
   useEffect(() => {
     // Load real data and get last updated date
-    fetch(import.meta.env.BASE_URL + 'data/zip_data.json')
+    fetch(import.meta.env.BASE_URL + 'data/zip-data.json')
       .then(response => response.json())
       .then(data => {
         // Find the most recent period_end date
