@@ -1,4 +1,4 @@
-<img src="https://jasperc2024.github.io/Domapus/favicon_io/android-chrome-512x512.png" width="50">   
+<img src="https://jasperc2024.github.io/Domapus/favicon_io/android-chrome-512x512.png" width="100">   
 
 # Domapus
 
