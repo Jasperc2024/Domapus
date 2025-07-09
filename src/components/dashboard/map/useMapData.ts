@@ -1,28 +1,35 @@
 
 import { useState, useEffect } from 'react';
 import { CityData } from './types';
+import pako from 'pako';
 
 export const useMapData = () => {
   const [zipData, setZipData] = useState<Record<string, any>>({});
   const [citiesData, setCitiesData] = useState<Record<string, CityData>>({});
   const [isLoading, setIsLoading] = useState(true);
 
+  // Helper function to decompress .gz files
+  const fetchGzipData = async (url: string, isJson: boolean = true) => {
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' });
+    return isJson ? JSON.parse(decompressed) : decompressed;
+  };
+
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
 
-        // Load ZIP data from CDN
-        const zipResponse = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/zip_data.json');
-        const zipJson = await zipResponse.json();
+        // Load ZIP data from CDN (.gz compressed)
+        const zipJson = await fetchGzipData('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/zip-data.json.gz');
         setZipData(zipJson);
 
-        // Load enhanced cities mapping with coordinates and county from CDN
-        const citiesResponse = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/zip-city-mapping.csv');
-        const citiesText = await citiesResponse.text();
+        // Load enhanced cities mapping with coordinates and county from CDN (.gz compressed)
+        const citiesText = await fetchGzipData('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/zip-city-mapping.csv.gz', false);
         const citiesMap: Record<string, CityData> = {};
         
-        citiesText.split('\n').slice(1).forEach(line => {
+        citiesText.split('\n').slice(1).forEach((line: string) => {
           const parts = line.split(',');
           if (parts.length >= 10) {
             const zip = parts[0]?.trim();
