@@ -32,10 +32,19 @@ export const getMetricDisplay = (data: any, metric: string): string => {
   }
 };
 
+import { styleCache } from './styleCache';
+
 export const getZipStyle = (feature: any, zoom: number, colorScale: any, zipData: Record<string, any>, selectedMetric: string) => {
-  const zipCode = feature?.properties?.ZCTA5CE20 || feature?.properties?.GEOID20;
+  const zipCode = feature?.properties?.ZCTA5CE20 || feature?.properties?.GEOID20 || feature?.properties?.ZCTA5CE10;
   const value = zipCode && zipData[zipCode] ? getMetricValue(zipData[zipCode], selectedMetric) : 0;
   
+  // Check cache first
+  const cacheKey = styleCache.getCacheKey(zipCode || 'no-zip', zoom, selectedMetric, value);
+  const cachedStyle = styleCache.get(cacheKey);
+  if (cachedStyle) {
+    return cachedStyle;
+  }
+
   let fillColor;
   if (!zipCode || !zipData[zipCode] || value === 0) {
     fillColor = '#9ca3af'; // Gray for no data
@@ -54,18 +63,22 @@ export const getZipStyle = (feature: any, zoom: number, colorScale: any, zipData
   } else if (zoom >= 6) {
     weight = 0.8;
   } else if (zoom >= 5) {
-    weight = 0.5; // Reduced for default zoom
+    weight = 0.3; // Reduced for default zoom
   } else if (zoom >= 4) {
-    weight = 0.3;
-  } else {
     weight = 0.2;
+  } else {
+    weight = 0.1;
   }
   
-  return {
+  const style = {
     fillColor,
     weight,
     color: '#ffffff', // White outline
     fillOpacity: (!zipCode || !zipData[zipCode] || value === 0) ? 0.3 : 0.8,
     opacity,
   };
+
+  // Cache the computed style
+  styleCache.set(cacheKey, style);
+  return style;
 };
