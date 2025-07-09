@@ -12,13 +12,13 @@ export const useMapData = () => {
       try {
         setIsLoading(true);
 
-        // Load ZIP data
-        const zipResponse = await fetch('data/zip_data.json');
+        // Load ZIP data from CDN
+        const zipResponse = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/zip_data.json');
         const zipJson = await zipResponse.json();
         setZipData(zipJson);
 
-        // Load enhanced cities mapping with coordinates and county
-        const citiesResponse = await fetch('data/zip-city-mapping.csv');
+        // Load enhanced cities mapping with coordinates and county from CDN
+        const citiesResponse = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/zip-city-mapping.csv');
         const citiesText = await citiesResponse.text();
         const citiesMap: Record<string, CityData> = {};
         

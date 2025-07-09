@@ -25,7 +25,8 @@ export const createMap = (container: HTMLElement): L.Map => {
     zoomDelta: 0.5, // Smoother, slower zooming
     zoomSnap: 0.25, // Allow fractional zoom levels
     renderer: L.canvas({
-      padding: 0.5,
+      padding: 2, // Increased padding for better performance
+      tolerance: 5, // Increased tolerance for smoother interactions
       pane: 'overlayPane'
     })
   });

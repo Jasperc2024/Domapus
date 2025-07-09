@@ -1,13 +1,13 @@
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { scaleLinear } from 'd3-scale';
-import * as topojson from 'topojson-client';
 import { useMapData } from './map/useMapData';
 import { createMap } from './map/MapInitializer';
 import { getMetricValue, getMetricDisplay, getZipStyle } from './map/utils';
 import { ZipData, LeafletMapProps } from './map/types';
+import { styleCache } from './map/styleCache';
 
 export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -72,14 +72,35 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     };
   }, [isInteractive]);
 
+  // Update styles without full reload
+  const updateLayerStyles = useCallback(() => {
+    if (!geojsonLayer || !colorScale) return;
+
+    geojsonLayer.eachLayer((leafletLayer) => {
+      if (leafletLayer instanceof L.Path) {
+        const pathLayer = leafletLayer as L.Path & { feature?: any };
+        if (pathLayer.feature) {
+          pathLayer.setStyle(getZipStyle(pathLayer.feature, map?.getZoom() || 5, colorScale, zipData, selectedMetric));
+        }
+      }
+    });
+  }, [geojsonLayer, colorScale, zipData, selectedMetric, map]);
+
+  // Update styles when metric changes instead of full reload
+  useEffect(() => {
+    if (geojsonLayer && colorScale) {
+      updateLayerStyles();
+    }
+  }, [selectedMetric, updateLayerStyles]);
+
   // Load map layers and add interactivity
   useEffect(() => {
-    if (!map || !colorScale || !isInteractive) return;
+    if (!map || !colorScale || !isInteractive || geojsonLayer) return;
 
     const loadMapLayers = async () => {
       // Load and add US land layer first (bottom layer)
       try {
-        const landResponse = await fetch('data/us_land.geojson');
+        const landResponse = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us_land.geojson');
         const landData = await landResponse.json();
         
         L.geoJSON(landData, {
@@ -97,25 +118,16 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
         console.warn('Could not load US land data:', error);
       }
 
-      // Load ZIP code boundaries (TopoJSON)
+      // Load ZIP code boundaries (GeoJSON from CDN)
       try {
-        const response = await fetch('./data/us-zip-codes.topojson');
-        const topojsonData = await response.json();
-        
-        // Convert TopoJSON to GeoJSON
-        const objectName = Object.keys(topojsonData.objects)[0];
-        const geojsonData = topojson.feature(topojsonData, topojsonData.objects[objectName]);
-
-        // Remove existing layer
-        if (geojsonLayer) {
-          map.removeLayer(geojsonLayer);
-        }
+        const response = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us-zip-codes.geojson');
+        const geojsonData = await response.json();
 
         const layer = L.geoJSON(geojsonData, {
           style: (feature) => getZipStyle(feature, map.getZoom(), colorScale, zipData, selectedMetric),
           pane: 'overlayPane',
           onEachFeature: (feature, layer) => {
-            const zipCode = feature.properties?.ZCTA5CE20 || feature.properties?.GEOID20;
+            const zipCode = feature.properties?.ZCTA5CE20 || feature.properties?.GEOID20 || feature.properties?.ZCTA5CE10;
             if (zipCode && zipData[zipCode]) {
               const data = zipData[zipCode];
               const cityData = citiesData[zipCode] || {};
@@ -174,15 +186,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
 
         // Add zoom event listener for dynamic styling
         map.on('zoomend', () => {
-          const zoom = map.getZoom();
-          layer.eachLayer((leafletLayer) => {
-            if (leafletLayer instanceof L.Path) {
-              const pathLayer = leafletLayer as L.Path & { feature?: any };
-              if (pathLayer.feature) {
-                pathLayer.setStyle(getZipStyle(pathLayer.feature, zoom, colorScale, zipData, selectedMetric));
-              }
-            }
-          });
+          updateLayerStyles();
         });
 
         layer.addTo(map);
@@ -191,9 +195,9 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
         console.error('Error loading ZIP code data:', error);
       }
 
-      // Load and add state boundaries with labels (top layer)
+      // Load and add state boundaries (top layer)
       try {
-        const stateResponse = await fetch('data/us-state.geojson');
+        const stateResponse = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us-state.geojson');
         const stateData = await stateResponse.json();
         
         // Add state boundaries
@@ -207,7 +211,6 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
           },
         });
         
-        
         stateLayer.addTo(map);
       } catch (error) {
         console.warn('Could not load state boundaries:', error);
@@ -215,62 +218,67 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     };
 
     loadMapLayers();
-  }, [map, zipData, citiesData, selectedMetric, onZipSelect, colorScale, isInteractive]);
+  }, [map, zipData, citiesData, onZipSelect, colorScale, isInteractive, geojsonLayer, updateLayerStyles]);
 
-  // Handle search with zoom functionality
+  // Handle search with coordinate-based zoom
   useEffect(() => {
-    if (!map || !geojsonLayer || !searchZip || !isInteractive) return;
+    if (!map || !searchZip || !isInteractive) return;
 
-    let found = false;
-    geojsonLayer.eachLayer((layer: any) => {
-      const zipCode = layer.feature?.properties?.ZCTA5CE10 || layer.feature?.properties?.GEOID20;
-      if (zipCode === searchZip) {
-        found = true;
-        const bounds = layer.getBounds();
-        map.fitBounds(bounds, { maxZoom: 12, padding: [10, 10] });
-        
-        // Highlight the searched ZIP
-        if (layer instanceof L.Path) {
-          layer.setStyle({
-            color: '#ef4444',
-            weight: 3,
-            fillOpacity: 0.8,
-          });
-          
-          // Reset style after 3 seconds
-          setTimeout(() => {
-            if (layer instanceof L.Path && colorScale) {
-              const pathLayer = layer as L.Path & { feature?: any };
-              if (pathLayer.feature) {
-                pathLayer.setStyle(getZipStyle(pathLayer.feature, map.getZoom(), colorScale, zipData, selectedMetric));
-              }
+    // First try to find coordinates in citiesData
+    const cityData = citiesData[searchZip];
+    if (cityData && cityData.latitude && cityData.longitude) {
+      // Zoom to the coordinate
+      map.setView([cityData.latitude, cityData.longitude], 12);
+      
+      // Highlight the searched ZIP if it exists in the layer
+      if (geojsonLayer) {
+        let found = false;
+        geojsonLayer.eachLayer((layer: any) => {
+          const zipCode = layer.feature?.properties?.ZCTA5CE10 || layer.feature?.properties?.GEOID20 || layer.feature?.properties?.ZCTA5CE20;
+          if (zipCode === searchZip) {
+            found = true;
+            
+            // Highlight the searched ZIP
+            if (layer instanceof L.Path) {
+              layer.setStyle({
+                color: '#ef4444',
+                weight: 3,
+                fillOpacity: 0.8,
+              });
+              
+              // Reset style after 3 seconds
+              setTimeout(() => {
+                if (layer instanceof L.Path && colorScale) {
+                  const pathLayer = layer as L.Path & { feature?: any };
+                  if (pathLayer.feature) {
+                    pathLayer.setStyle(getZipStyle(pathLayer.feature, map.getZoom(), colorScale, zipData, selectedMetric));
+                  }
+                }
+              }, 3000);
             }
-          }, 3000);
-        }
-
-        // Show popup for searched ZIP
-        if (zipData[zipCode]) {
-          const data = zipData[zipCode];
-          const cityData = citiesData[zipCode] || {};
-          const enhancedData = {
-            ...data,
-            zipCode,
-            city: cityData.city || data.city || 'Unknown',
-            county: cityData.county,
-            latitude: cityData.latitude,
-            longitude: cityData.longitude,
-            parent_metro: data.parent_metro,
-            state: data.state_name || 'Unknown',
-          };
-          onZipSelect(enhancedData);
-        }
+          }
+        });
       }
-    });
 
-    if (!found) {
-      console.log(`ZIP code ${searchZip} not found in map data`);
+      // Show popup for searched ZIP
+      if (zipData[searchZip]) {
+        const data = zipData[searchZip];
+        const enhancedData = {
+          ...data,
+          zipCode: searchZip,
+          city: cityData.city || data.city || 'Unknown',
+          county: cityData.county,
+          latitude: cityData.latitude,
+          longitude: cityData.longitude,
+          parent_metro: data.parent_metro,
+          state: data.state_name || 'Unknown',
+        };
+        onZipSelect(enhancedData);
+      }
+    } else {
+      console.log(`Coordinates not found for ZIP code ${searchZip}`);
     }
-  }, [map, geojsonLayer, searchZip, zipData, citiesData, onZipSelect, isInteractive, colorScale, selectedMetric]);
+  }, [map, searchZip, zipData, citiesData, onZipSelect, isInteractive, colorScale, selectedMetric, geojsonLayer]);
 
   // Enable interactive mode after initial load
   useEffect(() => {
