@@ -8,6 +8,7 @@ import { createMap } from './map/MapInitializer';
 import { getMetricValue, getMetricDisplay, getZipStyle } from './map/utils';
 import { ZipData, LeafletMapProps } from './map/types';
 import { styleCache } from './map/styleCache';
+import pako from 'pako';
 
 export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -100,8 +101,10 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     const loadMapLayers = async () => {
       // Load and add US land layer first (bottom layer)
       try {
-        const landResponse = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us_land.geojson');
-        const landData = await landResponse.json();
+        const landResponse = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us-land.geojson.gz');
+        const landArrayBuffer = await landResponse.arrayBuffer();
+        const landDecompressed = pako.ungzip(new Uint8Array(landArrayBuffer), { to: 'string' });
+        const landData = JSON.parse(landDecompressed);
         
         L.geoJSON(landData, {
           style: {
@@ -120,8 +123,10 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
 
       // Load ZIP code boundaries (GeoJSON from CDN)
       try {
-        const response = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us-zip-codes.geojson');
-        const geojsonData = await response.json();
+        const response = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us-zip-codes.geojson.gz');
+        const arrayBuffer = await response.arrayBuffer();
+        const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' });
+        const geojsonData = JSON.parse(decompressed);
 
         const layer = L.geoJSON(geojsonData, {
           style: (feature) => getZipStyle(feature, map.getZoom(), colorScale, zipData, selectedMetric),
@@ -197,8 +202,10 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
 
       // Load and add state boundaries (top layer)
       try {
-        const stateResponse = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us-state.geojson');
-        const stateData = await stateResponse.json();
+        const stateResponse = await fetch('https://cdn.jsdelivr.net/gh/jaspermayone/Domapus@main/public/data/us-state.geojson.gz');
+        const stateArrayBuffer = await stateResponse.arrayBuffer();
+        const stateDecompressed = pako.ungzip(new Uint8Array(stateArrayBuffer), { to: 'string' });
+        const stateData = JSON.parse(stateDecompressed);
         
         // Add state boundaries
         const stateLayer = L.geoJSON(stateData, {
@@ -227,8 +234,8 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     // First try to find coordinates in citiesData
     const cityData = citiesData[searchZip];
     if (cityData && cityData.latitude && cityData.longitude) {
-      // Zoom to the coordinate
-      map.setView([cityData.latitude, cityData.longitude], 12);
+      // Zoom to the coordinate with centering
+      map.setView([cityData.latitude, cityData.longitude], 12, { animate: true });
       
       // Highlight the searched ZIP if it exists in the layer
       if (geojsonLayer) {
