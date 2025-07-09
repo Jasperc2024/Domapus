@@ -1,4 +1,4 @@
-![App Icon](/favicon_io/android-chrome-512x512.png)
+<img src="https://jasperc2024.github.io/Domapus/favicon_io/android-chrome-512x512.png" width="400">
 
 #Domapus
 An interactive dashboard that visualizes U.S. housing market data down to the ZIP code level. 
