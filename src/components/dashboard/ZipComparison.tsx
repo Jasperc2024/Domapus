@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Search, X } from 'lucide-react';
+import pako from 'pako';
 
 interface ZipData {
   zipCode: string;
@@ -38,22 +39,26 @@ export function ZipComparison({ currentZip, onClose }: ZipComparisonProps) {
     const loadData = async () => {
       try {
         // Load ZIP data
-        const zipResponse = await fetch('data/zip-data.json');
-        const zipJson = await zipResponse.json();
+        const zipResponse = await fetch('data/zip-data.json.gz');
+        const zipBuffer = await zipResponse.arrayBuffer();
+        const zipDecompressed = pako.ungzip(new Uint8Array(zipBuffer), { to: 'string' });
+        const zipJson = JSON.parse(zipDecompressed);
         setAllZipData(zipJson);
 
         // Load cities mapping
-        const citiesResponse = await fetch('data/zip-city-mapping.csv');
-        const citiesText = await citiesResponse.text();
+        const citiesResponse = await fetch('data/zip-city-mapping.csv.gz');
+        const citiesBuffer = await citiesResponse.arrayBuffer();
+        const citiesDecompressed = pako.ungzip(new Uint8Array(citiesBuffer), { to: 'string' });
+
         const citiesMap: Record<string, string> = {};
-        
-        citiesText.split('\n').slice(1).forEach(line => {
+        citiesDecompressed.split('\n').slice(1).forEach(line => {
           const [zip, city] = line.split(',');
           if (zip && city) {
             citiesMap[zip.trim()] = city.trim();
           }
         });
         setCitiesData(citiesMap);
+
       } catch (error) {
         console.error('Error loading data:', error);
       }

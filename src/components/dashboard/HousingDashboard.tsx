@@ -9,7 +9,7 @@ const Sidebar = React.lazy(() =>
 );
 import { Legend } from "./Legend";
 import { LastUpdated } from "./LastUpdated";
-
+import pako from 'pako';
 import { TopBar } from "./TopBar";
 
 interface ZipData {
@@ -35,22 +35,31 @@ export function HousingDashboard() {
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
   useEffect(() => {
-    // Load real data and get last updated date
-    fetch(import.meta.env.BASE_URL + 'data/zip-data.json')
-      .then(response => response.json())
-      .then(data => {
-        // Find the most recent period_end date
-        const dates = Object.values(data).map((zip: any) => zip.period_end).filter(Boolean);
-        if (dates.length > 0) {
-          const latestDate = dates.sort().pop();
-          setLastUpdated(latestDate);
-        }
-      })
-      .catch(() => {
-        // Fallback to default date if file doesn't exist yet
+  const loadLastUpdatedDate = async () => {
+    try {
+      const response = await fetch(import.meta.env.BASE_URL + 'data/zip-data.json.gz');
+      const arrayBuffer = await response.arrayBuffer();
+      const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' });
+      const data = JSON.parse(decompressed);
+
+      const dates = Object.values(data)
+        .map((zip: any) => zip.period_end)
+        .filter(Boolean);
+
+      if (dates.length > 0) {
+        const latestDate = dates.sort().pop();
+        setLastUpdated(latestDate);
+      } else {
         setLastUpdated("2025-07-01");
-      });
-  }, []);
+      }
+    } catch (error) {
+      console.error("Failed to load or decompress zip-data.json.gz", error);
+      setLastUpdated("2025-07-01");
+    }
+  };
+
+  loadLastUpdatedDate();
+}, []);
 
   const handleZipSelect = (zipData: ZipData) => {
     setSelectedZip(zipData);

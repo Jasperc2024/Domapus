@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricType, METRICS } from "./MetricSelector";
 import { useEffect, useState } from "react";
 import { getMetricValue, getMetricDisplay } from "./map/utils";
+import pako from 'pako';
 
 interface LegendProps {
   selectedMetric: MetricType;
@@ -12,25 +13,30 @@ export function Legend({ selectedMetric }: LegendProps) {
   const [metricValues, setMetricValues] = useState<number[]>([]);
 
   useEffect(() => {
-    // Load ZIP data to get actual count and values
-    fetch('data/zip-data.json')
-      .then(response => response.json())
-      .then(data => {
-        setZipCount(Object.keys(data).length);
-        
-        // Get all values for the selected metric
-        const values = Object.values(data)
-          .map((zipData: any) => getMetricValue(zipData, selectedMetric))
-          .filter(v => v > 0)
-          .sort((a, b) => a - b);
-        
-        setMetricValues(values);
-      })
-      .catch(() => {
-        setZipCount(20000); // Fallback to default
-        setMetricValues([]);
-      });
-  }, [selectedMetric]);
+  const loadZipData = async () => {
+    try {
+      const response = await fetch('data/zip-data.json.gz');
+      const arrayBuffer = await response.arrayBuffer();
+      const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' });
+      const data = JSON.parse(decompressed);
+
+      setZipCount(Object.keys(data).length);
+
+      const values = Object.values(data)
+        .map((zipData: any) => getMetricValue(zipData, selectedMetric))
+        .filter(v => v > 0)
+        .sort((a, b) => a - b);
+
+      setMetricValues(values);
+    } catch (error) {
+      console.error("Failed to load or decompress zip-data.json.gz", error);
+      setZipCount(20000); // Fallback default
+      setMetricValues([]);
+    }
+  };
+
+  loadZipData();
+}, [selectedMetric]);
 
   // Calculate actual metric range from data
   const getLegendValues = () => {

@@ -1,4 +1,4 @@
-
+import pako from 'pako';
 import { useState, useEffect } from 'react';
 import { CityData } from './types';
 
@@ -21,16 +21,21 @@ export const useMapData = () => {
       try {
         setIsLoading(true);
 
-        // Load ZIP data from CDN
-        const zipResponse = await fetch('https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json.gz');
-        const zipJson = await zipResponse.json();
+        // Load ZIP data (compressed JSON)
+        const zipJson = await fetchGzipData(
+          'https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json.gz',
+          true
+        );
         setZipData(zipJson);
 
-        // Load enhanced cities mapping with coordinates and county from CDN
-        const citiesResponse = await fetch('https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-city-mapping.csv.gz');
-        const citiesText = await citiesResponse.text();
+        // Load cities CSV (compressed text)
+        const citiesText = await fetchGzipData(
+          'https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-city-mapping.csv.gz',
+          false
+        );
+
         const citiesMap: Record<string, CityData> = {};
-        
+
         citiesText.split('\n').slice(1).forEach(line => {
           const parts = line.split(',');
           if (parts.length >= 10) {
@@ -40,7 +45,7 @@ export const useMapData = () => {
             const city = parts[6]?.trim();
             const lat = parts[8] ? parseFloat(parts[8].trim()) : undefined;
             const lng = parts[9] ? parseFloat(parts[9].trim()) : undefined;
-            
+
             if (zip && city) {
               citiesMap[zip] = {
                 city,
