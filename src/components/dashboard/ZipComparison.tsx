@@ -38,7 +38,7 @@ export function ZipComparison({ currentZip, onClose }: ZipComparisonProps) {
     const loadData = async () => {
       try {
         // Load ZIP data
-        const zipResponse = await fetch('data/zip_data.json');
+        const zipResponse = await fetch('data/zip-data.json');
         const zipJson = await zipResponse.json();
         setAllZipData(zipJson);
 

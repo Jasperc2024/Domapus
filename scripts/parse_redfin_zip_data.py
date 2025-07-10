@@ -171,7 +171,7 @@ def main():
         
         output_dir = Path("public/data")
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / "zip_data.json.gz"
+        output_file = output_dir / "zip-data.json.gz"
 
         # === Smart write logic: skip if unchanged ===
         existing_data = {}
