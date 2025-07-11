@@ -10,6 +10,26 @@ import { ZipData, LeafletMapProps } from './map/types';
 import { styleCache } from './map/styleCache';
 import pako from 'pako';
 
+// Throttle function for hover effects
+const throttle = (func: Function, delay: number) => {
+  let timeoutId: NodeJS.Timeout | null = null;
+  let lastExecTime = 0;
+  return (...args: any[]) => {
+    const currentTime = Date.now();
+    
+    if (currentTime - lastExecTime > delay) {
+      func(...args);
+      lastExecTime = currentTime;
+    } else {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        func(...args);
+        lastExecTime = Date.now();
+      }, delay - (currentTime - lastExecTime));
+    }
+  };
+};
+
 export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<L.Map | null>(null);
@@ -99,27 +119,6 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
     if (!map || !colorScale || !isInteractive || geojsonLayer) return;
 
     const loadMapLayers = async () => {
-      // Load and add US land layer first (bottom layer)
-      try {
-        const landResponse = await fetch('https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-land.geojson.gz');
-        const landArrayBuffer = await landResponse.arrayBuffer();
-        const landDecompressed = pako.ungzip(new Uint8Array(landArrayBuffer), { to: 'string' });
-        const landData = JSON.parse(landDecompressed);
-        
-        L.geoJSON(landData, {
-          style: {
-            color: '#cccccc',
-            weight: 1,
-            fillColor: '#f5f5f5',
-            fillOpacity: 0.5,
-            opacity: 0.8
-          },
-          pane: 'overlayPane',
-          interactive: false
-        }).addTo(map);
-      } catch (error) {
-        console.warn('Could not load US land data:', error);
-      }
 
       // Load ZIP code boundaries (GeoJSON from CDN)
       try {
@@ -127,6 +126,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
         const arrayBuffer = await response.arrayBuffer();
         const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' });
         const geojsonData = JSON.parse(decompressed);
+        console.log('GeoJSON feature count:', geojsonData.features?.length || 0);
 
         const layer = L.geoJSON(geojsonData, {
           style: (feature) => getZipStyle(feature, map.getZoom(), colorScale, zipData, selectedMetric),
@@ -137,33 +137,35 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
               const data = zipData[zipCode];
               const cityData = citiesData[zipCode] || {};
               
-              // Add hover effect
+              // Add hover effect with throttling
+              const throttledMouseOver = throttle((e: L.LeafletMouseEvent) => {
+                const target = e.target as L.Path;
+                const currentZoom = map.getZoom();
+                target.setStyle({
+                  weight: Math.max(currentZoom > 8 ? 3 : 2, 1),
+                  color: '#333',
+                  fillOpacity: 0.9,
+                });
+                
+                // Show tooltip
+                const popup = L.popup({
+                  closeButton: false,
+                  autoClose: false,
+                  className: 'zip-tooltip',
+                })
+                  .setLatLng(e.latlng)
+                  .setContent(`
+                    <div class="p-2 bg-white rounded shadow-lg border">
+                      <div class="font-semibold text-sm">${zipCode}</div>
+                      <div class="text-xs text-gray-600">${cityData.city || 'Unknown'}</div>
+                      <div class="text-xs mt-1">${getMetricDisplay(data, selectedMetric)}</div>
+                    </div>
+                  `)
+                  .openOn(map);
+              }, 150); // Throttle hover effects to 150ms
+
               layer.on({
-                mouseover: (e) => {
-                  const target = e.target as L.Path;
-                  const currentZoom = map.getZoom();
-                  target.setStyle({
-                    weight: Math.max(currentZoom > 8 ? 3 : 2, 1),
-                    color: '#333',
-                    fillOpacity: 0.9,
-                  });
-                  
-                  // Show tooltip
-                  const popup = L.popup({
-                    closeButton: false,
-                    autoClose: false,
-                    className: 'zip-tooltip',
-                  })
-                    .setLatLng(e.latlng)
-                    .setContent(`
-                      <div class="p-2 bg-white rounded shadow-lg border">
-                        <div class="font-semibold text-sm">${zipCode}</div>
-                        <div class="text-xs text-gray-600">${cityData.city || 'Unknown'}</div>
-                        <div class="text-xs mt-1">${getMetricDisplay(data, selectedMetric)}</div>
-                      </div>
-                    `)
-                    .openOn(map);
-                },
+                mouseover: throttledMouseOver,
                 mouseout: (e) => {
                   const target = e.target as L.Path;
                   target.setStyle(getZipStyle(feature, map.getZoom(), colorScale, zipData, selectedMetric));
@@ -196,6 +198,11 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
 
         layer.addTo(map);
         setGeojsonLayer(layer);
+
+        // Add labels layer on top of ZIP codes
+        if ((map as any)._labelsLayer) {
+          (map as any)._labelsLayer.addTo(map);
+        }
       } catch (error) {
         console.error('Error loading ZIP code data:', error);
       }
@@ -206,6 +213,7 @@ export function LeafletMap({ selectedMetric, onZipSelect, searchZip }: LeafletMa
         const stateArrayBuffer = await stateResponse.arrayBuffer();
         const stateDecompressed = pako.ungzip(new Uint8Array(stateArrayBuffer), { to: 'string' });
         const stateData = JSON.parse(stateDecompressed);
+        console.log('GeoJSON feature count:', stateData.features?.length || 0);
         
         // Add state boundaries
         const stateLayer = L.geoJSON(stateData, {

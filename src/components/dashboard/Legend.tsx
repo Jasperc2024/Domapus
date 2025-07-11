@@ -6,37 +6,63 @@ import pako from 'pako';
 
 interface LegendProps {
   selectedMetric: MetricType;
+  exportOptions?: {
+    regionScope?: 'national' | 'state' | 'metro';
+    selectedState?: string;
+    selectedMetro?: string;
+  };
 }
 
-export function Legend({ selectedMetric }: LegendProps) {
+export function Legend({ selectedMetric, exportOptions }: LegendProps) {
   const [zipCount, setZipCount] = useState<number>(0);
   const [metricValues, setMetricValues] = useState<number[]>([]);
 
   useEffect(() => {
-  const loadZipData = async () => {
-    try {
-      const response = await fetch('data/zip-data.json.gz');
-      const arrayBuffer = await response.arrayBuffer();
-      const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' });
-      const data = JSON.parse(decompressed);
+    // Load ZIP data to get actual count and values
+    const loadData = async () => {
+      try {
+        // Load from compressed data
+        const response = await fetch(import.meta.env.BASE_URL + 'data/zip-data.json.gz');
+        const arrayBuffer = await response.arrayBuffer();
+        const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' });
+        const data = JSON.parse(decompressed);
 
-      setZipCount(Object.keys(data).length);
+        // Filter data based on export options if provided
+        let filteredData = data;
+        if (exportOptions) {
+          if (exportOptions.regionScope === 'state' && exportOptions.selectedState) {
+            filteredData = Object.fromEntries(
+              Object.entries(data).filter(([, zipData]: [string, any]) => 
+                zipData.state === exportOptions.selectedState
+              )
+            );
+          } else if (exportOptions.regionScope === 'metro' && exportOptions.selectedMetro) {
+            filteredData = Object.fromEntries(
+              Object.entries(data).filter(([, zipData]: [string, any]) => 
+                zipData.parent_metro === exportOptions.selectedMetro
+              )
+            );
+          }
+        }
 
-      const values = Object.values(data)
-        .map((zipData: any) => getMetricValue(zipData, selectedMetric))
-        .filter(v => v > 0)
-        .sort((a, b) => a - b);
+        setZipCount(Object.keys(filteredData).length);
+        
+        // Get all values for the selected metric from filtered data
+        const values = Object.values(filteredData)
+          .map((zipData: any) => getMetricValue(zipData, selectedMetric))
+          .filter(v => v > 0)
+          .sort((a, b) => a - b);
+        
+        setMetricValues(values);
+      } catch (error) {
+        console.error('Error loading legend data:', error);
+        setZipCount(20000); // Fallback to default
+        setMetricValues([]);
+      }
+    };
 
-      setMetricValues(values);
-    } catch (error) {
-      console.error("Failed to load or decompress zip-data.json.gz", error);
-      setZipCount(20000); // Fallback default
-      setMetricValues([]);
-    }
-  };
-
-  loadZipData();
-}, [selectedMetric]);
+    loadData();
+  }, [selectedMetric, exportOptions]);
 
   // Calculate actual metric range from data
   const getLegendValues = () => {

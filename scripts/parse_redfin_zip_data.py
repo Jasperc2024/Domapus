@@ -18,13 +18,13 @@ from io import BytesIO  # >>> ADDED FOR STREAMED GZIP DECOMPRESSION
 import random  # >>> ADDED FOR RANDOM SAMPLE
 
 logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("data_pipeline.log"),
-        logging.StreamHandler(sys.stdout)
-    ] 
-)     
+     filename='data_pipeline.log',
+     level=logging.INFO,                    # capture INFO→CRITICAL
+     format='%(asctime)s %(levelname)s %(message)s'
+ )
+
+MAX_RETRIES   = 3   # <–– centralised
+RETRY_DELAY_S = 5
 
 def download_redfin_data(url, timeout=300, retries=3):
     """Download the Redfin data file with retries."""
