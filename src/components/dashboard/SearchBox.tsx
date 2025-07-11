@@ -1,7 +1,26 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+
+// Debounce function for search
+const useDebounce = (callback: Function, delay: number) => {
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout>();
+
+  const debouncedCallback = useCallback((...args: any[]) => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    
+    const newTimer = setTimeout(() => {
+      callback(...args);
+    }, delay);
+    
+    setDebounceTimer(newTimer);
+  }, [callback, delay, debounceTimer]);
+
+  return debouncedCallback;
+};
 
 interface SearchBoxProps {
   onSearch: (zipCode: string) => void;
@@ -9,6 +28,21 @@ interface SearchBoxProps {
 
 export function SearchBox({ onSearch }: SearchBoxProps) {
   const [searchValue, setSearchValue] = useState("");
+
+  // Debounced search function
+  const debouncedSearch = useDebounce((value: string) => {
+    if (value.trim() && value.length >= 3) {
+      onSearch(value.trim());
+    }
+  }, 300);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchValue(value);
+    
+    // Trigger debounced search on input change
+    debouncedSearch(value);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +60,7 @@ export function SearchBox({ onSearch }: SearchBoxProps) {
             type="text"
             placeholder="Enter ZIP code..."
             value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
+            onChange={handleInputChange}
             className="pl-10 w-48"
             maxLength={5}
             aria-label="Search for ZIP code"

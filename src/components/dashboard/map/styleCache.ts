@@ -1,13 +1,24 @@
 // Style cache for memoizing ZIP code styles
 export class StyleCache {
   private cache = new Map<string, any>();
-  private maxSize = 10000; // Limit cache size to prevent memory issues
+  private maxSize = 50000; // Limit cache size to prevent memory issues
+  private cacheExpiry = new Map<string, number>();
+  private maxAge = 30 * 60 * 1000;
 
   getCacheKey(zipCode: string, zoom: number, metric: string, value: number): string {
     return `${zipCode}-${Math.floor(zoom)}-${metric}-${value}`;
   }
 
   get(key: string): any {
+       const now = Date.now();
+    const expiry = this.cacheExpiry.get(key);
+    
+    if (expiry && now > expiry) {
+      // Cache entry expired
+      this.cache.delete(key);
+      this.cacheExpiry.delete(key);
+      return undefined;
+    }
     return this.cache.get(key);
   }
 

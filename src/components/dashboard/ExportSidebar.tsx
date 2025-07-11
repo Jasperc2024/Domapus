@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Download, FileImage, FileText, Settings, Map } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import pako from 'pako';
 
 interface ExportSidebarProps {
   selectedMetric: string;
@@ -26,81 +27,24 @@ export interface ExportOptions {
   includeAttribution: boolean;
 }
 
-const US_STATES = [
-  { code: "AL", name: "Alabama" },
-  { code: "AK", name: "Alaska" },
-  { code: "AZ", name: "Arizona" },
-  { code: "AR", name: "Arkansas" },
-  { code: "CA", name: "California" },
-  { code: "CO", name: "Colorado" },
-  { code: "CT", name: "Connecticut" },
-  { code: "DE", name: "Delaware" },
-  { code: "FL", name: "Florida" },
-  { code: "GA", name: "Georgia" },
-  { code: "HI", name: "Hawaii" },
-  { code: "ID", name: "Idaho" },
-  { code: "IL", name: "Illinois" },
-  { code: "IN", name: "Indiana" },
-  { code: "IA", name: "Iowa" },
-  { code: "KS", name: "Kansas" },
-  { code: "KY", name: "Kentucky" },
-  { code: "LA", name: "Louisiana" },
-  { code: "ME", name: "Maine" },
-  { code: "MD", name: "Maryland" },
-  { code: "MA", name: "Massachusetts" },
-  { code: "MI", name: "Michigan" },
-  { code: "MN", name: "Minnesota" },
-  { code: "MS", name: "Mississippi" },
-  { code: "MO", name: "Missouri" },
-  { code: "MT", name: "Montana" },
-  { code: "NE", name: "Nebraska" },
-  { code: "NV", name: "Nevada" },
-  { code: "NH", name: "New Hampshire" },
-  { code: "NJ", name: "New Jersey" },
-  { code: "NM", name: "New Mexico" },
-  { code: "NY", name: "New York" },
-  { code: "NC", name: "North Carolina" },
-  { code: "ND", name: "North Dakota" },
-  { code: "OH", name: "Ohio" },
-  { code: "OK", name: "Oklahoma" },
-  { code: "OR", name: "Oregon" },
-  { code: "PA", name: "Pennsylvania" },
-  { code: "RI", name: "Rhode Island" },
-  { code: "SC", name: "South Carolina" },
-  { code: "SD", name: "South Dakota" },
-  { code: "TN", name: "Tennessee" },
-  { code: "TX", name: "Texas" },
-  { code: "UT", name: "Utah" },
-  { code: "VT", name: "Vermont" },
-  { code: "VA", name: "Virginia" },
-  { code: "WA", name: "Washington" },
-  { code: "WV", name: "West Virginia" },
-  { code: "WI", name: "Wisconsin" },
-  { code: "WY", name: "Wyoming" }
-];
+// Dynamic state mapping - will be populated from data
+const STATE_NAME_TO_CODE: Record<string, string> = {
+  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
+  'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
+  'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID',
+  'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS',
+  'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+  'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
+  'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+  'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+  'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
+  'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+  'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
+  'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+  'Wisconsin': 'WI', 'Wyoming': 'WY', 'Columbia': 'DC'
+};
 
-const METRO_AREAS = [
-  "New York-Newark-Jersey City, NY-NJ-PA",
-  "Los Angeles-Long Beach-Anaheim, CA",
-  "Chicago-Naperville-Elgin, IL-IN-WI",
-  "Dallas-Fort Worth-Arlington, TX",
-  "Houston-The Woodlands-Sugar Land, TX",
-  "Washington-Arlington-Alexandria, DC-VA-MD-WV",
-  "Miami-Fort Lauderdale-West Palm Beach, FL",
-  "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD",
-  "Atlanta-Sandy Springs-Roswell, GA",
-  "Boston-Cambridge-Newton, MA-NH",
-  "Phoenix-Mesa-Scottsdale, AZ",
-  "San Francisco-Oakland-Hayward, CA",
-  "Riverside-San Bernardino-Ontario, CA",
-  "Detroit-Warren-Dearborn, MI",
-  "Seattle-Tacoma-Bellevue, WA",
-  "Minneapolis-St. Paul-Bloomington, MN-WI",
-  "San Diego-Carlsbad, CA",
-  "Tampa-St. Petersburg-Clearwater, FL",
-  "Denver-Aurora-Lakewood, CO",
-  "St. Louis, MO-IL"
-];
+
 
 export function ExportSidebar({ selectedMetric, onExport, onCancel, isExporting }: ExportSidebarProps) {
   const [regionScope, setRegionScope] = useState<'national' | 'state' | 'metro'>('national');
@@ -109,6 +53,85 @@ export function ExportSidebar({ selectedMetric, onExport, onCancel, isExporting 
   const [fileFormat, setFileFormat] = useState<'png' | 'pdf'>('png');
   const [includeLegend, setIncludeLegend] = useState(true);
   const [includeTitle, setIncludeTitle] = useState(true);
+  const [availableStates, setAvailableStates] = useState<Array<{name: string, code: string}>>([]);
+  const [availableMetros, setAvailableMetros] = useState<string[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // Load available states and metro areas from data
+  useEffect(() => {
+    const loadAvailableOptions = async () => {
+      try {
+        setIsLoadingData(true);
+        
+        // Load from compressed data
+        const response = await fetch(import.meta.env.BASE_URL + 'data/zip-data.json.gz');
+        const arrayBuffer = await response.arrayBuffer();
+        const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' });
+        const data = JSON.parse(decompressed);
+
+        // Extract unique states and metros
+        const stateNames = new Set<string>();
+        const metroNames = new Set<string>();
+
+        Object.values(data).forEach((zipData: any) => {
+          if (zipData.state) {
+            stateNames.add(zipData.state);
+          }
+          if (zipData.parent_metro) {
+            metroNames.add(zipData.parent_metro);
+          }
+        });
+
+        // Convert state names to state objects with codes
+        const stateList = Array.from(stateNames)
+          .map(name => ({
+            name,
+            code: STATE_NAME_TO_CODE[name] || name.substring(0, 2).toUpperCase()
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        const metroList = Array.from(metroNames).sort();
+
+        setAvailableStates(stateList);
+        setAvailableMetros(metroList);
+      } catch (error) {
+        console.error('Error loading available options:', error);
+        // Fallback to hardcoded list
+        setAvailableStates([
+          { name: "Alabama", code: "AL" }, { name: "Alaska", code: "AK" },
+          { name: "Arizona", code: "AZ" }, { name: "Arkansas", code: "AR" },
+          { name: "California", code: "CA" }, { name: "Colorado", code: "CO" },
+          { name: "Connecticut", code: "CT" }, { name: "Delaware", code: "DE" },
+          { name: "Florida", code: "FL" }, { name: "Georgia", code: "GA" },
+          { name: "Hawaii", code: "HI" }, { name: "Idaho", code: "ID" },
+          { name: "Illinois", code: "IL" }, { name: "Indiana", code: "IN" },
+          { name: "Iowa", code: "IA" }, { name: "Kansas", code: "KS" },
+          { name: "Kentucky", code: "KY" }, { name: "Louisiana", code: "LA" },
+          { name: "Maine", code: "ME" }, { name: "Maryland", code: "MD" },
+          { name: "Massachusetts", code: "MA" }, { name: "Michigan", code: "MI" },
+          { name: "Minnesota", code: "MN" }, { name: "Mississippi", code: "MS" },
+          { name: "Missouri", code: "MO" }, { name: "Montana", code: "MT" },
+          { name: "Nebraska", code: "NE" }, { name: "Nevada", code: "NV" },
+          { name: "New Hampshire", code: "NH" }, { name: "New Jersey", code: "NJ" },
+          { name: "New Mexico", code: "NM" }, { name: "New York", code: "NY" },
+          { name: "North Carolina", code: "NC" }, { name: "North Dakota", code: "ND" },
+          { name: "Ohio", code: "OH" }, { name: "Oklahoma", code: "OK" },
+          { name: "Oregon", code: "OR" }, { name: "Pennsylvania", code: "PA" },
+          { name: "Rhode Island", code: "RI" }, { name: "South Carolina", code: "SC" },
+          { name: "South Dakota", code: "SD" }, { name: "Tennessee", code: "TN" },
+          { name: "Texas", code: "TX" }, { name: "Utah", code: "UT" },
+          { name: "Vermont", code: "VT" }, { name: "Virginia", code: "VA" },
+          { name: "Washington", code: "WA" }, { name: "West Virginia", code: "WV" },
+          { name: "Wisconsin", code: "WI" }, { name: "Wyoming", code: "WY" }
+        ]);
+        setAvailableMetros([]);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    loadAvailableOptions();
+  }, []);
 
   const getMetricDisplayName = (metric: string) => {
     const metricNames: Record<string, string> = {
@@ -127,7 +150,10 @@ export function ExportSidebar({ selectedMetric, onExport, onCancel, isExporting 
 
   const getRegionDisplayName = () => {
     if (regionScope === 'national') return 'United States';
-    if (regionScope === 'state') return US_STATES.find(s => s.code === selectedState)?.name || selectedState;
+    if (regionScope === 'state') {
+      const state = availableStates.find(s => s.name === selectedState);
+      return state?.name || selectedState;
+    }
     if (regionScope === 'metro') return selectedMetro;
     return '';
   };
@@ -152,7 +178,7 @@ export function ExportSidebar({ selectedMetric, onExport, onCancel, isExporting 
   };
 
   const isExportDisabled = () => {
-    if (isExporting) return true;
+    if (isExporting || isLoadingData) return true;
     if (regionScope === 'state' && !selectedState) return true;
     if (regionScope === 'metro' && !selectedMetro) return true;
     return false;
@@ -197,13 +223,13 @@ export function ExportSidebar({ selectedMetric, onExport, onCancel, isExporting 
             </RadioGroup>
 
             {regionScope === 'state' && (
-              <Select value={selectedState} onValueChange={setSelectedState}>
+              <Select value={selectedState} onValueChange={setSelectedState} disabled={isLoadingData}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a state" />
+                  <SelectValue placeholder={isLoadingData ? "Loading states..." : "Select a state"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {US_STATES.map((state) => (
-                    <SelectItem key={state.code} value={state.code}>
+                  {availableStates.map((state) => (
+                    <SelectItem key={state.name} value={state.name}>
                       {state.name}
                     </SelectItem>
                   ))}
@@ -212,12 +238,12 @@ export function ExportSidebar({ selectedMetric, onExport, onCancel, isExporting 
             )}
 
             {regionScope === 'metro' && (
-              <Select value={selectedMetro} onValueChange={setSelectedMetro}>
+              <Select value={selectedMetro} onValueChange={setSelectedMetro} disabled={isLoadingData}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a metro area" />
+                  <SelectValue placeholder={isLoadingData ? "Loading metro areas..." : "Select a metro area"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {METRO_AREAS.map((metro) => (
+                  {availableMetros.map((metro) => (
                     <SelectItem key={metro} value={metro}>
                       {metro}
                     </SelectItem>
@@ -309,6 +335,11 @@ export function ExportSidebar({ selectedMetric, onExport, onCancel, isExporting 
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
                 Exporting...
+              </>
+            ) : isLoadingData ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
+                Loading data...
               </>
             ) : (
               <>

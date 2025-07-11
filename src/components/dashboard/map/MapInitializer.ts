@@ -27,13 +27,12 @@ export const createMap = (container: HTMLElement): L.Map => {
     renderer: L.canvas({
       padding: 2, // Increased padding for better performance
       tolerance: 5, // Increased tolerance for smoother interactions
-      pane: 'overlayPane'
     })
   });
 
-  // Add Carto Positron tile layer with synchronous loading
-  const tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+  // Add Carto Positron no-label tile layer as base
+  const baseTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+    attribution: '',
     subdomains: 'abcd',
     maxZoom: 18,
     keepBuffer: 8, // Increased buffer to avoid blank spaces
@@ -44,7 +43,24 @@ export const createMap = (container: HTMLElement): L.Map => {
     pane: 'tilePane' // Ensure tiles are at bottom
   });
   
-  tileLayer.addTo(leafletMap);
+  baseTileLayer.addTo(leafletMap);
+
+  // Add labels layer on top (will be added after zip codes layer)
+  const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 18,
+    keepBuffer: 8,
+    updateWhenZooming: true,
+    updateWhenIdle: false,
+    crossOrigin: true,
+    detectRetina: true,
+    pane: 'overlayPane',
+    zIndex: 1000 // Ensure labels are on top
+  });
+
+  // Store labels layer for later addition
+  (leafletMap as any)._labelsLayer = labelsLayer;
 
   return leafletMap;
 };

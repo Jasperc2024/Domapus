@@ -34,7 +34,7 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
     if (exportOptions.regionScope === 'state' && exportOptions.selectedState) {
       filteredData = Object.fromEntries(
         Object.entries(zipData).filter(([, data]: [string, any]) => 
-          data.state_code === exportOptions.selectedState
+          data.state === exportOptions.selectedState
         )
       );
     } else if (exportOptions.regionScope === 'metro' && exportOptions.selectedMetro) {
@@ -133,7 +133,7 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
             // Filter based on export options
             if (exportOptions.regionScope === 'state' && exportOptions.selectedState) {
               const data = zipData[zipCode];
-              if (!data || data.state_code !== exportOptions.selectedState) {
+              if (!data || data.state !== exportOptions.selectedState) {
                 return { fillOpacity: 0, stroke: false };
               }
             } else if (exportOptions.regionScope === 'metro' && exportOptions.selectedMetro) {
@@ -194,7 +194,7 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
           // Filter based on export options
           if (exportOptions.regionScope === 'state' && exportOptions.selectedState) {
             const data = zipData[zipCode];
-            if (!data || data.state_code !== exportOptions.selectedState) {
+            if (!data || data.state !== exportOptions.selectedState) {
               pathLayer.setStyle({ fillOpacity: 0, stroke: false });
               return;
             }
