@@ -1,8 +1,8 @@
 # 🏠 Domapus - Interactive U.S. Housing Market Dashboard
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-blue?style=for-the-badge)](https://jasperc2024.github.io/Domapus/)
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=for-the-badge&logo=github)](https://github.com/Jasperc2024/Domapus)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-blue)](https://jasperc2024.github.io/Domapus/)
+[![GitHub](https://img.shields.io/badge/GitHub-Repo-black)](https://github.com/Jasperc2024/Domapus)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 Domapus is a high-performance, interactive dashboard for exploring U.S. housing market data at the ZIP code level. Built with React, TypeScript, and Leaflet, it visualizes real estate trends across 24,000+ ZIP codes using data sourced from Redfin.
 
