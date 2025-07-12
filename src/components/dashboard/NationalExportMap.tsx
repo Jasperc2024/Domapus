@@ -107,11 +107,16 @@ export function NationalExportMap({
         const alaskaFeatures = [];
         const hawaiiFeatures = [];
 
-        geojsonData.features.forEach((feature: any) => {
+        geojsonData.features.forEach((feature: unknown) => {
+          const featureTyped = feature as {
+            properties?: { ZCTA5CE20?: string; GEOID20?: string };
+          };
           const zipCode =
-            feature.properties?.ZCTA5CE20 || feature.properties?.GEOID20;
+            featureTyped.properties?.ZCTA5CE20 ||
+            featureTyped.properties?.GEOID20;
           if (zipCode && zipData[zipCode]) {
-            const state = zipData[zipCode].state_name;
+            const state = (zipData[zipCode] as { state_name?: string })
+              .state_name;
             if (state === "Alaska") {
               alaskaFeatures.push(feature);
             } else if (state === "Hawaii") {
