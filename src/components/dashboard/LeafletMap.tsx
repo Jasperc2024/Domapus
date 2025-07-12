@@ -9,7 +9,7 @@ import { ZipData, LeafletMapProps } from "./map/types";
 import { styleCache } from "./map/styleCache";
 import pako from "pako";
 
-// Throttle function for hover effects
+// Optimized throttle function for better responsiveness
 const throttle = (func: Function, delay: number) => {
   let timeoutId: NodeJS.Timeout | null = null;
   let lastExecTime = 0;
@@ -29,6 +29,15 @@ const throttle = (func: Function, delay: number) => {
         delay - (currentTime - lastExecTime),
       );
     }
+  };
+};
+
+// Debounce function for expensive operations
+const debounce = (func: Function, delay: number) => {
+  let timeoutId: NodeJS.Timeout | null = null;
+  return (...args: any[]) => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
   };
 };
 
