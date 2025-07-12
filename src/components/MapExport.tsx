@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, Map } from "lucide-react";
+import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ExportSidebar, ExportOptions } from "./dashboard/ExportSidebar";
 import { ExportPreviewMap } from "./dashboard/ExportPreviewMap";
@@ -11,18 +11,10 @@ interface MapExportProps {
 
 export function MapExport({ selectedMetric }: MapExportProps) {
   const [isExportMode, setIsExportMode] = useState(false);
-  const [exportOptions, setExportOptions] = useState<ExportOptions | null>(null);
+  const [exportOptions, setExportOptions] = useState<ExportOptions | null>(
+    null,
+  );
   const [isExporting, setIsExporting] = useState(false);
-
-  const states = [
-    { code: "CA", name: "California" },
-    { code: "NY", name: "New York" },
-    { code: "TX", name: "Texas" },
-    { code: "FL", name: "Florida" },
-    { code: "IL", name: "Illinois" },
-    { code: "WA", name: "Washington" },
-    // Add more states as needed
-  ];
 
   const handleExport = (options: ExportOptions) => {
     setExportOptions(options);
@@ -35,7 +27,7 @@ export function MapExport({ selectedMetric }: MapExportProps) {
       setIsExportMode(false);
       setExportOptions(null);
     } else if (error) {
-      console.error('Export failed:', error);
+      console.error("Export failed:", error);
     }
   };
 
@@ -57,14 +49,16 @@ export function MapExport({ selectedMetric }: MapExportProps) {
         <div className="flex-1">
           <ExportPreviewMap
             selectedMetric={selectedMetric}
-            exportOptions={exportOptions || {
-              regionScope: 'national',
-              fileFormat: 'png',
-              includeLegend: true,
-              includeTitle: true,
-              includeDateLabel: true,
-              includeAttribution: true
-            }}
+            exportOptions={
+              exportOptions || {
+                regionScope: "national",
+                fileFormat: "png",
+                includeLegend: true,
+                includeTitle: true,
+                includeDateLabel: true,
+                includeAttribution: true,
+              }
+            }
           />
         </div>
         {exportOptions && isExporting && (
@@ -79,9 +73,9 @@ export function MapExport({ selectedMetric }: MapExportProps) {
   }
 
   return (
-    <Button 
-      variant="outline" 
-      size="sm" 
+    <Button
+      variant="outline"
+      size="sm"
       onClick={() => setIsExportMode(true)}
       aria-label="Export map"
     >

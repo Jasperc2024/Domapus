@@ -1,171 +1,262 @@
-<img src="https://jasperc2024.github.io/Domapus//android-chrome-512x512.png" width="100">   
+# 🏠 Domapus - Interactive U.S. Housing Market Dashboard
 
-# Domapus
+[![Live Demo](https://img.shields.io/badge/Live-Demo-blue?style=for-the-badge)](https://jasperc2024.github.io/Domapus/)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=for-the-badge&logo=github)](https://github.com/Jasperc2024/Domapus)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-An interactive dashboard that visualizes U.S. housing market data down to the ZIP code level. 
+Domapus is a high-performance, interactive dashboard for exploring U.S. housing market data at the ZIP code level. Built with React, TypeScript, and Leaflet, it visualizes real estate trends across 24,000+ ZIP codes using data sourced from Redfin.
 
-Built on Redfin's public data, this tool offers detailed metrics, a clean interface, and automated monthly updates — all open-source and ad-free.
+![Domapus Preview](https://jasperc2024.github.io/Domapus/preview.png)
 
-> 🌐 **Live Demo**: [https://jasperc2024.github.io/Domapus/](https://jasperc2024.github.io/Domapus/)
+## ✨ Features
 
----
+### 🗺️ Interactive Map Visualization
 
-## 🚀 Features
+- **Real-time ZIP code data** for 24,000+ locations across the United States
+- **Multiple housing metrics** including median sale price, inventory, days on market, and more
+- **Smooth zoom and pan** with optimized rendering performance
+- **Hover tooltips** displaying detailed information for each ZIP code
+- **Search functionality** to quickly locate specific ZIP codes
 
-- 🗺️ Interactive ZIP-level U.S. Map with color-coded housing metrics
-- 📊 Real-time metrics including prices, inventory, sales, and more
-- 🔎 Search by ZIP code for quick navigation
-- 📱 Mobile-friendly responsive design
-- 🔄 Automated monthly updates via GitHub Actions
-- 📈 Detailed hover and click analytics per ZIP code
+### 📊 Advanced Analytics
 
----
+- **Dynamic color scaling** based on data distribution
+- **Quintile-based legend** showing actual data ranges
+- **Regional filtering** by state and metropolitan area
+- **Real-time metric switching** without data reloading
 
-## 📊 Tracked Metrics
+### 📸 Professional Export System
 
-- **🏷 Median Sale Price & Median List Price**
-- **📆 Median Days on Market (DOM) & Days to Close**
-- **🏘 Inventory, New Listings, Pending Sales**
-- **🏡 Homes Sold & % Sold Above List**
-- **💰 Sale-to-List Ratio & Price Drops**
-- **📦 Off-Market in Two Weeks Percentage**
-- **📐 Price per Square Foot (PPSF)**
-- **📈 Year-over-Year (YoY) and Month-over-Month (MoM)** changes
+- **High-quality map exports** in PNG and PDF formats
+- **Dynamic legend scaling** based on selected data
+- **Alaska and Hawaii repositioning** for professional national reports
+- **Customizable export options** including title, legend, and attribution
+- **Professional branding** with Domapus logo integration
 
----
+### ⚡ Performance Optimizations
 
-## ⚙️ Tech Stack
+- **Web Workers** for data processing to improve responsiveness
+- **Optimized INP (Interaction to Next Paint)** for better user experience
+- **Resource preconnection** and prefetching for faster loading
+- **Debounced interactions** to reduce main thread blocking
+- **Efficient memory management** with throttled hover effects
 
-| Layer        | Technology                            |
-|--------------|----------------------------------------|
-| Frontend     | React, TypeScript, Vite               |
-| Styling      | Tailwind CSS, shadcn/ui               |
-| Data Parsing | Python, Pandas                        |
-| Automation   | GitHub Actions                        |
-| Deployment   | GitHub Pages                          |
-| Data Source  | [Redfin Public Data](https://www.redfin.com/news/data-center/) |
+## 🚀 Quick Start
 
----
+### Prerequisites
 
-## 🔁 Data Pipeline
+- Node.js 18+
+- npm or yarn package manager
 
-The dashboard stays current through an automated monthly pipeline:
+### Installation
 
-1. 🗓 **Schedule**: Redfin releases new data monthly
-2. 📥 **Download**: TSV.gz file retrieved from Redfin’s public S3 bucket
-3. 🧹 **Cleanup**: Drops all unused metadata
-4. 🔄 **Parse**: Converts data to structured `zip_data.json` for frontend use
-5. 🚀 **Deploy**: GitHub Action commits new data and refreshes the site
+1. **Clone the repository**
 
-🛠 Script: `scripts/parse_redfin_zip_data.py`  
-🔁 Automation: `.github/workflows/update-data.yml`
+   ```bash
+   git clone https://github.com/Jasperc2024/Domapus.git
+   cd Domapus
+   ```
 
----
+2. **Install dependencies**
 
-## 💻 Local Development
+   ```bash
+   npm install
+   ```
 
-To run this project locally:
+3. **Start the development server**
+
+   ```bash
+   npm run dev
+   ```
+
+4. **Open your browser**
+   Navigate to `http://localhost:8080/Domapus/`
+
+### Build for Production
 
 ```bash
-git clone https://github.com/Jasperc2024/Domapus.git
-cd Domapus
-npm install
-npm run dev
+npm run build
+npm run preview
 ```
 
-Visit: `http://localhost:5173`
+## 🏗️ Project Structure
 
----
+```
+src/
+├── components/
+│   ├── dashboard/           # Main dashboard components
+│   │   ├── map/            # Map-related utilities and hooks
+│   │   ├── ExportRenderer.tsx    # Export functionality
+│   │   ├── ExportLegend.tsx      # Dynamic legend component
+│   │   ├── NationalExportMap.tsx # Alaska/Hawaii positioning
+│   │   └── ...
+│   ├── ui/                 # Reusable UI components (shadcn/ui)
+│   └── ...
+├── hooks/                  # Custom React hooks
+│   ├── useOptimizedMapData.ts    # Web worker data processing
+│   └── ...
+├── workers/                # Web workers for performance
+├── utils/                  # Utility functions
+└── pages/                  # Page components
+```
 
-## 🐍 Manual Data Update (Python)
+## 📊 Available Metrics
 
-To manually reprocess Redfin's data:
+- **Median Sale Price** - Middle price point of recently sold homes
+- **Median List Price** - Middle asking price of homes for sale
+- **Median Days on Market** - Average time homes spend listed before sale
+- **Inventory** - Number of homes currently available for sale
+- **New Listings** - Recently added properties to the market
+- **Homes Sold** - Number of completed transactions
+- **Sale to List Ratio** - Percentage of asking price achieved in sales
+- **Homes Sold Above List** - Properties selling above asking price
+- **Off Market in 2 Weeks** - Quick-selling properties
+
+## 🎨 Technology Stack
+
+### Frontend
+
+- **React 18** - Modern React with hooks and concurrent features
+- **TypeScript** - Type-safe development with enhanced IDE support
+- **Vite** - Fast build tool with hot module replacement
+- **Tailwind CSS** - Utility-first CSS framework
+- **shadcn/ui** - High-quality, accessible component library
+
+### Mapping & Visualization
+
+- **Leaflet** - Open-source interactive map library
+- **React-Leaflet** - React components for Leaflet maps
+- **D3-Scale** - Data-driven color scaling and interpolation
+- **Canvas Rendering** - High-performance map layer rendering
+
+### Data Processing
+
+- **Pako** - Fast zlib implementation for data decompression
+- **Web Workers** - Background processing for better performance
+- **CSV Parsing** - Efficient client-side data processing
+
+### Export & Analytics
+
+- **html2canvas** - High-quality screenshot generation
+- **jsPDF** - Client-side PDF generation
+- **Custom Export Engine** - Professional map export system
+
+## 📈 Performance Features
+
+### Core Web Vitals Optimization
+
+- **LCP (Largest Contentful Paint)** - Optimized with resource preloading
+- **FID (First Input Delay)** - Web workers prevent main thread blocking
+- **CLS (Cumulative Layout Shift)** - Fixed dimensions and skeleton loading
+- **INP (Interaction to Next Paint)** - Debounced interactions and RAF animations
+
+### Loading Optimizations
+
+- Resource preconnection to CDN domains
+- Critical asset prefetching
+- Lazy loading for non-critical components
+- Efficient data compression (gzip)
+
+### Runtime Performance
+
+- Throttled hover effects (100ms for responsiveness)
+- Debounced zoom events (100ms to prevent excessive updates)
+- RequestAnimationFrame for smooth animations
+- Canvas rendering for high-performance map layers
+
+## 🔧 Configuration
+
+### Environment Variables
 
 ```bash
-pip install -r requirements.txt
-python scripts/parse_redfin_zip_data.py
+# Base URL for the application (set in vite.config.ts)
+VITE_BASE_URL=/Domapus/
+
+# Data source URLs (configured in components)
+VITE_DATA_CDN=https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/
 ```
 
-The script:
-- Downloads latest `.tsv.gz` from Redfin
-- Filters, formats, and simplifies
-- Exports to `data/zip_data.json` for frontend usage
+### Build Configuration
+
+The project uses Vite with custom configuration for:
+
+- Base path configuration for GitHub Pages
+- Asset optimization and chunking
+- TypeScript compilation with strict mode
+- Tailwind CSS with custom design system
+
+## 📱 Responsive Design
+
+- **Mobile-first approach** with adaptive layouts
+- **Touch-optimized interactions** for mobile devices
+- **Responsive map controls** that adapt to screen size
+- **Mobile-specific UI patterns** for better usability
+
+## 🌐 Data Sources
+
+- **Primary Data**: Redfin real estate market data
+- **Geographic Data**: U.S. Census ZIP Code Tabulation Areas (ZCTA)
+- **City/County Mapping**: Custom aggregated geographic data
+- **Update Frequency**: Data refreshed monthly from Redfin sources
+
+## 🔒 Privacy & Security
+
+- **No user tracking** - All analytics are aggregated and anonymous
+- **Client-side processing** - No personal data sent to servers
+- **Secure data sources** - All external resources served over HTTPS
+- **Content Security Policy** - Strict CSP headers for security
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes with proper TypeScript types
+4. Test your changes: `npm run build && npm run preview`
+5. Run linting: `npm run lint`
+6. Commit your changes: `git commit -m 'Add amazing feature'`
+7. Push to your branch: `git push origin feature/amazing-feature`
+8. Open a Pull Request
+
+### Code Standards
+
+- TypeScript strict mode enabled
+- ESLint configuration with React and accessibility rules
+- Prettier code formatting
+- Component-based architecture with clear separation of concerns
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙋 Support
+
+- **Documentation**: Available in this README and inline code comments
+- **Issues**: Report bugs and request features via [GitHub Issues](https://github.com/Jasperc2024/Domapus/issues)
+- **Discussions**: Join the conversation in [GitHub Discussions](https://github.com/Jasperc2024/Domapus/discussions)
+- **Email**: Contact the maintainer at [jasperc2024@gmail.com](mailto:jasperc2024@gmail.com)
+
+## ☕ Support the Project
+
+If you find Domapus useful, consider supporting its development:
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/JasperC)
+
+## �� Acknowledgments
+
+- **Redfin** for providing comprehensive real estate data
+- **U.S. Census Bureau** for ZIP code boundary data
+- **Leaflet Community** for the excellent mapping library
+- **React & Vite Teams** for the modern development experience
+- **shadcn** for the beautiful component library
 
 ---
 
-## 📦 Deployment via GitHub Pages
-
-- Project auto-deploys via GitHub Pages using GitHub Actions
-- Hosted at: [https://jasperc2024.github.io/Domapus/](https://jasperc2024.github.io/Domapus/)
-- To manually deploy:
-  ```bash
-  npm run build
-  ```
-
----
-
-## 🧭 Roadmap
-
-- 🕒 Timeline slider to visualize historical changes
-- 📈 Animated YoY and MoM visualizations
-- 🧭 Multi-region support (City, County, Metro overlays)
-- 📍 Marker clustering for high-density ZIPs
-- 🔍 Multi-metric layer switching (Price, DOM, PPSF, etc.)
-- 🧠 Add AI-based housing trend insights
-- 🧮 Predictive analytics for key markets
-- 📤 Export or share ZIP-level reports
-
----
-
-## 🙋 Contributing
-
-We welcome pull requests!
-
-1. Fork the repo
-2. Create a feature branch:
-   ```bash
-   git checkout -b your-feature
-   ```
-3. Commit changes:
-   ```bash
-   git commit -m "Add your feature"
-   ```
-4. Push:
-   ```bash
-   git push origin your-feature
-   ```
-5. Open a pull request
-
----
-
-## 📢 Attribution & License
-
-**📊 Data Source**:  
-All housing data is from [Redfin’s Public Data Center](https://www.redfin.com/news/data-center/). Data is publicly available and used for non-commercial, educational, and informational purposes.
-
-> **Disclaimer**: This project is **not affiliated with or endorsed by Redfin Corporation**.  
-> Data is presented “as-is” without guarantees of accuracy. Always consult real estate professionals for decisions.
-
-**📝 License**: MIT  
-You are free to use, modify, and distribute this project. Give credit where it's due.
-
----
-
-## ❤️ Support the Project
-
-This site is completely **free**, **open-source**, and **ad-free**.
-
-If you’d like to help improve the dashboard or support the developer:
-
-- 🌟 Star the repo  
-- :hearts: [Sponsor on GitHub](https://github.com/sponsors/jasperc2024)
-- :coffee: [Buy Me A Coffee](https://buymeacoffee.com/jasperc)
-- 💬 Share feedback and ideas!
-
----
-
-## 🔗 Useful Links
-
-- 🌍 Live Website: [https://jasperc2024.github.io/Domapus/](https://jasperc2024.github.io/Domapus/)
-- 📁 GitHub Repo: [https://github.com/Jasperc2024/Domapus](https://github.com/Jasperc2024/Domapus)
-```
+<div align="center">
+  <strong>Built with ❤️ by <a href="https://github.com/Jasperc2024">Jasper Chen</a></strong>
+  <br>
+  <sub>Making housing data accessible and actionable for everyone</sub>
+</div>
