@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import { scaleLinear } from 'd3-scale';
-import { useMapData } from './map/useMapData';
-import { getMetricValue, getZipStyle } from './map/utils';
-import { ExportOptions } from './ExportSidebar';
-import pako from 'pako';
+import { useEffect, useRef, useState, useCallback } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { scaleLinear } from "d3-scale";
+import { useMapData } from "./map/useMapData";
+import { getMetricValue, getZipStyle } from "./map/utils";
+import { ExportOptions } from "./ExportSidebar";
+import pako from "pako";
 
 interface ExportPreviewMapProps {
   selectedMetric: string;
@@ -13,10 +13,14 @@ interface ExportPreviewMapProps {
   mapRef?: React.RefObject<HTMLDivElement>;
 }
 
-export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: ExportPreviewMapProps) {
+export function ExportPreviewMap({
+  selectedMetric,
+  exportOptions,
+  mapRef,
+}: ExportPreviewMapProps) {
   const internalMapRef = useRef<HTMLDivElement>(null);
   const currentMapRef = mapRef || internalMapRef;
-  
+
   const [map, setMap] = useState<L.Map | null>(null);
   const [geojsonLayer, setGeojsonLayer] = useState<L.GeoJSON | null>(null);
   const [colorScale, setColorScale] = useState<any>(null);
@@ -29,26 +33,31 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
     if (Object.keys(zipData).length === 0) return;
 
     let filteredData = zipData;
-    
+
     // Filter data based on export options
-    if (exportOptions.regionScope === 'state' && exportOptions.selectedState) {
+    if (exportOptions.regionScope === "state" && exportOptions.selectedState) {
       filteredData = Object.fromEntries(
-        Object.entries(zipData).filter(([, data]: [string, any]) => 
-          data.state === exportOptions.selectedState
-        )
+        Object.entries(zipData).filter(
+          ([, data]: [string, any]) =>
+            data.state === exportOptions.selectedState,
+        ),
       );
-    } else if (exportOptions.regionScope === 'metro' && exportOptions.selectedMetro) {
+    } else if (
+      exportOptions.regionScope === "metro" &&
+      exportOptions.selectedMetro
+    ) {
       filteredData = Object.fromEntries(
-        Object.entries(zipData).filter(([, data]: [string, any]) => 
-          data.parent_metro === exportOptions.selectedMetro
-        )
+        Object.entries(zipData).filter(
+          ([, data]: [string, any]) =>
+            data.parent_metro === exportOptions.selectedMetro,
+        ),
       );
     }
 
     const values = Object.values(filteredData)
       .map((data: any) => getMetricValue(data, selectedMetric))
-      .filter(v => v > 0);
-    
+      .filter((v) => v > 0);
+
     if (values.length === 0) return;
 
     const minValue = Math.min(...values);
@@ -56,29 +65,36 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
 
     const scale = scaleLinear<string>()
       .domain([minValue, maxValue])
-      .range(['#497eaf', '#e97000'])
+      .range(["#497eaf", "#e97000"])
       .interpolate(() => (t) => {
-        const colors = ['#497eaf', '#5fa4ca', '#b4d4ec', '#ffecd4', '#fac790', '#e97000'];
+        const colors = [
+          "#497eaf",
+          "#5fa4ca",
+          "#b4d4ec",
+          "#ffecd4",
+          "#fac790",
+          "#e97000",
+        ];
         const index = Math.floor(t * (colors.length - 1));
         const nextIndex = Math.min(index + 1, colors.length - 1);
-        const localT = (t * (colors.length - 1)) - index;
-        
+        const localT = t * (colors.length - 1) - index;
+
         const hex1 = colors[index];
         const hex2 = colors[nextIndex];
-        
+
         const r1 = parseInt(hex1.slice(1, 3), 16);
         const g1 = parseInt(hex1.slice(3, 5), 16);
         const b1 = parseInt(hex1.slice(5, 7), 16);
-        
+
         const r2 = parseInt(hex2.slice(1, 3), 16);
         const g2 = parseInt(hex2.slice(3, 5), 16);
         const b2 = parseInt(hex2.slice(5, 7), 16);
-        
+
         const r = Math.round(r1 + (r2 - r1) * localT);
         const g = Math.round(g1 + (g2 - g1) * localT);
         const b = Math.round(b1 + (b2 - b1) * localT);
-        
-        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+
+        return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
       });
 
     setColorScale(() => scale);
@@ -98,14 +114,17 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
       zoomControl: false,
       attributionControl: false,
       preferCanvas: true,
-      renderer: L.canvas({ padding: 2, tolerance: 5 })
+      renderer: L.canvas({ padding: 2, tolerance: 5 }),
     });
 
     // No basemap - clean white background
-    const whiteLayer = L.tileLayer('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', {
-      maxZoom: 18,
-      opacity: 0
-    });
+    const whiteLayer = L.tileLayer(
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
+      {
+        maxZoom: 18,
+        opacity: 0,
+      },
+    );
     whiteLayer.addTo(leafletMap);
 
     setMap(leafletMap);
@@ -121,45 +140,70 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
 
     const loadZipCodes = async () => {
       try {
-        const response = await fetch('https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz');
+        const response = await fetch(
+          "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz",
+        );
         const arrayBuffer = await response.arrayBuffer();
-        const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' });
+        const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), {
+          to: "string",
+        });
         const geojsonData = JSON.parse(decompressed);
 
         const layer = L.geoJSON(geojsonData, {
           style: (feature) => {
-            const zipCode = feature?.properties?.ZCTA5CE20 || feature?.properties?.GEOID20 || feature?.properties?.ZCTA5CE20;
-            
+            const zipCode =
+              feature?.properties?.ZCTA5CE20 ||
+              feature?.properties?.GEOID20 ||
+              feature?.properties?.ZCTA5CE20;
+
             // Filter based on export options
-            if (exportOptions.regionScope === 'state' && exportOptions.selectedState) {
+            if (
+              exportOptions.regionScope === "state" &&
+              exportOptions.selectedState
+            ) {
               const data = zipData[zipCode];
               if (!data || data.state !== exportOptions.selectedState) {
                 return { fillOpacity: 0, stroke: false };
               }
-            } else if (exportOptions.regionScope === 'metro' && exportOptions.selectedMetro) {
+            } else if (
+              exportOptions.regionScope === "metro" &&
+              exportOptions.selectedMetro
+            ) {
               const data = zipData[zipCode];
               if (!data || data.parent_metro !== exportOptions.selectedMetro) {
                 return { fillOpacity: 0, stroke: false };
               }
             }
 
-            return getZipStyle(feature, map.getZoom(), colorScale, zipData, selectedMetric);
+            return getZipStyle(
+              feature,
+              map.getZoom(),
+              colorScale,
+              zipData,
+              selectedMetric,
+            );
           },
-          pane: 'overlayPane',
-          interactive: false
+          pane: "overlayPane",
+          interactive: false,
         });
 
         layer.addTo(map);
         setGeojsonLayer(layer);
 
         // Auto-zoom based on region scope
-        if (exportOptions.regionScope === 'state' && exportOptions.selectedState) {
+        if (
+          exportOptions.regionScope === "state" &&
+          exportOptions.selectedState
+        ) {
           // Find state bounds and fit map
           const stateBounds = layer.getBounds();
           if (stateBounds.isValid()) {
             map.fitBounds(stateBounds, { padding: [20, 20] });
           }
-        } else if (exportOptions.regionScope === 'metro' && exportOptions.selectedMetro) {
+        } else if (
+          exportOptions.regionScope === "metro" &&
+          exportOptions.selectedMetro
+        ) {
           // Find metro bounds and fit map
           const metroBounds = layer.getBounds();
           if (metroBounds.isValid()) {
@@ -172,7 +216,7 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
 
         setIsLoaded(true);
       } catch (error) {
-        console.error('Error loading ZIP code data for export:', error);
+        console.error("Error loading ZIP code data for export:", error);
       }
     };
 
@@ -187,18 +231,25 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
       if (leafletLayer instanceof L.Path) {
         const pathLayer = leafletLayer as L.Path & { feature?: any };
         if (pathLayer.feature) {
-          const zipCode = pathLayer.feature.properties?.ZCTA5CE20 || 
-                         pathLayer.feature.properties?.GEOID20 || 
-                         pathLayer.feature.properties?.ZCTA5CE20;
-          
+          const zipCode =
+            pathLayer.feature.properties?.ZCTA5CE20 ||
+            pathLayer.feature.properties?.GEOID20 ||
+            pathLayer.feature.properties?.ZCTA5CE20;
+
           // Filter based on export options
-          if (exportOptions.regionScope === 'state' && exportOptions.selectedState) {
+          if (
+            exportOptions.regionScope === "state" &&
+            exportOptions.selectedState
+          ) {
             const data = zipData[zipCode];
             if (!data || data.state !== exportOptions.selectedState) {
               pathLayer.setStyle({ fillOpacity: 0, stroke: false });
               return;
             }
-          } else if (exportOptions.regionScope === 'metro' && exportOptions.selectedMetro) {
+          } else if (
+            exportOptions.regionScope === "metro" &&
+            exportOptions.selectedMetro
+          ) {
             const data = zipData[zipCode];
             if (!data || data.parent_metro !== exportOptions.selectedMetro) {
               pathLayer.setStyle({ fillOpacity: 0, stroke: false });
@@ -206,20 +257,44 @@ export function ExportPreviewMap({ selectedMetric, exportOptions, mapRef }: Expo
             }
           }
 
-          pathLayer.setStyle(getZipStyle(pathLayer.feature, map?.getZoom() || 4, colorScale, zipData, selectedMetric));
+          pathLayer.setStyle(
+            getZipStyle(
+              pathLayer.feature,
+              map?.getZoom() || 4,
+              colorScale,
+              zipData,
+              selectedMetric,
+            ),
+          );
         }
       }
     });
   }, [geojsonLayer, colorScale, zipData, selectedMetric, exportOptions, map]);
 
+  // Use special national map for national exports
+  if (
+    exportOptions.regionScope === "national" &&
+    colorScale &&
+    Object.keys(zipData).length > 0
+  ) {
+    return (
+      <NationalExportMap
+        selectedMetric={selectedMetric}
+        zipData={zipData}
+        colorScale={colorScale}
+        className="w-full h-full"
+      />
+    );
+  }
+
   return (
     <div className="relative w-full h-full bg-white">
-      <div 
-        ref={currentMapRef} 
+      <div
+        ref={currentMapRef}
         className="w-full h-full"
-        style={{ minHeight: '400px' }}
+        style={{ minHeight: "400px" }}
       />
-      
+
       {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/80">
           <div className="text-center space-y-2">
