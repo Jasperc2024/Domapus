@@ -245,8 +245,24 @@ export function LeafletMap({
           updateLayerStyles();
         });
 
-        layer.addTo(map);
-        setGeojsonLayer(layer);
+        try {
+          layer.addTo(map);
+          setGeojsonLayer(layer);
+        } catch (error) {
+          console.error("Error adding GeoJSON layer to map:", error);
+          // Retry after a short delay if the map isn't ready
+          setTimeout(() => {
+            try {
+              layer.addTo(map);
+              setGeojsonLayer(layer);
+            } catch (retryError) {
+              console.error(
+                "Retry failed for adding GeoJSON layer:",
+                retryError,
+              );
+            }
+          }, 100);
+        }
 
         // Add labels layer on top of ZIP codes
         if ((map as any)._labelsLayer) {
@@ -280,7 +296,11 @@ export function LeafletMap({
           },
         });
 
-        stateLayer.addTo(map);
+        try {
+          stateLayer.addTo(map);
+        } catch (error) {
+          console.error("Error adding state layer to map:", error);
+        }
       } catch (error) {
         console.warn("Could not load state boundaries:", error);
       }
