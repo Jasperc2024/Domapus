@@ -1,4 +1,3 @@
-
 import L from 'leaflet';
 
 // Fix for default markers in Leaflet
@@ -11,10 +10,10 @@ L.Icon.Default.mergeOptions({
 
 export const createMap = (container: HTMLElement): L.Map => {
   const leafletMap = L.map(container, {
-    center: [39.8283, -98.5795], // Default center: US center
-    zoom: 5, // Default zoom: 5
-    minZoom: 3, // Min zoom: 3
-    maxZoom: 12, // Max zoom: 12
+    center: [39.8283, -98.5795],
+    zoom: 5,
+    minZoom: 3,
+    maxZoom: 12,
     scrollWheelZoom: true,
     dragging: true,
     zoomControl: true,
@@ -22,30 +21,38 @@ export const createMap = (container: HTMLElement): L.Map => {
     maxBoundsViscosity: 1.0,
     preferCanvas: true,
     worldCopyJump: false,
-    zoomDelta: 0.5, // Smoother, slower zooming
-    zoomSnap: 0.25, // Allow fractional zoom levels
+    zoomDelta: 0.5,
+    zoomSnap: 0.25,
     renderer: L.canvas({
-      padding: 2, // Increased padding for better performance
-      tolerance: 5, // Increased tolerance for smoother interactions
-    })
+      padding: 2,
+      tolerance: 5,
+    }),
   });
 
-  // Add Carto Positron no-label tile layer as base
+  // 🟢 Create the custom pane for labels
+  leafletMap.createPane('labelsPane');
+  const labelsPane = leafletMap.getPane('labelsPane');
+  if (labelsPane) {
+    labelsPane.style.zIndex = '650'; // higher than tilePane (z-index: 200) and overlayPane (z-index: 400)
+    labelsPane.style.pointerEvents = 'none'; // avoid blocking interactivity
+  }
+
+  // Base tile layer: Carto Positron without labels
   const baseTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
     attribution: '',
     subdomains: 'abcd',
     maxZoom: 18,
-    keepBuffer: 8, // Increased buffer to avoid blank spaces
-    updateWhenZooming: true, // Load tiles while zooming  
-    updateWhenIdle: false, // Don't wait for idle
+    keepBuffer: 8,
+    updateWhenZooming: true,
+    updateWhenIdle: false,
     crossOrigin: true,
     detectRetina: true,
-    pane: 'tilePane' // Ensure tiles are at bottom
+    pane: 'tilePane',
   });
-  
+
   baseTileLayer.addTo(leafletMap);
 
-  // Add labels layer on top (will be added after zip codes layer)
+  // Labels layer: Carto Positron labels only (added later)
   const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
     subdomains: 'abcd',
@@ -55,11 +62,10 @@ export const createMap = (container: HTMLElement): L.Map => {
     updateWhenIdle: false,
     crossOrigin: true,
     detectRetina: true,
-    pane: 'overlayPane',
-    zIndex: 1000 // Ensure labels are on top
+    pane: 'labelsPane',
   });
 
-  // Store labels layer for later addition
+  // Save reference for later addition
   (leafletMap as any)._labelsLayer = labelsLayer;
 
   return leafletMap;
