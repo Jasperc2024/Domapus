@@ -257,9 +257,19 @@ export function LeafletMap({
           },
         });
 
-        // Add zoom event listener for dynamic styling
-        map.on("zoomend", () => {
+        // Add optimized zoom event listener with debouncing
+        const debouncedStyleUpdate = debounce(() => {
           updateLayerStyles();
+        }, 100);
+
+        map.on("zoomend", debouncedStyleUpdate);
+
+        // Also handle zoom start to provide immediate feedback
+        map.on("zoomstart", () => {
+          // Temporarily reduce opacity during zoom for better performance
+          if (layer) {
+            layer.setStyle({ fillOpacity: 0.5 });
+          }
         });
 
         try {
