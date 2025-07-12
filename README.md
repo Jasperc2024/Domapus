@@ -230,6 +230,7 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## 📝 License
 
+
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙋 Support
@@ -237,7 +238,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Documentation**: Available in this README and inline code comments
 - **Issues**: Report bugs and request features via [GitHub Issues](https://github.com/Jasperc2024/Domapus/issues)
 - **Discussions**: Join the conversation in [GitHub Discussions](https://github.com/Jasperc2024/Domapus/discussions)
-- **Email**: Contact the maintainer at [jasperc2024@gmail.com](mailto:jasperc2024@gmail.com)
+- **Email**: Contact the maintainer at [jasperc2024@gmail.com](mailto:jasperc.wk@gmail.com)
 
 ## ☕ Support the Project
 
@@ -245,7 +246,7 @@ If you find Domapus useful, consider supporting its development:
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/JasperC)
 
-## �� Acknowledgments
+## 💖 Acknowledgments
 
 - **Redfin** for providing comprehensive real estate data
 - **U.S. Census Bureau** for ZIP code boundary data
