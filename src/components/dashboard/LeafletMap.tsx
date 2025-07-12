@@ -189,17 +189,22 @@ export function LeafletMap({
               const throttledMouseOver = throttle((e: L.LeafletMouseEvent) => {
                 const target = e.target as L.Path;
                 const currentZoom = map.getZoom();
-                target.setStyle({
-                  weight: Math.max(currentZoom > 8 ? 3 : 2, 1),
-                  color: "#333",
-                  fillOpacity: 0.9,
+
+                // Use requestAnimationFrame for smooth animations
+                requestAnimationFrame(() => {
+                  target.setStyle({
+                    weight: Math.max(currentZoom > 8 ? 3 : 2, 1),
+                    color: "#333",
+                    fillOpacity: 0.9,
+                  });
                 });
 
-                // Show tooltip
+                // Show tooltip with minimal content for faster rendering
                 const popup = L.popup({
                   closeButton: false,
                   autoClose: false,
                   className: "zip-tooltip",
+                  offset: [0, -5], // Slight offset for better UX
                 })
                   .setLatLng(e.latlng)
                   .setContent(
@@ -212,21 +217,24 @@ export function LeafletMap({
                   `,
                   )
                   .openOn(map);
-              }, 150); // Throttle hover effects to 150ms
+              }, 100); // Reduced throttle delay for better responsiveness
 
               layer.on({
                 mouseover: throttledMouseOver,
                 mouseout: (e) => {
                   const target = e.target as L.Path;
-                  target.setStyle(
-                    getZipStyle(
-                      feature,
-                      map.getZoom(),
-                      colorScale,
-                      zipData,
-                      selectedMetric,
-                    ),
-                  );
+                  // Use requestAnimationFrame for smooth style reset
+                  requestAnimationFrame(() => {
+                    target.setStyle(
+                      getZipStyle(
+                        feature,
+                        map.getZoom(),
+                        colorScale,
+                        zipData,
+                        selectedMetric,
+                      ),
+                    );
+                  });
                   map.closePopup();
                 },
                 click: () => {
