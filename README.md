@@ -1,5 +1,6 @@
 # <img src="https://jasperc2024.github.io/Domapus//android-chrome-512x512.png" width="40">  Domapus - Interactive U.S. Housing Market Dashboard
 
+[![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindresorhus/awesome)
 [![Live Demo](https://img.shields.io/badge/Live-Demo-blue)](https://jasperc2024.github.io/Domapus/)
 [![GitHub](https://img.shields.io/badge/GitHub-Repo-black)](https://github.com/Jasperc2024/Domapus)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
