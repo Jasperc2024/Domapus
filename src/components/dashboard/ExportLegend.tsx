@@ -42,8 +42,9 @@ export function ExportLegend({
         ) {
           filteredData = Object.fromEntries(
             Object.entries(data).filter(
-              ([, zipData]: [string, any]) =>
-                zipData.state === exportOptions.selectedState,
+              ([, zipData]: [string, unknown]) =>
+                (zipData as Record<string, unknown>).state ===
+                exportOptions.selectedState,
             ),
           );
         } else if (
@@ -52,8 +53,9 @@ export function ExportLegend({
         ) {
           filteredData = Object.fromEntries(
             Object.entries(data).filter(
-              ([, zipData]: [string, any]) =>
-                zipData.parent_metro === exportOptions.selectedMetro,
+              ([, zipData]: [string, unknown]) =>
+                (zipData as Record<string, unknown>).parent_metro ===
+                exportOptions.selectedMetro,
             ),
           );
         }
@@ -62,7 +64,9 @@ export function ExportLegend({
 
         // Get all values for the selected metric from filtered data
         const values = Object.values(filteredData)
-          .map((zipData: any) => getMetricValue(zipData, selectedMetric))
+          .map((zipData: unknown) =>
+            getMetricValue(zipData as Record<string, unknown>, selectedMetric),
+          )
           .filter((v) => v > 0)
           .sort((a, b) => a - b);
 
