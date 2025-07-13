@@ -294,41 +294,58 @@ export function MapLibreMap({
             },
           });
 
-          // Add hover interactions
+          // Add hover interactions with throttling
+          let hoverTimeout: NodeJS.Timeout | null = null;
+          let currentPopup: maplibregl.Popup | null = null;
+
           map.current?.on("mouseenter", "zip-codes-fill", (e) => {
             if (map.current) {
               map.current.getCanvas().style.cursor = "pointer";
 
-              if (e.features && e.features[0]) {
-                const feature = e.features[0];
-                const zipCode = feature.properties?.zipCode;
-
-                if (zipCode) {
-                  setHoveredZip(zipCode);
-
-                  // Show popup
-                  const coordinates = e.lngLat;
-                  const zipInfo = zipData[zipCode];
-                  const cityInfo = citiesData[zipCode];
-
-                  new maplibregl.Popup({
-                    closeButton: false,
-                    closeOnClick: false,
-                    className: "zip-tooltip",
-                  })
-                    .setLngLat(coordinates)
-                    .setHTML(
-                      `
-                      <div class="p-2 bg-white rounded shadow-lg border">
-                        <div class="font-semibold text-sm">${zipCode}</div>
-                        <div class="text-xs text-gray-600">${cityInfo?.city || "Unknown"}</div>
-                        <div class="text-xs mt-1">${getMetricDisplay(zipInfo, selectedMetric)}</div>
-                      </div>
-                    `,
-                    )
-                    .addTo(map.current);
-                }
+              // Clear any existing timeout
+              if (hoverTimeout) {
+                clearTimeout(hoverTimeout);
               }
+
+              // Throttle hover to improve performance
+              hoverTimeout = setTimeout(() => {
+                if (e.features && e.features[0]) {
+                  const feature = e.features[0];
+                  const zipCode = feature.properties?.zipCode;
+
+                  if (zipCode && zipData[zipCode]) {
+                    setHoveredZip(zipCode);
+
+                    // Remove existing popup
+                    if (currentPopup) {
+                      currentPopup.remove();
+                    }
+
+                    // Show new popup
+                    const coordinates = e.lngLat;
+                    const zipInfo = zipData[zipCode];
+                    const cityInfo = citiesData[zipCode];
+
+                    currentPopup = new maplibregl.Popup({
+                      closeButton: false,
+                      closeOnClick: false,
+                      className: "zip-tooltip",
+                      offset: [0, -10],
+                    })
+                      .setLngLat(coordinates)
+                      .setHTML(
+                        `
+                        <div class="p-2 bg-white rounded shadow-lg border">
+                          <div class="font-semibold text-sm">${zipCode}</div>
+                          <div class="text-xs text-gray-600">${cityInfo?.city || "Unknown"}</div>
+                          <div class="text-xs mt-1">${getMetricDisplay(zipInfo, selectedMetric)}</div>
+                        </div>
+                      `,
+                      )
+                      .addTo(map.current!);
+                  }
+                }
+              }, 50); // 50ms throttle for better performance
             }
           });
 
@@ -337,10 +354,17 @@ export function MapLibreMap({
               map.current.getCanvas().style.cursor = "";
               setHoveredZip(null);
 
+              // Clear hover timeout
+              if (hoverTimeout) {
+                clearTimeout(hoverTimeout);
+                hoverTimeout = null;
+              }
+
               // Remove popup
-              const popups =
-                document.getElementsByClassName("maplibregl-popup");
-              Array.from(popups).forEach((popup) => popup.remove());
+              if (currentPopup) {
+                currentPopup.remove();
+                currentPopup = null;
+              }
             }
           });
 
