@@ -3,7 +3,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { scaleLinear } from "d3-scale";
 import { getMetricValue, getMetricDisplay } from "./map/utils";
-import { LeafletMapProps } from "./map/types";
+import { MapProps } from "./map/types";
 
 // Custom hook for web worker
 function useDataWorker() {
