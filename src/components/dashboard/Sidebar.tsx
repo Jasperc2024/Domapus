@@ -368,14 +368,6 @@ export function Sidebar({
               {/* All Available Metrics */}
               <div className="space-y-3">
                 {allMetrics.map((metric, index) => {
-                  // Debug: log available data fields (remove in production)
-                  if (index === 0) {
-                    console.log(
-                      "Available ZIP data fields:",
-                      Object.keys(zipData),
-                    );
-                  }
-
                   const momChange = metric.momKey
                     ? formatChange(zipData[metric.momKey as keyof ZipData])
                     : null;
