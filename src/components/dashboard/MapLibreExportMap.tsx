@@ -23,9 +23,32 @@ export function MapLibreExportMap({
   const [zipData, setZipData] = useState<Record<string, any>>({});
   const [dataLoaded, setDataLoaded] = useState(false);
 
+  // Load ZIP data
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const response = await fetch(
+          "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json.gz",
+        );
+        const arrayBuffer = await response.arrayBuffer();
+        const pako = await import("pako");
+        const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), {
+          to: "string",
+        });
+        const data = JSON.parse(decompressed);
+        setZipData(data);
+        setDataLoaded(true);
+      } catch (error) {
+        console.error("Failed to load data for export:", error);
+      }
+    };
+
+    loadData();
+  }, []);
+
   // Create color scale based on filtered data
   useEffect(() => {
-    if (Object.keys(zipData).length === 0) return;
+    if (!dataLoaded || Object.keys(zipData).length === 0) return;
 
     let filteredData = zipData;
 
