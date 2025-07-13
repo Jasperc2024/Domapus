@@ -75,7 +75,7 @@ export function MapLibreMap({
   selectedMetric,
   onZipSelect,
   searchZip,
-}: LeafletMapProps) {
+}: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
