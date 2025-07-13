@@ -51,7 +51,6 @@ export function MapExport({ selectedMetric }: MapExportProps) {
             <MapLibreExportMap
               selectedMetric={selectedMetric}
               exportOptions={exportOptions}
-              zipData={{}} // Will be loaded by the component
             />
           ) : (
             <div className="w-full h-full bg-gray-50 flex items-center justify-center">
