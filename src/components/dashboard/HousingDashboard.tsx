@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
-import { LeafletMap } from "./LeafletMap";
+import { MapLibreMap } from "./MapLibreMap";
 import React, { Suspense } from "react";
 const Sidebar = React.lazy(() =>
   import("./Sidebar").then((module) => ({ default: module.Sidebar })),
