@@ -47,19 +47,11 @@ export function MapExport({ selectedMetric }: MapExportProps) {
           isExporting={isExporting}
         />
         <div className="flex-1 relative">
-          <ExportPreviewMap
-            selectedMetric={selectedMetric}
-            exportOptions={
-              exportOptions || {
-                regionScope: "national",
-                fileFormat: "png",
-                includeLegend: true,
-                includeTitle: true,
-                includeDateLabel: true,
-                includeAttribution: true,
-              }
-            }
-          />
+          <div className="w-full h-full bg-gray-50 flex items-center justify-center">
+            <p className="text-gray-500">
+              Map preview will be available after selecting export options
+            </p>
+          </div>
           {/* Centered loading overlay */}
           {isExporting && (
             <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-50">
