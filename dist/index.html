@@ -74,12 +74,34 @@
       as="fetch"
       crossorigin
     />
+    <link
+      rel="prefetch"
+      href="https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz"
+      as="fetch"
+      crossorigin
+    />
 
-    <!-- Preload Leaflet CSS -->
+    <!-- Preload MapLibre GL CSS -->
     <link
       rel="preload"
-      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
+      href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
       as="style"
+      crossorigin
+    />
+
+    <!-- Preload web worker -->
+    <link
+      rel="prefetch"
+      href="/Domapus/workers/data-processor.js"
+      as="worker"
+      crossorigin
+    />
+
+    <!-- Preload Pako for compression -->
+    <link
+      rel="prefetch"
+      href="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"
+      as="script"
       crossorigin
     />
 
@@ -185,8 +207,8 @@
     <!-- Resource hints for critical paths -->
     <link rel="modulepreload" href="data:application/octet-stream;base64,aW1wb3J0IHsgY3JlYXRlUm9vdCB9IGZyb20gJ3JlYWN0LWRvbS9jbGllbnQnCmltcG9ydCBBcHAgZnJvbSAnLi9BcHAudHN4JwppbXBvcnQgeyBFcnJvckJvdW5kYXJ5IH0gZnJvbSAnLi9jb21wb25lbnRzL0Vycm9yQm91bmRhcnknCmltcG9ydCAnLi9pbmRleC5jc3MnCgpjcmVhdGVSb290KGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCJyb290IikhKS5yZW5kZXIoCiAgPEVycm9yQm91bmRhcnk+CiAgICA8QXBwIC8+CiAgPC9FcnJvckJvdW5kYXJ5PgopOwo=" />
     <link rel="modulepreload" href="data:application/octet-stream;base64,aW1wb3J0IHsgVG9hc3RlciB9IGZyb20gIkAvY29tcG9uZW50cy91aS90b2FzdGVyIjsKaW1wb3J0IHsgVG9hc3RlciBhcyBTb25uZXIgfSBmcm9tICJAL2NvbXBvbmVudHMvdWkvc29ubmVyIjsKaW1wb3J0IHsgVG9vbHRpcFByb3ZpZGVyIH0gZnJvbSAiQC9jb21wb25lbnRzL3VpL3Rvb2x0aXAiOwppbXBvcnQgeyBRdWVyeUNsaWVudCwgUXVlcnlDbGllbnRQcm92aWRlciB9IGZyb20gIkB0YW5zdGFjay9yZWFjdC1xdWVyeSI7CmltcG9ydCB7IEJyb3dzZXJSb3V0ZXIsIFJvdXRlcywgUm91dGUgfSBmcm9tICJyZWFjdC1yb3V0ZXItZG9tIjsKaW1wb3J0IEluZGV4IGZyb20gIi4vcGFnZXMvSW5kZXgiOwppbXBvcnQgTm90Rm91bmQgZnJvbSAiLi9wYWdlcy9Ob3RGb3VuZCI7Cgpjb25zdCBxdWVyeUNsaWVudCA9IG5ldyBRdWVyeUNsaWVudCgpOwoKY29uc3QgQXBwID0gKCkgPT4gKAogIDxRdWVyeUNsaWVudFByb3ZpZGVyIGNsaWVudD17cXVlcnlDbGllbnR9PgogICAgPFRvb2x0aXBQcm92aWRlcj4KICAgICAgPFRvYXN0ZXIgLz4KICAgICAgPFNvbm5lciAvPgogICAgICA8QnJvd3NlclJvdXRlciBiYXNlbmFtZT0iL0RvbWFwdXMiPgogICAgICAgIDxSb3V0ZXM+CiAgICAgICAgICA8Um91dGUgcGF0aD0iLyIgZWxlbWVudD17PEluZGV4IC8+fSAvPgogICAgICAgICAgey8qIEFERCBBTEwgQ1VTVE9NIFJPVVRFUyBBQk9WRSBUSEUgQ0FUQ0gtQUxMICIqIiBST1VURSAqL30KICAgICAgICAgIDxSb3V0ZSBwYXRoPSIqIiBlbGVtZW50PXs8Tm90Rm91bmQgLz59IC8+CiAgICAgICAgPC9Sb3V0ZXM+CiAgICAgIDwvQnJvd3NlclJvdXRlcj4KICAgIDwvVG9vbHRpcFByb3ZpZGVyPgogIDwvUXVlcnlDbGllbnRQcm92aWRlcj4KKTsKCmV4cG9ydCBkZWZhdWx0IEFwcDsK" />
-    <script type="module" crossorigin src="/Domapus/assets/index-Cvfv9eOh.js"></script>
-    <link rel="stylesheet" crossorigin href="/Domapus/assets/index-Cwy7jUDX.css">
+    <script type="module" crossorigin src="/Domapus/assets/index-C98FlV03.js"></script>
+    <link rel="stylesheet" crossorigin href="/Domapus/assets/index-Br0rO09z.css">
   </head>
 
   <body>
