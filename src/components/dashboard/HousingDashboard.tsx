@@ -8,7 +8,7 @@ const Sidebar = React.lazy(() =>
 );
 import { Legend } from "./Legend";
 import { LastUpdated } from "./LastUpdated";
-import pako from "pako";
+
 import { TopBar } from "./TopBar";
 
 interface ZipData {
@@ -35,34 +35,8 @@ export function HousingDashboard() {
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
   useEffect(() => {
-    const loadLastUpdatedDate = async () => {
-      try {
-        const response = await fetch(
-          "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json.gz",
-        );
-        const arrayBuffer = await response.arrayBuffer();
-        const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), {
-          to: "string",
-        });
-        const data = JSON.parse(decompressed);
-
-        const dates = Object.values(data)
-          .map((zip: any) => zip.period_end)
-          .filter(Boolean);
-
-        if (dates.length > 0) {
-          const latestDate = dates.sort().pop();
-          setLastUpdated(latestDate);
-        } else {
-          setLastUpdated("2025-07-01");
-        }
-      } catch (error) {
-        console.error("Failed to load or decompress zip-data.json.gz", error);
-        setLastUpdated("2025-07-01");
-      }
-    };
-
-    loadLastUpdatedDate();
+    // Set a default last updated date - the map component will handle data loading
+    setLastUpdated("2025-07-01");
   }, []);
 
   const handleZipSelect = (zipData: ZipData) => {
