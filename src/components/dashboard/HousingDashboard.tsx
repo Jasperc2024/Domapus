@@ -119,7 +119,7 @@ export function HousingDashboard() {
         >
           {/* Map View - Full container */}
           <div className="absolute inset-0">
-            <LeafletMap
+            <MapLibreMap
               selectedMetric={selectedMetric}
               onZipSelect={handleZipSelect}
               searchZip={searchZip}
