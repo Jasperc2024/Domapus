@@ -74,12 +74,34 @@
       as="fetch"
       crossorigin
     />
+    <link
+      rel="prefetch"
+      href="https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz"
+      as="fetch"
+      crossorigin
+    />
 
-    <!-- Preload Leaflet CSS -->
+    <!-- Preload MapLibre GL CSS -->
     <link
       rel="preload"
-      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
+      href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
       as="style"
+      crossorigin
+    />
+
+    <!-- Preload web worker -->
+    <link
+      rel="prefetch"
+      href="/Domapus/workers/data-processor.js"
+      as="worker"
+      crossorigin
+    />
+
+    <!-- Preload Pako for compression -->
+    <link
+      rel="prefetch"
+      href="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"
+      as="script"
       crossorigin
     />
 
