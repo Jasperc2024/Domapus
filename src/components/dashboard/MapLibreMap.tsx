@@ -380,8 +380,8 @@ export function MapLibreMap({
               "line-width": [
                 "case",
                 ["==", ["get", "zipCode"], hoveredZip || ""],
-                3,
-                1.5, // Thicker default outline
+                4,
+                2, // Thicker default outline as requested
               ],
             },
           });
@@ -399,7 +399,7 @@ export function MapLibreMap({
                 clearTimeout(hoverTimeout);
               }
 
-              // Throttle hover to improve performance
+              // Reduced throttle for better responsiveness
               hoverTimeout = setTimeout(() => {
                 if (e.features && e.features[0]) {
                   const feature = e.features[0];
@@ -437,7 +437,7 @@ export function MapLibreMap({
                       .addTo(map.current!);
                   }
                 }
-              }, 50); // 50ms throttle for better performance
+              }, 25); // Reduced to 25ms for better INP
             }
           });
 
