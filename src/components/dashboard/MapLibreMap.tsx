@@ -16,24 +16,32 @@ function useDataWorker() {
   });
 
   useEffect(() => {
-    // Create worker
-    workerRef.current = new Worker("/Domapus/workers/data-processor.js", {
-      type: "module",
-    });
+    // Try to create worker, fallback to main thread if it fails
+    try {
+      workerRef.current = new Worker("/Domapus/workers/data-processor.js");
 
-    workerRef.current.onmessage = (e) => {
-      const { type, data, error } = e.data;
+      workerRef.current.onmessage = (e) => {
+        const { type, data, error } = e.data;
 
-      switch (type) {
-        case "PROGRESS":
-          setProgress(data);
-          break;
-        case "ERROR":
-          console.error("Worker error:", error);
-          setIsLoading(false);
-          break;
-      }
-    };
+        switch (type) {
+          case "PROGRESS":
+            setProgress(data);
+            break;
+          case "ERROR":
+            console.error("Worker error:", error);
+            setIsLoading(false);
+            break;
+        }
+      };
+
+      workerRef.current.onerror = (error) => {
+        console.warn("Web worker failed, falling back to main thread:", error);
+        workerRef.current = null;
+      };
+    } catch (error) {
+      console.warn("Web worker not supported, using main thread:", error);
+      workerRef.current = null;
+    }
 
     return () => {
       workerRef.current?.terminate();
