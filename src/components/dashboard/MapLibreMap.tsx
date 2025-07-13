@@ -368,8 +368,10 @@ export function MapLibreMap({
             }
           });
 
-          // Add click interaction
+          // Add click interaction with immediate response
           map.current?.on("click", "zip-codes-fill", (e) => {
+            e.preventDefault();
+
             if (e.features && e.features[0]) {
               const feature = e.features[0];
               const zipCode = feature.properties?.zipCode;
@@ -377,6 +379,11 @@ export function MapLibreMap({
               if (zipCode && zipData[zipCode]) {
                 const zipInfo = zipData[zipCode];
                 const cityInfo = citiesData[zipCode];
+
+                // Provide immediate visual feedback
+                if (currentPopup) {
+                  currentPopup.remove();
+                }
 
                 const enhancedData = {
                   ...zipInfo,
@@ -389,7 +396,10 @@ export function MapLibreMap({
                   state: zipInfo.state_name || "Unknown",
                 };
 
-                onZipSelect(enhancedData);
+                // Use requestAnimationFrame for smooth interaction
+                requestAnimationFrame(() => {
+                  onZipSelect(enhancedData);
+                });
               }
             }
           });
