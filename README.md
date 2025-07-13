@@ -1,8 +1,17 @@
+<<<<<<< HEAD
 # 🏠 Domapus - Interactive U.S. Housing Market Dashboard
 
 [![Live Demo](https://img.shields.io/badge/Live-Demo-blue?style=for-the-badge)](https://jasperc2024.github.io/Domapus/)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=for-the-badge&logo=github)](https://github.com/Jasperc2024/Domapus)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+=======
+# <img src="https://jasperc2024.github.io/Domapus//android-chrome-512x512.png" width="40">  Domapus - Interactive U.S. Housing Market Dashboard
+
+[![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindresorhus/awesome)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-blue)](https://jasperc2024.github.io/Domapus/)
+[![GitHub](https://img.shields.io/badge/GitHub-Repo-black)](https://github.com/Jasperc2024/Domapus)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+>>>>>>> origin/main
 
 Domapus is a high-performance, interactive dashboard for exploring U.S. housing market data at the ZIP code level. Built with React, TypeScript, and Leaflet, it visualizes real estate trends across 24,000+ ZIP codes using data sourced from Redfin.
 
@@ -230,6 +239,10 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## 📝 License
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙋 Support
@@ -237,7 +250,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Documentation**: Available in this README and inline code comments
 - **Issues**: Report bugs and request features via [GitHub Issues](https://github.com/Jasperc2024/Domapus/issues)
 - **Discussions**: Join the conversation in [GitHub Discussions](https://github.com/Jasperc2024/Domapus/discussions)
+<<<<<<< HEAD
 - **Email**: Contact the maintainer at [jasperc2024@gmail.com](mailto:jasperc2024@gmail.com)
+=======
+- **Email**: Contact the maintainer at [jasperc2024@gmail.com](mailto:jasperc.wk@gmail.com)
+>>>>>>> origin/main
 
 ## ☕ Support the Project
 
@@ -245,7 +262,11 @@ If you find Domapus useful, consider supporting its development:
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/JasperC)
 
+<<<<<<< HEAD
 ## �� Acknowledgments
+=======
+## 💖 Acknowledgments
+>>>>>>> origin/main
 
 - **Redfin** for providing comprehensive real estate data
 - **U.S. Census Bureau** for ZIP code boundary data

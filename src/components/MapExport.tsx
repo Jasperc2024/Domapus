@@ -46,6 +46,7 @@ export function MapExport({ selectedMetric }: MapExportProps) {
           onCancel={handleCancel}
           isExporting={isExporting}
         />
+<<<<<<< HEAD
         <div className="flex-1 relative">
           <div className="w-full h-full bg-gray-50 flex items-center justify-center">
             <p className="text-gray-500">
@@ -66,6 +67,22 @@ export function MapExport({ selectedMetric }: MapExportProps) {
               </div>
             </div>
           )}
+=======
+        <div className="flex-1">
+          <ExportPreviewMap
+            selectedMetric={selectedMetric}
+            exportOptions={
+              exportOptions || {
+                regionScope: "national",
+                fileFormat: "png",
+                includeLegend: true,
+                includeTitle: true,
+                includeDateLabel: true,
+                includeAttribution: true,
+              }
+            }
+          />
+>>>>>>> origin/main
         </div>
         {exportOptions && isExporting && (
           <ExportRenderer

@@ -9,7 +9,11 @@ import { ZipData, LeafletMapProps } from "./map/types";
 import { styleCache } from "./map/styleCache";
 import pako from "pako";
 
+<<<<<<< HEAD
 // Optimized throttle function for better responsiveness
+=======
+// Throttle function for hover effects
+>>>>>>> origin/main
 const throttle = (func: Function, delay: number) => {
   let timeoutId: NodeJS.Timeout | null = null;
   let lastExecTime = 0;
@@ -32,6 +36,7 @@ const throttle = (func: Function, delay: number) => {
   };
 };
 
+<<<<<<< HEAD
 // Debounce function for expensive operations
 const debounce = (func: Function, delay: number) => {
   let timeoutId: NodeJS.Timeout | null = null;
@@ -41,6 +46,8 @@ const debounce = (func: Function, delay: number) => {
   };
 };
 
+=======
+>>>>>>> origin/main
 export function LeafletMap({
   selectedMetric,
   onZipSelect,
@@ -189,6 +196,7 @@ export function LeafletMap({
               const throttledMouseOver = throttle((e: L.LeafletMouseEvent) => {
                 const target = e.target as L.Path;
                 const currentZoom = map.getZoom();
+<<<<<<< HEAD
 
                 // Use requestAnimationFrame for smooth animations
                 requestAnimationFrame(() => {
@@ -200,11 +208,23 @@ export function LeafletMap({
                 });
 
                 // Show tooltip with minimal content for faster rendering
+=======
+                target.setStyle({
+                  weight: Math.max(currentZoom > 8 ? 3 : 2, 1),
+                  color: "#333",
+                  fillOpacity: 0.9,
+                });
+
+                // Show tooltip
+>>>>>>> origin/main
                 const popup = L.popup({
                   closeButton: false,
                   autoClose: false,
                   className: "zip-tooltip",
+<<<<<<< HEAD
                   offset: [0, -5], // Slight offset for better UX
+=======
+>>>>>>> origin/main
                 })
                   .setLatLng(e.latlng)
                   .setContent(
@@ -223,6 +243,7 @@ export function LeafletMap({
                 mouseover: throttledMouseOver,
                 mouseout: (e) => {
                   const target = e.target as L.Path;
+<<<<<<< HEAD
                   // Use requestAnimationFrame for smooth style reset
                   requestAnimationFrame(() => {
                     target.setStyle(
@@ -235,6 +256,17 @@ export function LeafletMap({
                       ),
                     );
                   });
+=======
+                  target.setStyle(
+                    getZipStyle(
+                      feature,
+                      map.getZoom(),
+                      colorScale,
+                      zipData,
+                      selectedMetric,
+                    ),
+                  );
+>>>>>>> origin/main
                   map.closePopup();
                 },
                 click: () => {
@@ -257,8 +289,13 @@ export function LeafletMap({
           },
         });
 
+<<<<<<< HEAD
         // Add optimized zoom event listener with debouncing
         const debouncedStyleUpdate = debounce(() => {
+=======
+        // Add zoom event listener for dynamic styling
+        map.on("zoomend", () => {
+>>>>>>> origin/main
           updateLayerStyles();
         }, 100);
 
