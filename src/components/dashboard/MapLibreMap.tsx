@@ -559,8 +559,8 @@ export function MapLibreMap({
       map.current.setPaintProperty("zip-codes-border", "line-width", [
         "case",
         ["==", ["get", "zipCode"], hoveredZip || ""],
-        3,
-        1.5,
+        4,
+        2,
       ]);
     }
   }, [hoveredZip]);
