@@ -8,20 +8,20 @@ import { ExportOptions } from "./ExportSidebar";
 interface MapLibreExportMapProps {
   selectedMetric: string;
   exportOptions: ExportOptions;
-  zipData: Record<string, any>;
   onMapReady?: (map: maplibregl.Map) => void;
 }
 
 export function MapLibreExportMap({
   selectedMetric,
   exportOptions,
-  zipData,
   onMapReady,
 }: MapLibreExportMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [colorScale, setColorScale] = useState<any>(null);
+  const [zipData, setZipData] = useState<Record<string, any>>({});
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Create color scale based on filtered data
   useEffect(() => {
