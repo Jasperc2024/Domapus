@@ -1,19 +1,10 @@
-<<<<<<< HEAD
 # 🏠 Domapus - Interactive U.S. Housing Market Dashboard
 
 [![Live Demo](https://img.shields.io/badge/Live-Demo-blue?style=for-the-badge)](https://jasperc2024.github.io/Domapus/)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=for-the-badge&logo=github)](https://github.com/Jasperc2024/Domapus)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-=======
-# <img src="https://jasperc2024.github.io/Domapus//android-chrome-512x512.png" width="40">  Domapus - Interactive U.S. Housing Market Dashboard
 
-[![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/sindresorhus/awesome)
-[![Live Demo](https://img.shields.io/badge/Live-Demo-blue)](https://jasperc2024.github.io/Domapus/)
-[![GitHub](https://img.shields.io/badge/GitHub-Repo-black)](https://github.com/Jasperc2024/Domapus)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
->>>>>>> origin/main
-
-Domapus is a high-performance, interactive dashboard for exploring U.S. housing market data at the ZIP code level. Built with React, TypeScript, and Leaflet, it visualizes real estate trends across 24,000+ ZIP codes using data sourced from Redfin.
+Domapus is a high-performance, interactive dashboard for exploring U.S. housing market data at the ZIP code level. Built with React, TypeScript, and MapLibre GL JS, it visualizes real estate trends across 24,000+ ZIP codes using data sourced from Redfin.
 
 ![Domapus Preview](https://jasperc2024.github.io/Domapus/preview.png)
 
@@ -23,7 +14,7 @@ Domapus is a high-performance, interactive dashboard for exploring U.S. housing 
 
 - **Real-time ZIP code data** for 24,000+ locations across the United States
 - **Multiple housing metrics** including median sale price, inventory, days on market, and more
-- **Smooth zoom and pan** with optimized rendering performance
+- **Smooth zoom and pan** with hardware-accelerated MapLibre GL JS rendering
 - **Hover tooltips** displaying detailed information for each ZIP code
 - **Search functionality** to quickly locate specific ZIP codes
 
@@ -45,10 +36,11 @@ Domapus is a high-performance, interactive dashboard for exploring U.S. housing 
 ### ⚡ Performance Optimizations
 
 - **Web Workers** for data processing to improve responsiveness
+- **Hardware-accelerated rendering** with MapLibre GL JS
 - **Optimized INP (Interaction to Next Paint)** for better user experience
 - **Resource preconnection** and prefetching for faster loading
 - **Debounced interactions** to reduce main thread blocking
-- **Efficient memory management** with throttled hover effects
+- **Efficient memory management** with proper cleanup
 
 ## 🚀 Quick Start
 
@@ -95,15 +87,13 @@ src/
 ├── components/
 │   ├── dashboard/           # Main dashboard components
 │   │   ├── map/            # Map-related utilities and hooks
+│   │   ├── MapLibreMap.tsx       # Main MapLibre GL JS component
 │   │   ├── ExportRenderer.tsx    # Export functionality
 │   │   ├── ExportLegend.tsx      # Dynamic legend component
-│   │   ├── NationalExportMap.tsx # Alaska/Hawaii positioning
 │   │   └── ...
 │   ├── ui/                 # Reusable UI components (shadcn/ui)
 │   └── ...
 ├── hooks/                  # Custom React hooks
-│   ├── useOptimizedMapData.ts    # Web worker data processing
-│   └── ...
 ├── workers/                # Web workers for performance
 ├── utils/                  # Utility functions
 └── pages/                  # Page components
@@ -133,10 +123,9 @@ src/
 
 ### Mapping & Visualization
 
-- **Leaflet** - Open-source interactive map library
-- **React-Leaflet** - React components for Leaflet maps
+- **MapLibre GL JS** - Open-source vector map rendering with hardware acceleration
 - **D3-Scale** - Data-driven color scaling and interpolation
-- **Canvas Rendering** - High-performance map layer rendering
+- **Canvas Rendering** - High-performance GPU-accelerated rendering
 
 ### Data Processing
 
@@ -157,7 +146,7 @@ src/
 - **LCP (Largest Contentful Paint)** - Optimized with resource preloading
 - **FID (First Input Delay)** - Web workers prevent main thread blocking
 - **CLS (Cumulative Layout Shift)** - Fixed dimensions and skeleton loading
-- **INP (Interaction to Next Paint)** - Debounced interactions and RAF animations
+- **INP (Interaction to Next Paint)** - Hardware acceleration and efficient event handling
 
 ### Loading Optimizations
 
@@ -168,10 +157,10 @@ src/
 
 ### Runtime Performance
 
-- Throttled hover effects (100ms for responsiveness)
-- Debounced zoom events (100ms to prevent excessive updates)
-- RequestAnimationFrame for smooth animations
-- Canvas rendering for high-performance map layers
+- Hardware-accelerated map rendering with MapLibre GL JS
+- Web worker data processing
+- Efficient event handling with throttling
+- Optimized memory management
 
 ## 🔧 Configuration
 
@@ -239,10 +228,6 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## 📝 License
 
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙋 Support
@@ -250,11 +235,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Documentation**: Available in this README and inline code comments
 - **Issues**: Report bugs and request features via [GitHub Issues](https://github.com/Jasperc2024/Domapus/issues)
 - **Discussions**: Join the conversation in [GitHub Discussions](https://github.com/Jasperc2024/Domapus/discussions)
-<<<<<<< HEAD
 - **Email**: Contact the maintainer at [jasperc2024@gmail.com](mailto:jasperc2024@gmail.com)
-=======
-- **Email**: Contact the maintainer at [jasperc2024@gmail.com](mailto:jasperc.wk@gmail.com)
->>>>>>> origin/main
 
 ## ☕ Support the Project
 
@@ -262,15 +243,11 @@ If you find Domapus useful, consider supporting its development:
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/JasperC)
 
-<<<<<<< HEAD
-## �� Acknowledgments
-=======
-## 💖 Acknowledgments
->>>>>>> origin/main
+## 🏆 Acknowledgments
 
 - **Redfin** for providing comprehensive real estate data
 - **U.S. Census Bureau** for ZIP code boundary data
-- **Leaflet Community** for the excellent mapping library
+- **MapLibre GL JS Community** for the excellent mapping library
 - **React & Vite Teams** for the modern development experience
 - **shadcn** for the beautiful component library
 
