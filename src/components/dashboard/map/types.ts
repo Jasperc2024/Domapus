@@ -1,4 +1,3 @@
-
 export interface ZipData {
   zipCode: string;
   state: string;
@@ -25,11 +24,14 @@ export interface ZipData {
   homesSoldYoY?: number;
 }
 
-export interface LeafletMapProps {
+export interface MapProps {
   selectedMetric: string;
   onZipSelect: (zipData: ZipData) => void;
   searchZip?: string;
 }
+
+// Legacy alias for backward compatibility
+export interface LeafletMapProps extends MapProps {}
 
 export interface CityData {
   city?: string;
