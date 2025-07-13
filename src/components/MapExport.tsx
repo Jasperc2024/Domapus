@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ExportSidebar, ExportOptions } from "./dashboard/ExportSidebar";
-import { ExportPreviewMap } from "./dashboard/ExportPreviewMap";
+import { MapLibreExportMap } from "./dashboard/MapLibreExportMap";
 import { ExportRenderer } from "./dashboard/ExportRenderer";
 
 interface MapExportProps {
