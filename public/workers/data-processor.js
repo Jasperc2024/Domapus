@@ -1,7 +1,8 @@
 // Web Worker for heavy data processing operations
 // This runs in a separate thread to avoid blocking the main UI
 
-import pako from "pako";
+// Import pako for decompression
+importScripts("https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js");
 
 // Cache for processed data
 const dataCache = new Map();
@@ -97,7 +98,7 @@ function processGeoJSON(geojsonData, zipData, selectedMetric) {
   const total = geojsonData.features.length;
 
   for (const feature of geojsonData.features) {
-    if (processed % 1000 === 0) {
+    if (processed % 500 === 0) {
       self.postMessage({
         type: "PROGRESS",
         data: { processed, total, phase: "geojson" },
@@ -165,22 +166,27 @@ self.onmessage = async function (e) {
 
           // Parse cities CSV
           const citiesMap = {};
-          citiesDecompressed
-            .split("\n")
-            .slice(1)
-            .forEach((line) => {
-              const parts = line.split(",");
-              if (parts.length >= 10) {
-                const zip = parts[0]?.trim();
-                const city = parts[6]?.trim();
-                const lat = parts[8] ? parseFloat(parts[8].trim()) : undefined;
-                const lng = parts[9] ? parseFloat(parts[9].trim()) : undefined;
+          const lines = citiesDecompressed.split("\n");
+          for (let i = 1; i < lines.length; i++) {
+            const parts = lines[i].split(",");
+            if (parts.length >= 10) {
+              const zip = parts[0]?.trim();
+              const stateName = parts[3]?.trim();
+              const countyName = parts[5]?.trim();
+              const city = parts[6]?.trim();
+              const lat = parts[8] ? parseFloat(parts[8].trim()) : undefined;
+              const lng = parts[9] ? parseFloat(parts[9].trim()) : undefined;
 
-                if (zip && city) {
-                  citiesMap[zip] = { city, latitude: lat, longitude: lng };
-                }
+              if (zip && city) {
+                citiesMap[zip] = {
+                  city,
+                  county: countyName || undefined,
+                  latitude: lat,
+                  longitude: lng,
+                };
               }
-            });
+            }
+          }
 
           // Process the data
           self.postMessage({
@@ -203,7 +209,21 @@ self.onmessage = async function (e) {
 
       case "PROCESS_GEOJSON":
         {
-          const { geojsonData, zipData, selectedMetric } = data;
+          // Load GeoJSON data first
+          self.postMessage({
+            type: "PROGRESS",
+            data: { phase: "loading_geojson" },
+          });
+          const response = await fetch(
+            "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz",
+          );
+          const arrayBuffer = await response.arrayBuffer();
+          const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), {
+            to: "string",
+          });
+          const geojsonData = JSON.parse(decompressed);
+
+          const { zipData, selectedMetric } = data;
           const processedGeoJSON = processGeoJSON(
             geojsonData,
             zipData,
