@@ -421,15 +421,19 @@ export function MapLibreMap({
     processData,
   ]);
 
-  // Handle search
+  // Handle search with smart zoom behavior
   useEffect(() => {
     if (!map.current || !searchZip || !citiesData[searchZip]) return;
 
     const cityData = citiesData[searchZip];
     if (cityData.latitude && cityData.longitude) {
+      const currentZoom = map.current.getZoom();
+      // Use current zoom if it's already close enough, otherwise zoom to 10
+      const targetZoom = currentZoom >= 8 ? Math.max(currentZoom, 9) : 10;
+
       map.current.flyTo({
         center: [cityData.longitude, cityData.latitude],
-        zoom: 10,
+        zoom: targetZoom,
         duration: 1000,
       });
 
