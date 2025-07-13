@@ -1,10 +1,11 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { ExportOptions } from "./ExportSidebar";
-import { ExportPreviewMap } from "./ExportPreviewMap";
+import { MapLibreExportMap } from "./MapLibreExportMap";
 import { ExportLegend } from "./ExportLegend";
 import { DomapusLogo } from "@/components/ui/domapus-logo";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import maplibregl from "maplibre-gl";
 
 interface ExportRendererProps {
   selectedMetric: string;
@@ -18,8 +19,10 @@ export function ExportRenderer({
   onExportComplete,
 }: ExportRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<HTMLDivElement>(null);
   const [isRendering, setIsRendering] = useState(false);
+  const [zipData, setZipData] = useState<Record<string, any>>({});
+  const [mapReady, setMapReady] = useState(false);
+  const mapInstanceRef = useRef<maplibregl.Map | null>(null);
 
   const getMetricDisplayName = (metric: string) => {
     const metricNames: Record<string, string> = {
@@ -111,11 +114,36 @@ export function ExportRenderer({
     }
   };
 
-  // Start rendering when component mounts
-  useState(() => {
-    const timer = setTimeout(renderToImage, 1000);
-    return () => clearTimeout(timer);
-  });
+  // Load data when component mounts
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const response = await fetch(
+          "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json.gz",
+        );
+        const arrayBuffer = await response.arrayBuffer();
+        const pako = await import("pako");
+        const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), {
+          to: "string",
+        });
+        const data = JSON.parse(decompressed);
+        setZipData(data);
+      } catch (error) {
+        console.error("Failed to load data for export:", error);
+        onExportComplete(false, "Failed to load data");
+      }
+    };
+
+    loadData();
+  }, [onExportComplete]);
+
+  // Start rendering when map is ready
+  useEffect(() => {
+    if (mapReady && Object.keys(zipData).length > 0) {
+      const timer = setTimeout(renderToImage, 2000); // Give map more time to load
+      return () => clearTimeout(timer);
+    }
+  }, [mapReady, zipData]);
 
   return (
     <div
@@ -141,11 +169,24 @@ export function ExportRenderer({
       {/* Map Container */}
       <div className="flex-1 px-8 pb-4">
         <div className="w-full h-[600px] border border-gray-300 rounded">
-          <ExportPreviewMap
-            selectedMetric={selectedMetric}
-            exportOptions={exportOptions}
-            mapRef={mapRef}
-          />
+          {Object.keys(zipData).length > 0 ? (
+            <MapLibreExportMap
+              selectedMetric={selectedMetric}
+              exportOptions={exportOptions}
+              zipData={zipData}
+              onMapReady={(map) => {
+                mapInstanceRef.current = map;
+                setMapReady(true);
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gray-50">
+              <div className="text-center space-y-2">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
+                <p className="text-sm text-gray-600">Loading data...</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
