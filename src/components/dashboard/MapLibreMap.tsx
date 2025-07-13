@@ -48,33 +48,117 @@ function useDataWorker() {
     };
   }, []);
 
-  const processData = useCallback((message: any) => {
-    return new Promise((resolve, reject) => {
-      if (!workerRef.current) {
-        reject(new Error("Worker not available"));
-        return;
-      }
+  const processData = useCallback(async (message: any) => {
+    return new Promise(async (resolve, reject) => {
+      if (workerRef.current) {
+        // Use web worker
+        const id = Math.random().toString(36);
+        setIsLoading(true);
 
-      const id = Math.random().toString(36);
-      setIsLoading(true);
+        const handleMessage = (e: MessageEvent) => {
+          if (e.data.id === id) {
+            workerRef.current?.removeEventListener("message", handleMessage);
+            setIsLoading(false);
 
-      const handleMessage = (e: MessageEvent) => {
-        if (e.data.id === id) {
-          workerRef.current?.removeEventListener("message", handleMessage);
-          setIsLoading(false);
-
-          if (e.data.type.includes("ERROR")) {
-            reject(new Error(e.data.error));
-          } else {
-            resolve(e.data.data);
+            if (e.data.type.includes("ERROR")) {
+              reject(new Error(e.data.error));
+            } else {
+              resolve(e.data.data);
+            }
           }
-        }
-      };
+        };
 
-      workerRef.current.addEventListener("message", handleMessage);
-      workerRef.current.postMessage({ ...message, id });
+        workerRef.current.addEventListener("message", handleMessage);
+        workerRef.current.postMessage({ ...message, id });
+      } else {
+        // Fallback to main thread
+        try {
+          setIsLoading(true);
+          const result = await processDataMainThread(message);
+          setIsLoading(false);
+          resolve(result);
+        } catch (error) {
+          setIsLoading(false);
+          reject(error);
+        }
+      }
     });
   }, []);
+
+  // Fallback data processing on main thread
+  const processDataMainThread = async (message: any) => {
+    const { type, data } = message;
+
+    if (type === "LOAD_AND_PROCESS_DATA") {
+      const { urls, selectedMetric } = data;
+
+      // Load ZIP data
+      const zipResponse = await fetch(urls.zipData);
+      const zipArrayBuffer = await zipResponse.arrayBuffer();
+      const pako = await import("pako");
+      const zipDecompressed = pako.ungzip(new Uint8Array(zipArrayBuffer), {
+        to: "string",
+      });
+      const zipData = JSON.parse(zipDecompressed);
+
+      // Load cities data
+      const citiesResponse = await fetch(urls.citiesData);
+      const citiesArrayBuffer = await citiesResponse.arrayBuffer();
+      const citiesDecompressed = pako.ungzip(
+        new Uint8Array(citiesArrayBuffer),
+        { to: "string" },
+      );
+
+      // Parse cities CSV
+      const citiesMap: Record<string, any> = {};
+      const lines = citiesDecompressed.split("\n");
+      for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].split(",");
+        if (parts.length >= 10) {
+          const zip = parts[0]?.trim();
+          const city = parts[6]?.trim();
+          const lat = parts[8] ? parseFloat(parts[8].trim()) : undefined;
+          const lng = parts[9] ? parseFloat(parts[9].trim()) : undefined;
+
+          if (zip && city) {
+            citiesMap[zip] = { city, latitude: lat, longitude: lng };
+          }
+        }
+      }
+
+      // Process the data
+      const values = Object.values(zipData)
+        .map((zipInfo: any) => {
+          const metricMap: Record<string, string> = {
+            "median-sale-price": "median_sale_price",
+            "median-list-price": "median_list_price",
+            "median-dom": "median_dom",
+            inventory: "inventory",
+            "new-listings": "new_listings",
+            "homes-sold": "homes_sold",
+            "sale-to-list-ratio": "sale_to_list_ratio",
+            "homes-sold-above-list": "homes_sold_above_list",
+            "off-market-2-weeks": "off_market_in_2_weeks",
+          };
+          const key = metricMap[selectedMetric] || selectedMetric;
+          return zipInfo[key] || 0;
+        })
+        .filter((v) => v > 0)
+        .sort((a, b) => a - b);
+
+      return {
+        zipData,
+        citiesData: citiesMap,
+        metricValues: values,
+        bounds: {
+          min: values[0] || 0,
+          max: values[values.length - 1] || 0,
+        },
+      };
+    }
+
+    throw new Error(`Unsupported message type: ${type}`);
+  };
 
   return { processData, isLoading, progress };
 }
