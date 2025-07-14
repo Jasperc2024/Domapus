@@ -204,6 +204,14 @@ export function MapLibreMap({
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
+    // Ensure container has dimensions before initializing map
+    const container = mapContainer.current;
+    const rect = container.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      console.warn("Map container has no dimensions, delaying initialization");
+      return;
+    }
+
     try {
       map.current = new maplibregl.Map({
         container: mapContainer.current,
@@ -255,7 +263,22 @@ export function MapLibreMap({
       map.current.addControl(new maplibregl.NavigationControl(), "top-right");
 
       map.current.on("load", () => {
-        setMapLoaded(true);
+        // Double-check container dimensions after load
+        if (mapContainer.current) {
+          const rect = mapContainer.current.getBoundingClientRect();
+          if (rect.width && rect.height) {
+            setMapLoaded(true);
+          } else {
+            console.warn("Map loaded but container still has no dimensions");
+            // Try to resize after a short delay
+            setTimeout(() => {
+              if (map.current && mapContainer.current) {
+                map.current.resize();
+                setMapLoaded(true);
+              }
+            }, 100);
+          }
+        }
       });
 
       map.current.on("error", (e) => {
@@ -267,8 +290,10 @@ export function MapLibreMap({
     }
 
     return () => {
-      map.current?.remove();
-      map.current = null;
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
     };
   }, []);
 
@@ -604,12 +629,39 @@ export function MapLibreMap({
     }
   }, [hoveredZip]);
 
+  // Handle container resize to fix matrix calculation issues
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    const handleResize = () => {
+      if (map.current && mapContainer.current) {
+        const rect = mapContainer.current.getBoundingClientRect();
+        if (rect.width && rect.height) {
+          try {
+            map.current.resize();
+          } catch (error) {
+            console.warn("Map resize error:", error);
+          }
+        }
+      }
+    };
+
+    const resizeObserver = new ResizeObserver(handleResize);
+    if (mapContainer.current) {
+      resizeObserver.observe(mapContainer.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [mapLoaded]);
+
   return (
     <div className="absolute inset-0 w-full h-full">
       <div
         ref={mapContainer}
         className="w-full h-full"
-        style={{ minHeight: "400px" }}
+        style={{ minHeight: "400px", minWidth: "300px" }}
       />
 
       {(isLoading || !mapLoaded) && (
