@@ -197,8 +197,32 @@ export function MapLibreMap({
   const [citiesData, setCitiesData] = useState<Record<string, any>>({});
   const [colorScale, setColorScale] = useState<any>(null);
   const [hoveredZip, setHoveredZip] = useState<string | null>(null);
+  const [containerReady, setContainerReady] = useState(false);
 
   const { processData, isLoading, progress } = useDataWorker();
+
+  // Ensure container is visible and has dimensions before initializing map
+  useEffect(() => {
+    if (!mapContainer.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          const rect = entry.boundingClientRect;
+          if (rect.width > 0 && rect.height > 0) {
+            setContainerReady(true);
+            observer.disconnect();
+          }
+        }
+      },
+      { threshold: 0.1 },
+    );
+
+    observer.observe(mapContainer.current);
+
+    return () => observer.disconnect();
+  }, []);
 
   // Initialize map
   useEffect(() => {
