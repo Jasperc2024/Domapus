@@ -297,20 +297,35 @@ export function MapLibreMap({
       map.current.addControl(new maplibregl.NavigationControl(), "top-right");
 
       map.current.on("load", () => {
-        // Double-check container dimensions after load
-        if (mapContainer.current) {
+        // Validate container and manually trigger resize safely
+        if (mapContainer.current && map.current) {
           const rect = mapContainer.current.getBoundingClientRect();
           if (rect.width && rect.height) {
-            setMapLoaded(true);
+            // Manual resize after load to ensure proper matrix calculation
+            try {
+              map.current.resize();
+              setMapLoaded(true);
+            } catch (resizeError) {
+              console.warn("Error during manual resize:", resizeError);
+              // Retry after a delay
+              setTimeout(() => {
+                if (map.current) {
+                  try {
+                    map.current.resize();
+                    setMapLoaded(true);
+                  } catch (retryError) {
+                    console.error(
+                      "Failed to resize map after retry:",
+                      retryError,
+                    );
+                    setMapLoaded(true); // Proceed anyway
+                  }
+                }
+              }, 200);
+            }
           } else {
-            console.warn("Map loaded but container still has no dimensions");
-            // Try to resize after a short delay
-            setTimeout(() => {
-              if (map.current && mapContainer.current) {
-                map.current.resize();
-                setMapLoaded(true);
-              }
-            }, 100);
+            console.warn("Map loaded but container has no dimensions");
+            setMapLoaded(true); // Proceed anyway to avoid infinite blocking
           }
         }
       });
