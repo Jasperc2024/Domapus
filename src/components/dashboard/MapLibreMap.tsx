@@ -443,44 +443,39 @@ export function MapLibreMap({
     )
       return;
 
-    const loadGeoJSON = async () => {
+    const loadMBTiles = async () => {
       try {
-        const response = await fetch(
-          "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz",
-        );
-        const arrayBuffer = await response.arrayBuffer();
+        // Use mbtiles format instead of compressed geojson
+        const mbtileUrl =
+          "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.mbtiles";
 
-        // Use web worker to decompress and process
-        const processedGeoJSON = await processData({
-          type: "PROCESS_GEOJSON",
-          data: {
-            geojsonData: { features: [] }, // Will be processed in worker
-            zipData,
-            selectedMetric,
-          },
-        });
+        console.log("Loading zip codes from mbtiles:", mbtileUrl);
 
-        // Add source if it doesn't exist
+        // Add mbtiles source if it doesn't exist
         if (!map.current?.getSource("zip-codes")) {
           map.current?.addSource("zip-codes", {
-            type: "geojson",
-            data: processedGeoJSON as any,
-            lineMetrics: true,
+            type: "vector",
+            url: mbtileUrl,
           });
 
-          // Add fill layer
+          // Add fill layer (choropleth)
           map.current?.addLayer({
             id: "zip-codes-fill",
             type: "fill",
             source: "zip-codes",
+            "source-layer": "zip_codes", // Specify the layer name in the mbtiles
             paint: {
               "fill-color": [
                 "case",
-                ["has", "metricValue"],
+                ["!=", ["get", ["get", "zipCode"], ["literal", zipData]], null],
                 [
                   "interpolate",
                   ["linear"],
-                  ["get", "metricValue"],
+                  [
+                    "to-number",
+                    ["get", ["get", "zipCode"], ["literal", zipData]],
+                    0,
+                  ],
                   ...createColorStops(colorScale, zipData, selectedMetric),
                 ],
                 "rgba(200, 200, 200, 0.1)",
@@ -494,6 +489,7 @@ export function MapLibreMap({
             id: "zip-codes-border",
             type: "line",
             source: "zip-codes",
+            "source-layer": "zip_codes",
             paint: {
               "line-color": [
                 "case",
@@ -505,9 +501,18 @@ export function MapLibreMap({
                 "case",
                 ["==", ["get", "zipCode"], hoveredZip || ""],
                 4,
-                2, // Thicker default outline as requested
+                2,
               ],
             },
+          });
+
+          // Add labels layer on top
+          map.current?.addLayer({
+            id: "carto-positron-labels",
+            type: "raster",
+            source: "carto-positron-labels",
+            minzoom: 0,
+            maxzoom: 18,
           });
 
           // Add hover interactions with throttling
