@@ -226,7 +226,7 @@ export function MapLibreMap({
 
   // Initialize map
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    if (!mapContainer.current || map.current || !containerReady) return;
 
     // Ensure container has dimensions before initializing map
     const container = mapContainer.current;
