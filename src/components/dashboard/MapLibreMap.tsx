@@ -197,7 +197,7 @@ export function MapLibreMap({
   const [citiesData, setCitiesData] = useState<Record<string, any>>({});
   const [colorScale, setColorScale] = useState<any>(null);
   const [hoveredZip, setHoveredZip] = useState<string | null>(null);
-  const [containerReady, setContainerReady] = useState(false);
+    const [containerReady, setContainerReady] = useState(false);
   const [initializationAttempted, setInitializationAttempted] = useState(false);
 
   const { processData, isLoading, progress } = useDataWorker();
@@ -278,19 +278,39 @@ export function MapLibreMap({
     };
   }, []);
 
-  // Initialize map
+    // Initialize map with comprehensive validation
   useEffect(() => {
-    if (!mapContainer.current || map.current || !containerReady) return;
-
-    // Ensure container has dimensions before initializing map
-    const container = mapContainer.current;
-    const rect = container.getBoundingClientRect();
-    if (!rect.width || !rect.height) {
-      console.warn("Map container has no dimensions, delaying initialization");
+    if (!mapContainer.current || map.current || !containerReady || initializationAttempted) {
       return;
     }
 
-    try {
+    const container = mapContainer.current;
+
+    // Final validation before initialization
+    const rect = container.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      console.warn("Map container has no dimensions during initialization, aborting");
+      return;
+    }
+
+    // Ensure we're in DOM and visible
+    if (!document.body.contains(container)) {
+      console.warn("Map container not in DOM, aborting initialization");
+      return;
+    }
+
+    setInitializationAttempted(true);
+
+    // Use requestAnimationFrame to ensure DOM is fully rendered
+    const initializeMap = () => {
+      try {
+        // Double-check dimensions one more time
+        const finalRect = container.getBoundingClientRect();
+        if (!finalRect.width || !finalRect.height) {
+          console.error("Container lost dimensions during initialization");
+          setInitializationAttempted(false);
+          return;
+        }
       map.current = new maplibregl.Map({
         container: mapContainer.current,
         style: {
