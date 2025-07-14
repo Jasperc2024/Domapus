@@ -1,4 +1,3 @@
-
 import { Github, Heart, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MetricSelector, MetricType } from "./MetricSelector";
@@ -13,7 +12,12 @@ interface TopBarProps {
   lastUpdated: string;
 }
 
-export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }: TopBarProps) {
+export function TopBar({
+  selectedMetric,
+  onMetricChange,
+  onSearch,
+  lastUpdated,
+}: TopBarProps) {
   const isMobile = useIsMobile();
 
   return (
@@ -21,10 +25,14 @@ export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }
       <div className="flex items-center space-x-2 sm:space-x-6">
         {/* Logo and Title */}
         <div className="flex items-center space-x-2 sm:space-x-3">
-          <img 
-            src="/Domapus/apple-touch-icon.png" 
-            alt="Domapus Logo" 
+          <img
+            src="/Domapus/apple-touch-icon.png"
+            alt="Domapus Logo"
             className="h-6 w-6 sm:h-8 sm:w-8"
+            width="32"
+            height="32"
+            loading="eager"
+            decoding="sync"
           />
           <div className="flex flex-col">
             <h1 className="text-lg sm:text-xl font-bold text-dashboard-text-primary leading-tight">
@@ -35,29 +43,24 @@ export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }
             </p>
           </div>
         </div>
-        
+
         {!isMobile && (
-          <MetricSelector 
+          <MetricSelector
             selectedMetric={selectedMetric}
             onMetricChange={onMetricChange}
           />
         )}
       </div>
-      
+
       <div className="flex items-center space-x-2 sm:space-x-4">
         {!isMobile && <SearchBox onSearch={onSearch} />}
         {!isMobile && <LastUpdated lastUpdated={lastUpdated} />}
-        
+
         {/* GitHub Button */}
-        <Button 
-          variant="outline" 
-          size="sm"
-          asChild
-          className="hidden sm:flex"
-        >
-          <a 
-            href="https://github.com/Jasperc2024/Domapus" 
-            target="_blank" 
+        <Button variant="outline" size="sm" asChild className="hidden sm:flex">
+          <a
+            href="https://github.com/Jasperc2024/Domapus"
+            target="_blank"
             rel="noopener noreferrer"
             aria-label="View project on GitHub"
             className="flex items-center space-x-2"
@@ -68,15 +71,15 @@ export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }
         </Button>
 
         {/* Sponsor Button */}
-        <Button 
-          variant="default" 
+        <Button
+          variant="default"
           size="sm"
           asChild
           className="hidden sm:flex bg-pink-600 hover:bg-pink-700 text-white"
         >
-          <a 
-            href="https://buymeacoffee.com/JasperC" 
-            target="_blank" 
+          <a
+            href="https://buymeacoffee.com/JasperC"
+            target="_blank"
             rel="noopener noreferrer"
             aria-label="Support this project by sponsoring"
             className="flex items-center space-x-2"
@@ -91,7 +94,7 @@ export function TopBar({ selectedMetric, onMetricChange, onSearch, lastUpdated }
       {isMobile && (
         <div className="fixed bottom-4 left-4 right-4 z-[1001] bg-dashboard-panel border border-dashboard-border rounded-lg p-3 shadow-lg">
           <div className="space-y-3">
-            <MetricSelector 
+            <MetricSelector
               selectedMetric={selectedMetric}
               onMetricChange={onMetricChange}
             />

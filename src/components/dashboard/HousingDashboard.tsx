@@ -1,15 +1,14 @@
-
 import { useState, useEffect } from "react";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
-import { LeafletMap } from "./LeafletMap";
+import { MapLibreMap } from "./MapLibreMap";
 import React, { Suspense } from "react";
 const Sidebar = React.lazy(() =>
-  import("./Sidebar").then((module) => ({ default: module.Sidebar }))
+  import("./Sidebar").then((module) => ({ default: module.Sidebar })),
 );
 import { Legend } from "./Legend";
 import { LastUpdated } from "./LastUpdated";
-import pako from 'pako';
+
 import { TopBar } from "./TopBar";
 
 interface ZipData {
@@ -27,7 +26,8 @@ interface ZipData {
 }
 
 export function HousingDashboard() {
-  const [selectedMetric, setSelectedMetric] = useState<MetricType>("median-sale-price");
+  const [selectedMetric, setSelectedMetric] =
+    useState<MetricType>("median-sale-price");
   const [selectedZip, setSelectedZip] = useState<ZipData | null>(null);
   const [searchZip, setSearchZip] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -35,31 +35,9 @@ export function HousingDashboard() {
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
   useEffect(() => {
-  const loadLastUpdatedDate = async () => {
-    try {
-      const response = await fetch(import.meta.env.BASE_URL + 'data/zip-data.json.gz');
-      const arrayBuffer = await response.arrayBuffer();
-      const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' });
-      const data = JSON.parse(decompressed);
-
-      const dates = Object.values(data)
-        .map((zip: any) => zip.period_end)
-        .filter(Boolean);
-
-      if (dates.length > 0) {
-        const latestDate = dates.sort().pop();
-        setLastUpdated(latestDate);
-      } else {
-        setLastUpdated("2025-07-01");
-      }
-    } catch (error) {
-      console.error("Failed to load or decompress zip-data.json.gz", error);
-      setLastUpdated("2025-07-01");
-    }
-  };
-
-  loadLastUpdatedDate();
-}, []);
+    // Set a default last updated date - the map component will handle data loading
+    setLastUpdated("2025-07-01");
+  }, []);
 
   const handleZipSelect = (zipData: ZipData) => {
     setSelectedZip(zipData);
@@ -83,7 +61,7 @@ export function HousingDashboard() {
   return (
     <div className="w-full h-screen bg-dashboard-bg overflow-hidden flex flex-col">
       {/* Top Navigation Bar */}
-      <TopBar 
+      <TopBar
         selectedMetric={selectedMetric}
         onMetricChange={setSelectedMetric}
         onSearch={handleSearch}
@@ -93,7 +71,11 @@ export function HousingDashboard() {
       {/* Main Content Area */}
       <div className="flex flex-1 relative">
         {/* Sidebar */}
-        <Suspense fallback={<div className="p-4 text-sm text-muted">Loading sidebar...</div>}>
+        <Suspense
+          fallback={
+            <div className="p-4 text-sm text-muted">Loading sidebar...</div>
+          }
+        >
           <Sidebar
             isOpen={sidebarOpen}
             isCollapsed={sidebarCollapsed}
@@ -104,14 +86,14 @@ export function HousingDashboard() {
         </Suspense>
 
         {/* Map Container - Full size with proper positioning */}
-        <div 
+        <div
           className={`flex-1 relative transition-all duration-300 ${
-            sidebarOpen ? (sidebarCollapsed ? 'ml-16' : 'ml-96') : 'ml-0'
+            sidebarOpen ? (sidebarCollapsed ? "ml-16" : "ml-96") : "ml-0"
           }`}
         >
           {/* Map View - Full container */}
           <div className="absolute inset-0">
-            <LeafletMap
+            <MapLibreMap
               selectedMetric={selectedMetric}
               onZipSelect={handleZipSelect}
               searchZip={searchZip}

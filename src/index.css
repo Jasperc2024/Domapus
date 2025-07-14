@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -125,43 +124,56 @@
   }
 }
 
-/* Leaflet map improvements */
-.leaflet-container {
+/* MapLibre GL JS map improvements */
+.maplibregl-map {
   background: hsl(var(--dashboard-bg)) !important;
 }
 
-.leaflet-tile {
+.maplibregl-canvas {
   image-rendering: -webkit-optimize-contrast;
   image-rendering: optimize-contrast;
   image-rendering: crisp-edges;
   -ms-interpolation-mode: nearest-neighbor;
 }
 
-.leaflet-tile-loaded {
-  opacity: 1 !important;
-  transition: opacity 0.2s ease-in-out;
+/* MapLibre popup styles */
+.maplibregl-popup-content {
+  border-radius: 8px;
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
-.leaflet-tile-loading {
-  opacity: 0.3 !important;
+.maplibregl-popup-tip {
+  border-top-color: white;
 }
 
 .zip-tooltip {
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* MapLibre popup custom styling */
+.zip-tooltip .maplibregl-popup-content {
+  padding: 0;
+  border-radius: 8px;
+  background: white;
 }
 
 /* Mobile optimizations */
 @media (max-width: 768px) {
-  .leaflet-control-container {
-    pointer-events: none;
-  }
-  
-  .leaflet-control {
+  .maplibregl-ctrl-group {
     pointer-events: auto;
   }
-  
-  .leaflet-popup-content-wrapper {
+
+  .maplibregl-popup-content {
     border-radius: 8px;
+    max-width: 90vw;
+  }
+
+  .maplibregl-canvas {
+    touch-action: pan-x pan-y;
   }
 }
 
@@ -170,7 +182,7 @@
   .animate-fade-in {
     animation: fade-in 0.3s ease-in-out;
   }
-  
+
   .animate-slide-up {
     animation: slide-up 0.3s ease-out;
   }

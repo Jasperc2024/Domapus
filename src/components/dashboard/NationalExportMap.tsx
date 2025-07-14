@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import { scaleLinear } from "d3-scale";
-import { getMetricValue, getZipStyle } from "./map/utils";
-import pako from "pako";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { getMetricValue } from "./map/utils";
 
 interface NationalExportMapProps {
   selectedMetric: string;
@@ -22,24 +20,34 @@ export function NationalExportMap({
   const alaskaMapRef = useRef<HTMLDivElement>(null);
   const hawaiiMapRef = useRef<HTMLDivElement>(null);
 
-  const [mainMap, setMainMap] = useState<L.Map | null>(null);
-  const [alaskaMap, setAlaskaMap] = useState<L.Map | null>(null);
-  const [hawaiiMap, setHawaiiMap] = useState<L.Map | null>(null);
+  const [mainMap, setMainMap] = useState<maplibregl.Map | null>(null);
+  const [alaskaMap, setAlaskaMap] = useState<maplibregl.Map | null>(null);
+  const [hawaiiMap, setHawaiiMap] = useState<maplibregl.Map | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Initialize main map (continental US)
   useEffect(() => {
     if (!mapRef.current) return;
 
-    const map = L.map(mapRef.current, {
-      center: [39.8283, -98.5795],
+    const map = new maplibregl.Map({
+      container: mapRef.current,
+      style: {
+        version: 8,
+        sources: {},
+        layers: [
+          {
+            id: "background",
+            type: "background",
+            paint: {
+              "background-color": "#ffffff",
+            },
+          },
+        ],
+      },
+      center: [-98.5795, 39.8283],
       zoom: 4,
-      scrollWheelZoom: false,
-      dragging: false,
-      zoomControl: false,
+      interactive: false,
       attributionControl: false,
-      preferCanvas: true,
-      renderer: L.canvas({ padding: 2, tolerance: 5 }),
     });
 
     setMainMap(map);
@@ -51,15 +59,25 @@ export function NationalExportMap({
   useEffect(() => {
     if (!alaskaMapRef.current) return;
 
-    const map = L.map(alaskaMapRef.current, {
-      center: [64.0685, -152.2782], // Alaska center
+    const map = new maplibregl.Map({
+      container: alaskaMapRef.current,
+      style: {
+        version: 8,
+        sources: {},
+        layers: [
+          {
+            id: "background",
+            type: "background",
+            paint: {
+              "background-color": "#ffffff",
+            },
+          },
+        ],
+      },
+      center: [-152.2782, 64.0685], // Alaska center
       zoom: 3,
-      scrollWheelZoom: false,
-      dragging: false,
-      zoomControl: false,
+      interactive: false,
       attributionControl: false,
-      preferCanvas: true,
-      renderer: L.canvas({ padding: 2, tolerance: 5 }),
     });
 
     setAlaskaMap(map);
@@ -71,15 +89,25 @@ export function NationalExportMap({
   useEffect(() => {
     if (!hawaiiMapRef.current) return;
 
-    const map = L.map(hawaiiMapRef.current, {
-      center: [19.8968, -155.5828], // Hawaii center
+    const map = new maplibregl.Map({
+      container: hawaiiMapRef.current,
+      style: {
+        version: 8,
+        sources: {},
+        layers: [
+          {
+            id: "background",
+            type: "background",
+            paint: {
+              "background-color": "#ffffff",
+            },
+          },
+        ],
+      },
+      center: [-155.5828, 19.8968], // Hawaii center
       zoom: 6,
-      scrollWheelZoom: false,
-      dragging: false,
-      zoomControl: false,
+      interactive: false,
       attributionControl: false,
-      preferCanvas: true,
-      renderer: L.canvas({ padding: 2, tolerance: 5 }),
     });
 
     setHawaiiMap(map);
@@ -97,6 +125,9 @@ export function NationalExportMap({
           "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz",
         );
         const arrayBuffer = await response.arrayBuffer();
+
+        // Import pako dynamically to avoid issues
+        const pako = await import("pako");
         const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), {
           to: "string",
         });
@@ -107,16 +138,11 @@ export function NationalExportMap({
         const alaskaFeatures = [];
         const hawaiiFeatures = [];
 
-        geojsonData.features.forEach((feature: unknown) => {
-          const featureTyped = feature as {
-            properties?: { ZCTA5CE20?: string; GEOID20?: string };
-          };
+        geojsonData.features.forEach((feature: any) => {
           const zipCode =
-            featureTyped.properties?.ZCTA5CE20 ||
-            featureTyped.properties?.GEOID20;
+            feature.properties?.ZCTA5CE20 || feature.properties?.GEOID20;
           if (zipCode && zipData[zipCode]) {
-            const state = (zipData[zipCode] as { state_name?: string })
-              .state_name;
+            const state = zipData[zipCode].state_name;
             if (state === "Alaska") {
               alaskaFeatures.push(feature);
             } else if (state === "Hawaii") {
@@ -127,53 +153,97 @@ export function NationalExportMap({
           }
         });
 
-        // Add continental US layer
-        if (continentalFeatures.length > 0) {
-          const continentalLayer = L.geoJSON(
-            {
-              type: "FeatureCollection",
-              features: continentalFeatures,
-            },
-            {
-              style: (feature) =>
-                getZipStyle(feature, 4, colorScale, zipData, selectedMetric),
-              interactive: false,
-            },
-          );
-          continentalLayer.addTo(mainMap);
+        // Create color stops
+        const values = Object.values(zipData)
+          .map((data: any) => getMetricValue(data, selectedMetric))
+          .filter((v) => v > 0)
+          .sort((a, b) => a - b);
+
+        const stops: (number | string)[] = [];
+        const colors = [
+          "#497eaf",
+          "#5fa4ca",
+          "#b4d4ec",
+          "#ffecd4",
+          "#fac790",
+          "#e97000",
+        ];
+
+        for (let i = 0; i < colors.length; i++) {
+          const value =
+            values[Math.floor((values.length - 1) * (i / (colors.length - 1)))];
+          stops.push(value, colors[i]);
         }
 
-        // Add Alaska layer
-        if (alaskaFeatures.length > 0) {
-          const alaskaLayer = L.geoJSON(
-            {
-              type: "FeatureCollection",
-              features: alaskaFeatures,
-            },
-            {
-              style: (feature) =>
-                getZipStyle(feature, 3, colorScale, zipData, selectedMetric),
-              interactive: false,
-            },
-          );
-          alaskaLayer.addTo(alaskaMap);
-        }
+        // Helper function to add data to map
+        const addDataToMap = (
+          map: maplibregl.Map,
+          features: any[],
+          sourceId: string,
+        ) => {
+          if (features.length === 0) return;
 
-        // Add Hawaii layer
-        if (hawaiiFeatures.length > 0) {
-          const hawaiiLayer = L.geoJSON(
-            {
-              type: "FeatureCollection",
-              features: hawaiiFeatures,
+          const processedGeoJSON = {
+            type: "FeatureCollection",
+            features: features.map((feature: any) => {
+              const zipCode =
+                feature.properties?.ZCTA5CE20 || feature.properties?.GEOID20;
+              const value = zipCode
+                ? getMetricValue(zipData[zipCode], selectedMetric)
+                : 0;
+
+              return {
+                ...feature,
+                properties: {
+                  ...feature.properties,
+                  zipCode,
+                  metricValue: value,
+                },
+              };
+            }),
+          };
+
+          map.addSource(sourceId, {
+            type: "geojson",
+            data: processedGeoJSON,
+          });
+
+          map.addLayer({
+            id: `${sourceId}-fill`,
+            type: "fill",
+            source: sourceId,
+            paint: {
+              "fill-color": [
+                "interpolate",
+                ["linear"],
+                ["get", "metricValue"],
+                ...stops,
+              ],
+              "fill-opacity": 0.8,
             },
-            {
-              style: (feature) =>
-                getZipStyle(feature, 6, colorScale, zipData, selectedMetric),
-              interactive: false,
+          });
+
+          map.addLayer({
+            id: `${sourceId}-border`,
+            type: "line",
+            source: sourceId,
+            paint: {
+              "line-color": "rgba(255, 255, 255, 0.8)",
+              "line-width": 1.5,
             },
-          );
-          hawaiiLayer.addTo(hawaiiMap);
-        }
+          });
+        };
+
+        // Add data to each map
+        mainMap.on("load", () =>
+          addDataToMap(mainMap, continentalFeatures, "continental"),
+        );
+        alaskaMap.on("load", () =>
+          addDataToMap(alaskaMap, alaskaFeatures, "alaska"),
+        );
+        hawaiiMap.on("load", () =>
+          addDataToMap(hawaiiMap, hawaiiFeatures, "hawaii"),
+        );
 
         setIsLoaded(true);
       } catch (error) {
