@@ -393,8 +393,7 @@ export function MapLibreMap({
               const colors = [
                 "#497eaf",
                 "#5fa4ca",
-                "#b4d4ec",
-                "#ffecd4",
+                "#ffffff",
                 "#fac790",
                 "#e97000",
               ];
@@ -778,14 +777,7 @@ function createColorStops(
   if (values.length === 0) return [0, "#cccccc"];
 
   const stops: (number | string)[] = [];
-  const colors = [
-    "#497eaf",
-    "#5fa4ca",
-    "#b4d4ec",
-    "#ffecd4",
-    "#fac790",
-    "#e97000",
-  ];
+  const colors = ["#497eaf", "#5fa4ca", "#ffffff", "#fac790", "#e97000"];
 
   for (let i = 0; i < colors.length; i++) {
     const value =
