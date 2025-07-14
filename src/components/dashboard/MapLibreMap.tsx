@@ -682,17 +682,26 @@ export function MapLibreMap({
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
+    let resizeTimeout: NodeJS.Timeout;
+
     const handleResize = () => {
-      if (map.current && mapContainer.current) {
-        const rect = mapContainer.current.getBoundingClientRect();
-        if (rect.width && rect.height) {
-          try {
-            map.current.resize();
-          } catch (error) {
-            console.warn("Map resize error:", error);
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+
+      resizeTimeout = setTimeout(() => {
+        if (map.current && mapContainer.current) {
+          const rect = mapContainer.current.getBoundingClientRect();
+          if (rect.width && rect.height) {
+            try {
+              // Only resize if container has meaningful dimensions
+              if (rect.width > 100 && rect.height > 100) {
+                map.current.resize();
+              }
+            } catch (error) {
+              console.warn("Map resize error:", error);
+            }
           }
         }
-      }
+      }, 100); // Debounce resize events
     };
 
     const resizeObserver = new ResizeObserver(handleResize);
