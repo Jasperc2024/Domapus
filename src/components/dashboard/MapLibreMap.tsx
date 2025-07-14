@@ -319,7 +319,7 @@ export function MapLibreMap({
         map.current = null;
       }
     };
-  }, []);
+  }, [containerReady]);
 
   // Load and process data
   useEffect(() => {
