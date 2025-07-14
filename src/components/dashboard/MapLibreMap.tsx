@@ -711,6 +711,7 @@ export function MapLibreMap({
 
     return () => {
       resizeObserver.disconnect();
+      if (resizeTimeout) clearTimeout(resizeTimeout);
     };
   }, [mapLoaded]);
 
