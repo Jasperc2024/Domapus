@@ -198,22 +198,58 @@ export function MapLibreMap({
   const [colorScale, setColorScale] = useState<any>(null);
   const [hoveredZip, setHoveredZip] = useState<string | null>(null);
   const [containerReady, setContainerReady] = useState(false);
+  const [initializationAttempted, setInitializationAttempted] = useState(false);
 
   const { processData, isLoading, progress } = useDataWorker();
 
-  // Ensure container is visible and has dimensions before initializing map
+  // More robust container readiness check
   useEffect(() => {
     if (!mapContainer.current) return;
 
+    const checkContainerReadiness = () => {
+      const container = mapContainer.current;
+      if (!container) return false;
+
+      // Check if container is attached to DOM
+      const isInDOM = document.body.contains(container);
+      if (!isInDOM) return false;
+
+      // Check if container has valid dimensions
+      const rect = container.getBoundingClientRect();
+      const hasValidDimensions = rect.width > 0 && rect.height > 0;
+      if (!hasValidDimensions) return false;
+
+      // Check if parent elements are properly sized
+      let parent = container.parentElement;
+      while (parent && parent !== document.body) {
+        const parentRect = parent.getBoundingClientRect();
+        if (parentRect.width === 0 || parentRect.height === 0) {
+          return false;
+        }
+        parent = parent.parentElement;
+      }
+
+      return true;
+    };
+
+    const trySetReady = () => {
+      if (checkContainerReadiness()) {
+        setContainerReady(true);
+        return true;
+      }
+      return false;
+    };
+
+    // Try immediate check
+    if (trySetReady()) return;
+
+    // Use multiple strategies to detect readiness
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
-        if (entry.isIntersecting) {
-          const rect = entry.boundingClientRect;
-          if (rect.width > 0 && rect.height > 0) {
-            setContainerReady(true);
-            observer.disconnect();
-          }
+        if (entry.isIntersecting && checkContainerReadiness()) {
+          setContainerReady(true);
+          observer.disconnect();
         }
       },
       { threshold: 0.1 },
@@ -221,7 +257,25 @@ export function MapLibreMap({
 
     observer.observe(mapContainer.current);
 
-    return () => observer.disconnect();
+    // Retry with animation frame
+    const rafId = requestAnimationFrame(() => {
+      if (trySetReady()) {
+        observer.disconnect();
+      }
+    });
+
+    // Final fallback with timeout
+    const timeoutId = setTimeout(() => {
+      if (trySetReady()) {
+        observer.disconnect();
+      }
+    }, 200);
+
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   // Initialize map
