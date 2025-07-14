@@ -289,6 +289,8 @@ export function MapLibreMap({
           [180, 85],
         ],
         attributionControl: false,
+        trackResize: false, // Disable automatic resize to prevent matrix errors
+        preserveDrawingBuffer: true,
       });
 
       // Add navigation control
