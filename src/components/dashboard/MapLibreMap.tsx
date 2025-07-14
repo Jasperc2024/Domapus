@@ -197,59 +197,23 @@ export function MapLibreMap({
   const [citiesData, setCitiesData] = useState<Record<string, any>>({});
   const [colorScale, setColorScale] = useState<any>(null);
   const [hoveredZip, setHoveredZip] = useState<string | null>(null);
-    const [containerReady, setContainerReady] = useState(false);
-  const [initializationAttempted, setInitializationAttempted] = useState(false);
+  const [containerReady, setContainerReady] = useState(false);
 
   const { processData, isLoading, progress } = useDataWorker();
 
-  // More robust container readiness check
+  // Ensure container is visible and has dimensions before initializing map
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    const checkContainerReadiness = () => {
-      const container = mapContainer.current;
-      if (!container) return false;
-
-      // Check if container is attached to DOM
-      const isInDOM = document.body.contains(container);
-      if (!isInDOM) return false;
-
-      // Check if container has valid dimensions
-      const rect = container.getBoundingClientRect();
-      const hasValidDimensions = rect.width > 0 && rect.height > 0;
-      if (!hasValidDimensions) return false;
-
-      // Check if parent elements are properly sized
-      let parent = container.parentElement;
-      while (parent && parent !== document.body) {
-        const parentRect = parent.getBoundingClientRect();
-        if (parentRect.width === 0 || parentRect.height === 0) {
-          return false;
-        }
-        parent = parent.parentElement;
-      }
-
-      return true;
-    };
-
-    const trySetReady = () => {
-      if (checkContainerReadiness()) {
-        setContainerReady(true);
-        return true;
-      }
-      return false;
-    };
-
-    // Try immediate check
-    if (trySetReady()) return;
-
-    // Use multiple strategies to detect readiness
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
-        if (entry.isIntersecting && checkContainerReadiness()) {
-          setContainerReady(true);
-          observer.disconnect();
+        if (entry.isIntersecting) {
+          const rect = entry.boundingClientRect;
+          if (rect.width > 0 && rect.height > 0) {
+            setContainerReady(true);
+            observer.disconnect();
+          }
         }
       },
       { threshold: 0.1 },
@@ -257,60 +221,22 @@ export function MapLibreMap({
 
     observer.observe(mapContainer.current);
 
-    // Retry with animation frame
-    const rafId = requestAnimationFrame(() => {
-      if (trySetReady()) {
-        observer.disconnect();
-      }
-    });
-
-    // Final fallback with timeout
-    const timeoutId = setTimeout(() => {
-      if (trySetReady()) {
-        observer.disconnect();
-      }
-    }, 200);
-
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(rafId);
-      clearTimeout(timeoutId);
-    };
+    return () => observer.disconnect();
   }, []);
 
-    // Initialize map with comprehensive validation
+  // Initialize map
   useEffect(() => {
-    if (!mapContainer.current || map.current || !containerReady || initializationAttempted) {
-      return;
-    }
+    if (!mapContainer.current || map.current || !containerReady) return;
 
+    // Ensure container has dimensions before initializing map
     const container = mapContainer.current;
-
-    // Final validation before initialization
     const rect = container.getBoundingClientRect();
     if (!rect.width || !rect.height) {
-      console.warn("Map container has no dimensions during initialization, aborting");
+      console.warn("Map container has no dimensions, delaying initialization");
       return;
     }
 
-    // Ensure we're in DOM and visible
-    if (!document.body.contains(container)) {
-      console.warn("Map container not in DOM, aborting initialization");
-      return;
-    }
-
-    setInitializationAttempted(true);
-
-    // Use requestAnimationFrame to ensure DOM is fully rendered
-    const initializeMap = () => {
-      try {
-        // Double-check dimensions one more time
-        const finalRect = container.getBoundingClientRect();
-        if (!finalRect.width || !finalRect.height) {
-          console.error("Container lost dimensions during initialization");
-          setInitializationAttempted(false);
-          return;
-        }
+    try {
       map.current = new maplibregl.Map({
         container: mapContainer.current,
         style: {
