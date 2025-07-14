@@ -249,13 +249,25 @@ export function MapLibreMap({
         style: {
           version: 8,
           sources: {
-            "carto-light": {
+            "carto-positron-nolabels": {
               type: "raster",
               tiles: [
-                "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-                "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-                "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-                "https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                "https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
+                "https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
+                "https://c.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
+                "https://d.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
+              ],
+              tileSize: 256,
+              attribution:
+                '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+            },
+            "carto-positron-labels": {
+              type: "raster",
+              tiles: [
+                "https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
+                "https://b.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
+                "https://c.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
+                "https://d.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
               ],
               tileSize: 256,
               attribution:
@@ -271,9 +283,9 @@ export function MapLibreMap({
               },
             },
             {
-              id: "carto-light-layer",
+              id: "carto-positron-base",
               type: "raster",
-              source: "carto-light",
+              source: "carto-positron-nolabels",
               minzoom: 0,
               maxzoom: 18,
             },
