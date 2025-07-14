@@ -1,5 +1,13 @@
-
-import { X, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, MapPin, Building } from "lucide-react";
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  MapPin,
+  Building,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -62,165 +70,181 @@ interface SidebarProps {
   onToggleCollapse: () => void;
 }
 
-export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollapse }: SidebarProps) {
+export function Sidebar({
+  isOpen,
+  isCollapsed,
+  zipData,
+  onClose,
+  onToggleCollapse,
+}: SidebarProps) {
   const [showComparison, setShowComparison] = useState(false);
 
   if (!isOpen || !zipData) return null;
 
   const formatValue = (value: any, type: string): string => {
-    if (value === null || value === undefined) return 'N/A';
-    
+    if (value === null || value === undefined) return "N/A";
+
     const numValue = Number(value);
     switch (type) {
-      case 'price':
+      case "price":
         return `$${numValue.toLocaleString()}`;
-      case 'days':
+      case "days":
         return `${numValue} days`;
-      case 'percentage':
+      case "percentage":
         // Display as integer if it's a whole number
-        return numValue % 1 === 0 ? `${numValue.toFixed(0)}%` : `${numValue.toFixed(1)}%`;
-      case 'ratio':
+        return numValue % 1 === 0
+          ? `${numValue.toFixed(0)}%`
+          : `${numValue.toFixed(1)}%`;
+      case "ratio":
         const ratioPercent = numValue * 100;
-        return ratioPercent % 1 === 0 ? `${ratioPercent.toFixed(0)}%` : `${ratioPercent.toFixed(1)}%`;
-      case 'coordinate':
+        return ratioPercent % 1 === 0
+          ? `${ratioPercent.toFixed(0)}%`
+          : `${ratioPercent.toFixed(1)}%`;
+      case "coordinate":
         return numValue.toFixed(4);
       default:
         return numValue % 1 === 0 ? numValue.toFixed(0) : numValue.toString();
     }
   };
 
-  const formatChange = (value: any): { formatted: string; isPositive: boolean; isZero: boolean } => {
-    if (value === null || value === undefined) return { formatted: 'N/A', isPositive: false, isZero: true };
+  const formatChange = (
+    value: any,
+  ): { formatted: string; isPositive: boolean; isZero: boolean } => {
+    if (value === null || value === undefined)
+      return { formatted: "N/A", isPositive: false, isZero: true };
     const numValue = Number(value);
     const isPositive = numValue > 0;
     const isZero = numValue === 0;
     return {
-      formatted: `${isPositive ? '+' : ''}${numValue % 1 === 0 ? numValue.toFixed(0) : numValue.toFixed(1)}%`,
+      formatted: `${isPositive ? "+" : ""}${numValue % 1 === 0 ? numValue.toFixed(0) : numValue.toFixed(1)}%`,
       isPositive,
-      isZero
+      isZero,
     };
   };
 
   // Create comprehensive metrics list with all available data
   const allMetrics = [
-    { 
-      key: 'median_sale_price', 
-      label: 'Median Sale Price', 
-      type: 'price', 
-      momKey: 'median_sale_price_mom',
-      yoyKey: 'median_sale_price_yoy',
-      value: zipData.median_sale_price || zipData.medianSalePrice
+    {
+      key: "median_sale_price",
+      label: "Median Sale Price",
+      type: "price",
+      momKey: "median_sale_price_mm",
+      yoyKey: "median_sale_price_yy",
+      value: zipData.median_sale_price || zipData.medianSalePrice,
     },
-    { 
-      key: 'median_list_price', 
-      label: 'Median List Price', 
-      type: 'price', 
-      momKey: 'median_list_price_mom',
-      yoyKey: 'median_list_price_yoy',
-      value: zipData.median_list_price || zipData.medianListPrice
+    {
+      key: "median_list_price",
+      label: "Median List Price",
+      type: "price",
+      momKey: "median_list_price_mm",
+      yoyKey: "median_list_price_yy",
+      value: zipData.median_list_price || zipData.medianListPrice,
     },
-    { 
-      key: 'median_dom', 
-      label: 'Median Days on Market', 
-      type: 'days', 
-      momKey: 'median_dom_mom',
-      yoyKey: 'median_dom_yoy',
-      value: zipData.median_dom || zipData.medianDOM
+    {
+      key: "median_dom",
+      label: "Median Days on Market",
+      type: "days",
+      momKey: "median_dom_mm",
+      yoyKey: "median_dom_yy",
+      value: zipData.median_dom || zipData.medianDOM,
     },
-    { 
-      key: 'inventory', 
-      label: 'Inventory', 
-      type: 'number', 
-      momKey: 'inventory_mom',
-      yoyKey: 'inventory_yoy',
-      value: zipData.inventory
+    {
+      key: "inventory",
+      label: "Inventory",
+      type: "number",
+      momKey: "inventory_mm",
+      yoyKey: "inventory_yy",
+      value: zipData.inventory,
     },
-    { 
-      key: 'new_listings', 
-      label: 'New Listings', 
-      type: 'number', 
-      momKey: 'new_listings_mom',
-      yoyKey: 'new_listings_yoy',
-      value: zipData.new_listings
+    {
+      key: "new_listings",
+      label: "New Listings",
+      type: "number",
+      momKey: "new_listings_mm",
+      yoyKey: "new_listings_yy",
+      value: zipData.new_listings,
     },
-    { 
-      key: 'homes_sold', 
-      label: 'Homes Sold', 
-      type: 'number', 
-      momKey: 'homes_sold_mom',
-      yoyKey: 'homes_sold_yoy',
-      value: zipData.homes_sold || zipData.homesSold
+    {
+      key: "homes_sold",
+      label: "Homes Sold",
+      type: "number",
+      momKey: "homes_sold_mm",
+      yoyKey: "homes_sold_yy",
+      value: zipData.homes_sold || zipData.homesSold,
     },
-    { 
-      key: 'avg_sale_to_list_ratio', 
-      label: 'Sale-to-List Ratio', 
-      type: 'ratio', 
+    {
+      key: "avg_sale_to_list_ratio",
+      label: "Sale-to-List Ratio",
+      type: "ratio",
       momKey: null,
       yoyKey: null,
-      value: zipData.avg_sale_to_list_ratio || zipData.saleToListRatio
+      value: zipData.avg_sale_to_list_ratio || zipData.saleToListRatio,
     },
-    { 
-      key: 'sold_above_list', 
-      label: '% Sold Above List', 
-      type: 'percentage', 
+    {
+      key: "sold_above_list",
+      label: "% Sold Above List",
+      type: "percentage",
       momKey: null,
       yoyKey: null,
-      value: zipData.sold_above_list || zipData.homesSoldAboveList
+      value: zipData.sold_above_list || zipData.homesSoldAboveList,
     },
-    { 
-      key: 'off_market_in_two_weeks', 
-      label: '% Off Market in 2 Weeks', 
-      type: 'percentage', 
+    {
+      key: "off_market_in_two_weeks",
+      label: "% Off Market in 2 Weeks",
+      type: "percentage",
       momKey: null,
       yoyKey: null,
-      value: zipData.off_market_in_two_weeks || zipData.offMarket2Weeks
+      value: zipData.off_market_in_two_weeks || zipData.offMarket2Weeks,
     },
-    { 
-      key: 'median_ppsf', 
-      label: 'Median Price per Sq Ft', 
-      type: 'price', 
+    {
+      key: "median_ppsf",
+      label: "Median Price per Sq Ft",
+      type: "price",
       momKey: null,
       yoyKey: null,
-      value: zipData.median_ppsf
+      value: zipData.median_ppsf,
     },
-    { 
-      key: 'median_list_ppsf', 
-      label: 'Median List Price per Sq Ft', 
-      type: 'price', 
+    {
+      key: "median_list_ppsf",
+      label: "Median List Price per Sq Ft",
+      type: "price",
       momKey: null,
       yoyKey: null,
-      value: zipData.median_list_ppsf
+      value: zipData.median_list_ppsf,
     },
-    { 
-      key: 'pending_sales', 
-      label: 'Pending Sales', 
-      type: 'number', 
+    {
+      key: "pending_sales",
+      label: "Pending Sales",
+      type: "number",
       momKey: null,
       yoyKey: null,
-      value: zipData.pending_sales
+      value: zipData.pending_sales,
     },
-    { 
-      key: 'months_of_supply', 
-      label: 'Months of Supply', 
-      type: 'number', 
+    {
+      key: "months_of_supply",
+      label: "Months of Supply",
+      type: "number",
       momKey: null,
       yoyKey: null,
-      value: zipData.months_of_supply
+      value: zipData.months_of_supply,
     },
-    { 
-      key: 'price_drops', 
-      label: 'Price Drops', 
-      type: 'number', 
+    {
+      key: "price_drops",
+      label: "Price Drops",
+      type: "number",
       momKey: null,
       yoyKey: null,
-      value: zipData.price_drops
-    }
-  ].filter(metric => metric.value !== null && metric.value !== undefined && metric.value !== 0);
+      value: zipData.price_drops,
+    },
+  ].filter(
+    (metric) =>
+      metric.value !== null && metric.value !== undefined && metric.value !== 0,
+  );
 
   return (
-    <div 
+    <div
       className={`fixed left-0 top-0 h-full bg-dashboard-panel border-r border-dashboard-border shadow-lg z-40 transition-all duration-300 ${
-        isCollapsed ? 'w-16' : 'w-96'
+        isCollapsed ? "w-16" : "w-96"
       }`}
     >
       {/* Sidebar Header */}
@@ -242,7 +266,11 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
         )}
         <div className="flex items-center space-x-2">
           <Button variant="ghost" size="sm" onClick={onToggleCollapse}>
-            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
           </Button>
           {!isCollapsed && (
             <Button variant="ghost" size="sm" onClick={onClose}>
@@ -257,9 +285,9 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
         <div className="flex flex-col h-full">
           {showComparison ? (
             <div className="p-4 flex-1 overflow-y-auto">
-              <ZipComparison 
-                currentZip={zipData} 
-                onClose={() => setShowComparison(false)} 
+              <ZipComparison
+                currentZip={zipData}
+                onClose={() => setShowComparison(false)}
               />
             </div>
           ) : (
@@ -282,31 +310,47 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
                 <CardContent className="space-y-2 text-sm">
                   {zipData.city && (
                     <div className="flex justify-between">
-                      <span className="text-dashboard-text-secondary">City:</span>
+                      <span className="text-dashboard-text-secondary">
+                        City:
+                      </span>
                       <span className="font-medium">{zipData.city}</span>
                     </div>
                   )}
                   {zipData.county && (
                     <div className="flex justify-between">
-                      <span className="text-dashboard-text-secondary">County:</span>
+                      <span className="text-dashboard-text-secondary">
+                        County:
+                      </span>
                       <span className="font-medium">{zipData.county}</span>
                     </div>
                   )}
                   {zipData.parent_metro && (
                     <div className="flex justify-between">
-                      <span className="text-dashboard-text-secondary">Metro Area:</span>
-                      <span className="font-medium">{zipData.parent_metro}</span>
+                      <span className="text-dashboard-text-secondary">
+                        Metro Area:
+                      </span>
+                      <span className="font-medium">
+                        {zipData.parent_metro}
+                      </span>
                     </div>
                   )}
                   {zipData.latitude && zipData.longitude && (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-dashboard-text-secondary">Latitude:</span>
-                        <span className="font-medium">{formatValue(zipData.latitude, 'coordinate')}</span>
+                        <span className="text-dashboard-text-secondary">
+                          Latitude:
+                        </span>
+                        <span className="font-medium">
+                          {formatValue(zipData.latitude, "coordinate")}
+                        </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-dashboard-text-secondary">Longitude:</span>
-                        <span className="font-medium">{formatValue(zipData.longitude, 'coordinate')}</span>
+                        <span className="text-dashboard-text-secondary">
+                          Longitude:
+                        </span>
+                        <span className="font-medium">
+                          {formatValue(zipData.longitude, "coordinate")}
+                        </span>
                       </div>
                     </>
                   )}
@@ -316,15 +360,21 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
               {/* Market Data Header */}
               <div className="flex items-center mb-3">
                 <Building className="h-4 w-4 mr-2" />
-                <h3 className="text-sm font-medium text-dashboard-text-primary">Market Data</h3>
+                <h3 className="text-sm font-medium text-dashboard-text-primary">
+                  Market Data
+                </h3>
               </div>
 
               {/* All Available Metrics */}
               <div className="space-y-3">
                 {allMetrics.map((metric, index) => {
-                  const momChange = metric.momKey ? formatChange(zipData[metric.momKey as keyof ZipData]) : null;
-                  const yoyChange = metric.yoyKey ? formatChange(zipData[metric.yoyKey as keyof ZipData]) : null;
-                  
+                  const momChange = metric.momKey
+                    ? formatChange(zipData[metric.momKey as keyof ZipData])
+                    : null;
+                  const yoyChange = metric.yoyKey
+                    ? formatChange(zipData[metric.yoyKey as keyof ZipData])
+                    : null;
+
                   return (
                     <Card key={index} className="border-dashboard-border">
                       <CardContent className="p-4">
@@ -335,28 +385,38 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
                           <p className="text-xl font-bold text-dashboard-text-primary">
                             {formatValue(metric.value, metric.type)}
                           </p>
-                          
+
                           {/* Changes */}
                           <div className="flex flex-wrap gap-2 text-xs">
                             {momChange && !momChange.isZero && (
-                              <span className={`flex items-center ${
-                                momChange.isPositive ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                {momChange.isPositive ? 
-                                  <TrendingUp className="h-3 w-3 mr-1" /> : 
+                              <span
+                                className={`flex items-center ${
+                                  momChange.isPositive
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }`}
+                              >
+                                {momChange.isPositive ? (
+                                  <TrendingUp className="h-3 w-3 mr-1" />
+                                ) : (
                                   <TrendingDown className="h-3 w-3 mr-1" />
-                                }
+                                )}
                                 {momChange.formatted} vs last month
                               </span>
                             )}
                             {yoyChange && !yoyChange.isZero && (
-                              <span className={`flex items-center ${
-                                yoyChange.isPositive ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                {yoyChange.isPositive ? 
-                                  <TrendingUp className="h-3 w-3 mr-1" /> : 
+                              <span
+                                className={`flex items-center ${
+                                  yoyChange.isPositive
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }`}
+                              >
+                                {yoyChange.isPositive ? (
+                                  <TrendingUp className="h-3 w-3 mr-1" />
+                                ) : (
                                   <TrendingDown className="h-3 w-3 mr-1" />
-                                }
+                                )}
                                 {yoyChange.formatted} vs last year
                               </span>
                             )}
@@ -372,13 +432,13 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
 
           {/* Action Buttons - Fixed at bottom */}
           <div className="p-4 space-y-3 border-t border-dashboard-border bg-dashboard-panel">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full"
               onClick={() => setShowComparison(!showComparison)}
             >
               <BarChart3 className="h-4 w-4 mr-2" />
-              {showComparison ? 'Back to Details' : 'Compare ZIP Codes'}
+              {showComparison ? "Back to Details" : "Compare ZIP Codes"}
             </Button>
             <MapExport selectedMetric="current-view" />
 
@@ -386,8 +446,8 @@ export function Sidebar({ isOpen, isCollapsed, zipData, onClose, onToggleCollaps
             <Card className="border-dashboard-border bg-muted/30">
               <CardContent className="p-3">
                 <p className="text-xs text-dashboard-text-secondary">
-                  Data sourced from Redfin Data Center. 
-                  Updated periodically from latest available data.
+                  Data sourced from Redfin Data Center. Updated periodically
+                  from latest available data.
                 </p>
               </CardContent>
             </Card>
