@@ -237,7 +237,6 @@ export function MapLibreMap({
     }
 
     // Ensure container has dimensions before initializing map
-    const container = mapContainer.current;
     const rect = container.getBoundingClientRect();
     if (!rect.width || !rect.height) {
       console.warn("Map container has no dimensions, delaying initialization");
