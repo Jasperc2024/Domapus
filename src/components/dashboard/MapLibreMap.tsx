@@ -703,14 +703,14 @@ export function MapLibreMap({
     if (map.current?.getLayer("zip-codes-border")) {
       map.current.setPaintProperty("zip-codes-border", "line-color", [
         "case",
-        ["==", ["get", "zipCode"], hoveredZip || ""],
+        ["==", ["get", "GEOID10"], hoveredZip || ""],
         "#333333",
         "rgba(255, 255, 255, 0.8)",
       ]);
 
       map.current.setPaintProperty("zip-codes-border", "line-width", [
         "case",
-        ["==", ["get", "zipCode"], hoveredZip || ""],
+        ["==", ["get", "GEOID10"], hoveredZip || ""],
         4,
         2,
       ]);
