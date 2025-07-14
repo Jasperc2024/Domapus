@@ -457,6 +457,34 @@ export function MapLibreMap({
             url: mbtileUrl,
           });
 
+          // Process zip data to create feature-state based styling
+          const processZipDataForStyling = () => {
+            Object.entries(zipData).forEach(([zipCode, data]) => {
+              const metricValue = getMetricValue(data as any, selectedMetric);
+              if (map.current && metricValue > 0) {
+                try {
+                  map.current.setFeatureState(
+                    {
+                      source: "zip-codes",
+                      sourceLayer: "zip_codes",
+                      id: zipCode,
+                    },
+                    { metricValue },
+                  );
+                } catch (error) {
+                  // Ignore errors for missing features
+                }
+              }
+            });
+          };
+
+          // Process data after source is loaded
+          map.current.on("sourcedata", (e) => {
+            if (e.sourceId === "zip-codes" && e.isSourceLoaded) {
+              processZipDataForStyling();
+            }
+          });
+
           // Add fill layer (choropleth)
           map.current?.addLayer({
             id: "zip-codes-fill",
@@ -466,15 +494,11 @@ export function MapLibreMap({
             paint: {
               "fill-color": [
                 "case",
-                ["!=", ["get", ["get", "zipCode"], ["literal", zipData]], null],
+                [">", ["feature-state", "metricValue"], 0],
                 [
                   "interpolate",
                   ["linear"],
-                  [
-                    "to-number",
-                    ["get", ["get", "zipCode"], ["literal", zipData]],
-                    0,
-                  ],
+                  ["feature-state", "metricValue"],
                   ...createColorStops(colorScale, zipData, selectedMetric),
                 ],
                 "rgba(200, 200, 200, 0.1)",
@@ -492,13 +516,13 @@ export function MapLibreMap({
             paint: {
               "line-color": [
                 "case",
-                ["==", ["get", "zipCode"], hoveredZip || ""],
+                ["==", ["get", "GEOID10"], hoveredZip || ""],
                 "#333333",
                 "rgba(255, 255, 255, 0.8)",
               ],
               "line-width": [
                 "case",
-                ["==", ["get", "zipCode"], hoveredZip || ""],
+                ["==", ["get", "GEOID10"], hoveredZip || ""],
                 4,
                 2,
               ],
