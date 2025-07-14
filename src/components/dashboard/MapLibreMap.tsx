@@ -224,9 +224,17 @@ export function MapLibreMap({
     return () => observer.disconnect();
   }, []);
 
-  // Initialize map
+  // Initialize map with extra validation
   useEffect(() => {
     if (!mapContainer.current || map.current || !containerReady) return;
+
+    const container = mapContainer.current;
+
+    // Ensure container is properly attached and visible
+    if (!document.body.contains(container)) {
+      console.warn("Container not in DOM");
+      return;
+    }
 
     // Ensure container has dimensions before initializing map
     const container = mapContainer.current;
