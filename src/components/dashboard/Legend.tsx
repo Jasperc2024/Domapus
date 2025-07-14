@@ -127,7 +127,7 @@ export function Legend({ selectedMetric, exportOptions }: LegendProps) {
               className="h-4 rounded-lg"
               style={{
                 background:
-                  "linear-gradient(to right, #497eaf, #5fa4ca, #b4d4ec, #ffecd4, #fac790, #e97000)",
+                  "linear-gradient(to right, #497eaf, #5fa4ca, #ffffff, #fac790, #e97000)",
               }}
             ></div>
             <div className="flex justify-between text-xs text-dashboard-text-secondary mt-1">
@@ -142,7 +142,7 @@ export function Legend({ selectedMetric, exportOptions }: LegendProps) {
               const colors = [
                 "#497eaf",
                 "#5fa4ca",
-                "#b4d4ec",
+                "#ffffff",
                 "#fac790",
                 "#e97000",
               ];
