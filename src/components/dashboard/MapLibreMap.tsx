@@ -555,7 +555,7 @@ export function MapLibreMap({
               hoverTimeout = setTimeout(() => {
                 if (e.features && e.features[0]) {
                   const feature = e.features[0];
-                  const zipCode = feature.properties?.zipCode;
+                  const zipCode = feature.properties?.GEOID10;
 
                   if (zipCode && zipData[zipCode]) {
                     setHoveredZip(zipCode);
@@ -618,7 +618,7 @@ export function MapLibreMap({
 
             if (e.features && e.features[0]) {
               const feature = e.features[0];
-              const zipCode = feature.properties?.zipCode;
+              const zipCode = feature.properties?.GEOID10;
 
               if (zipCode && zipData[zipCode]) {
                 const zipInfo = zipData[zipCode];
