@@ -630,7 +630,7 @@ export function MapLibreMap({
       }
     };
 
-    loadGeoJSON();
+    loadMBTiles();
   }, [
     mapLoaded,
     colorScale,
