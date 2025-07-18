@@ -28,9 +28,9 @@ export function TopBar({
           <img
             src="/Domapus/apple-touch-icon.png"
             alt="Domapus Logo"
-            className="h-6 w-6 sm:h-8 sm:w-8"
-            width="32"
-            height="32"
+            className="h-8 w-8 sm:h-10 sm:w-10"
+            width="40"
+            height="40"
             loading="eager"
             decoding="sync"
           />

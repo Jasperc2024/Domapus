@@ -198,7 +198,7 @@ export function MapLibreMap({
   const [colorScale, setColorScale] = useState<any>(null);
   const [hoveredZip, setHoveredZip] = useState<string | null>(null);
   const [containerReady, setContainerReady] = useState(false);
-
+  const zipLayerAddedRef = useRef(false);
   const { processData, isLoading, progress } = useDataWorker();
 
   // Initialize map
@@ -376,7 +376,8 @@ export function MapLibreMap({
       !map.current ||
       !mapLoaded ||
       !colorScale ||
-      Object.keys(zipData).length === 0
+      Object.keys(zipData).length === 0 ||
+      zipLayerAddedRef.current
     )
       return;
 
@@ -425,7 +426,8 @@ export function MapLibreMap({
               "fill-opacity": 0.7,
             },
           });
-
+          zipLayerAddedRef.current = true;
+          
           // Add border layer with thicker outline
           map.current?.addLayer({
             id: "zip-codes-border",
@@ -442,7 +444,7 @@ export function MapLibreMap({
                 "case",
                 ["==", ["get", "zipCode"], hoveredZip || ""],
                 4,
-                2, // Thicker default outline as requested
+                2, 
               ],
             },
           });
