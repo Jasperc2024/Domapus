@@ -325,15 +325,14 @@ export function MapLibreMap({
         if (result.metricValues.length > 0) {
           const scale = scaleLinear<string>()
             .domain([result.bounds.min, result.bounds.max])
-            .range(["#497eaf", "#e97000"])
+            .range(["#FFF9B0", "#2E0B59"])
             .interpolate(() => (t) => {
               const colors = [
-                "#497eaf",
-                "#5fa4ca",
-                "#b4d4ec",
-                "#ffecd4",
-                "#fac790",
-                "#e97000",
+                "#FFF9B0",
+                "#FFA873",
+                "#E84C61",
+                "#922C7E",
+                "#2E0B59",
               ];
               const index = Math.floor(t * (colors.length - 1));
               const nextIndex = Math.min(index + 1, colors.length - 1);
