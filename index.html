@@ -62,21 +62,16 @@
     <link rel="dns-prefetch" href="//d.basemaps.cartocdn.com" />
 
     <!-- Preload critical data files -->
+    <link rel="prefetch" href="/data/zip-data.json.gz" as="fetch" crossorigin />
     <link
       rel="prefetch"
-      href="https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json.gz"
+      href="/data/zip-city-mapping.csv.gz"
       as="fetch"
       crossorigin
     />
     <link
       rel="prefetch"
-      href="https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-city-mapping.csv.gz"
-      as="fetch"
-      crossorigin
-    />
-    <link
-      rel="prefetch"
-      href="https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz"
+      href="/data/us-zip-codes.geojson.gz"
       as="fetch"
       crossorigin
     />
@@ -203,7 +198,6 @@
       content="https://jasperc2024.github.io/Domapus/preview.png"
     />
     <meta name="twitter:creator" content="@Jasperchen925" />
-
   </head>
 
   <body>
