@@ -32,18 +32,13 @@ jobs:
       run: |
         python -u scripts/parse_redfin_zip_data.py
 
-    - name: Check if zip-data.json is new or changed
+    - name: Check for changes in ZIP data file
       id: check_changes
       run: |
-        if [ ! -f public/data/zip-data.json ]; then
-          echo "zip-data.json does not exist. It will be committed."
-          echo "changes=true" >> $GITHUB_OUTPUT
-        elif ! git diff --quiet HEAD -- public/data/zip-data.json; then
-          echo "zip-data.json has changes. It will be committed."
-          echo "changes=true" >> $GITHUB_OUTPUT
-        else
-          echo "No changes in zip-data.json."
+        if git diff --quiet HEAD -- public/data/zip-data.json.gz; then
           echo "changes=false" >> $GITHUB_OUTPUT
+        else
+          echo "changes=true" >> $GITHUB_OUTPUT
         fi
 
     - name: Commit and push if changed or missing
@@ -51,7 +46,7 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add public/data/zip-data.json
+        git add public/data/zip-data.json.gz
         git commit -m "Update Redfin ZIP data - $(date +'%Y-%m-%d')"
         git push
       env:
