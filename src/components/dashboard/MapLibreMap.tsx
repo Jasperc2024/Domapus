@@ -4,7 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { scaleLinear } from "d3-scale";
 import { getMetricValue, getMetricDisplay } from "./map/utils";
 import { MapProps } from "./map/types";
-
+import { createMap } from "./map/MapInitializer.ts";
 // Custom hook for web worker
 function useDataWorker() {
   const workerRef = useRef<Worker | null>(null);
@@ -205,54 +205,7 @@ export function MapLibreMap({
     if (!mapContainer.current || map.current) return;
 
     try {
-      map.current = new maplibregl.Map({
-        container: mapContainer.current,
-        style: {
-          version: 8,
-          sources: {
-            "carto-light": {
-              type: "raster",
-              tiles: [
-                "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-                "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-                "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-                "https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-              ],
-              tileSize: 256,
-              attribution:
-                '&copy; <a href="https://carto.com/attributions">CARTO</a>',
-            },
-          },
-          layers: [
-            {
-              id: "background",
-              type: "background",
-              paint: {
-                "background-color": "#f8f9fa",
-              },
-            },
-            {
-              id: "carto-light-layer",
-              type: "raster",
-              source: "carto-light",
-              minzoom: 0,
-              maxzoom: 18,
-            },
-          ],
-        },
-        center: [-98.5795, 39.8283],
-        zoom: 4,
-        minZoom: 3,
-        maxZoom: 12,
-        maxBounds: [
-          [-180, -85],
-          [180, 85],
-        ],
-        attributionControl: false,
-      });
-
-      // Add navigation control
-      map.current.addControl(new maplibregl.NavigationControl(), "top-right");
+      map.current = createMap(mapContainer.current);
 
       map.current.on("load", () => {
         setMapLoaded(true);
