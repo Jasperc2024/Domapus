@@ -203,7 +203,7 @@ export function MapLibreMap({
 
   // Initialize map
   useEffect(() => {
-     if (!mapContainer.current) return;
+    if (!mapContainer.current) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -325,15 +325,14 @@ export function MapLibreMap({
         if (result.metricValues.length > 0) {
           const scale = scaleLinear<string>()
             .domain([result.bounds.min, result.bounds.max])
-            .range(["#497eaf", "#e97000"])
+            .range(["#FFF9B0", "#2E0B59"])
             .interpolate(() => (t) => {
               const colors = [
-                "#497eaf",
-                "#5fa4ca",
-                "#b4d4ec",
-                "#ffecd4",
-                "#fac790",
-                "#e97000",
+                "#FFF9B0",
+                "#FFA873",
+                "#E84C61",
+                "#922C7E",
+                "#2E0B59",
               ];
               const index = Math.floor(t * (colors.length - 1));
               const nextIndex = Math.min(index + 1, colors.length - 1);
@@ -427,7 +426,7 @@ export function MapLibreMap({
             },
           });
           zipLayerAddedRef.current = true;
-          
+
           // Add border layer with thicker outline
           map.current?.addLayer({
             id: "zip-codes-border",
@@ -444,7 +443,7 @@ export function MapLibreMap({
                 "case",
                 ["==", ["get", "zipCode"], hoveredZip || ""],
                 4,
-                2, 
+                2,
               ],
             },
           });
@@ -675,14 +674,7 @@ function createColorStops(
   if (values.length === 0) return [0, "#cccccc"];
 
   const stops: (number | string)[] = [];
-  const colors = [
-    "#497eaf",
-    "#5fa4ca",
-    "#b4d4ec",
-    "#ffecd4",
-    "#fac790",
-    "#e97000",
-  ];
+  const colors = ["#FFF9B0", "#FFA873", "#E84C61", "#922C7E", "#2E0B59"];
 
   for (let i = 0; i < colors.length; i++) {
     const value =

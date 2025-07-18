@@ -34,11 +34,11 @@
     --dashboard-text-secondary: 215.4 16.3% 46.9%;
 
     /* Data visualization colors - Updated to match map */
-    --data-low: 210 40% 75%; /* #497eaf equivalent */
-    --data-medium-low: 199 45% 70%; /* #5fa4ca equivalent */
-    --data-medium: 214 60% 82%; /* #b4d4ec equivalent */
-    --data-medium-high: 48 100% 93%; /* #ffecd4 equivalent */
-    --data-high: 27 85% 60%; /* #e97000 equivalent */
+    --data-low: 57 100% 84%; /* #FFF9B0 equivalent */
+    --data-medium-low: 19 100% 71%; /* #FFA873 equivalent */
+    --data-medium: 343 75% 57%; /* #E84C61 equivalent */
+    --data-medium-high: 312 54% 38%; /* #922C7E equivalent */
+    --data-high: 252 67% 20%; /* #2E0B59 equivalent */
 
     /* Map colors */
     --map-hover: 221.2 83.2% 53.3%;
@@ -85,11 +85,11 @@
     --dashboard-text-secondary: 215 20.2% 65.1%;
 
     /* Data visualization dark colors - Updated to match map */
-    --data-low: 210 30% 35%; /* Darker #497eaf equivalent */
-    --data-medium-low: 199 35% 40%; /* Darker #5fa4ca equivalent */
-    --data-medium: 214 40% 45%; /* Darker #b4d4ec equivalent */
-    --data-medium-high: 48 60% 50%; /* Darker #ffecd4 equivalent */
-    --data-high: 27 75% 40%; /* Darker #e97000 equivalent */
+    --data-low: 57 80% 74%; /* Darker #FFF9B0 equivalent */
+    --data-medium-low: 19 80% 61%; /* Darker #FFA873 equivalent */
+    --data-medium: 343 65% 47%; /* Darker #E84C61 equivalent */
+    --data-medium-high: 312 44% 28%; /* Darker #922C7E equivalent */
+    --data-high: 252 57% 15%; /* Darker #2E0B59 equivalent */
 
     /* Map dark colors */
     --map-hover: 217.2 91.2% 59.8%;
