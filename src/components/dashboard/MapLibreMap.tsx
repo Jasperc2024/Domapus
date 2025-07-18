@@ -304,10 +304,8 @@ export function MapLibreMap({
           type: "LOAD_AND_PROCESS_DATA",
           data: {
             urls: {
-              zipData:
-                "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json.gz",
-              citiesData:
-                "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-city-mapping.csv.gz",
+              zipData: "/data/zip-data.json.gz",
+              citiesData: "/data/zip-city-mapping.csv.gz",
             },
             selectedMetric,
           },
@@ -382,9 +380,7 @@ export function MapLibreMap({
 
     const loadGeoJSON = async () => {
       try {
-        const response = await fetch(
-          "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz",
-        );
+        const response = await fetch("/data/us-zip-codes.geojson.gz");
         const arrayBuffer = await response.arrayBuffer();
 
         // Use web worker to decompress and process
