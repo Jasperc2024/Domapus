@@ -674,14 +674,7 @@ function createColorStops(
   if (values.length === 0) return [0, "#cccccc"];
 
   const stops: (number | string)[] = [];
-  const colors = [
-    "#497eaf",
-    "#5fa4ca",
-    "#b4d4ec",
-    "#ffecd4",
-    "#fac790",
-    "#e97000",
-  ];
+  const colors = ["#FFF9B0", "#FFA873", "#E84C61", "#922C7E", "#2E0B59"];
 
   for (let i = 0; i < colors.length; i++) {
     const value =
