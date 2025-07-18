@@ -87,16 +87,9 @@ export function MapLibreExportMap({
 
     const scale = scaleLinear<string>()
       .domain([minValue, maxValue])
-      .range(["#497eaf", "#e97000"])
+      .range(["#FFF9B0", "#2E0B59"])
       .interpolate(() => (t) => {
-        const colors = [
-          "#497eaf",
-          "#5fa4ca",
-          "#b4d4ec",
-          "#ffecd4",
-          "#fac790",
-          "#e97000",
-        ];
+        const colors = ["#FFF9B0", "#FFA873", "#E84C61", "#922C7E", "#2E0B59"];
         const index = Math.floor(t * (colors.length - 1));
         const nextIndex = Math.min(index + 1, colors.length - 1);
         const localT = t * (colors.length - 1) - index;
@@ -209,14 +202,7 @@ export function MapLibreExportMap({
           .sort((a, b) => a - b);
 
         const stops: (number | string)[] = [];
-        const colors = [
-          "#497eaf",
-          "#5fa4ca",
-          "#b4d4ec",
-          "#ffecd4",
-          "#fac790",
-          "#e97000",
-        ];
+        const colors = ["#FFF9B0", "#FFA873", "#E84C61", "#922C7E", "#2E0B59"];
 
         for (let i = 0; i < colors.length; i++) {
           const value =

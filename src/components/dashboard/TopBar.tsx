@@ -24,7 +24,11 @@ export function TopBar({
     <div className="flex items-center justify-between p-2 sm:p-4 bg-dashboard-panel border-b border-dashboard-border">
       <div className="flex items-center space-x-2 sm:space-x-6">
         {/* Logo and Title */}
-        <div className="flex items-center space-x-2 sm:space-x-3">
+        <div
+          className="flex items-center space-x-2 sm:space-x-3 cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={() => window.location.reload()}
+          title="Click to reload page"
+        >
           <img
             src="/Domapus/apple-touch-icon.png"
             alt="Domapus Logo"
