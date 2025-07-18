@@ -25,9 +25,7 @@ export function ExportLegend({
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch(
-          "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json.gz",
-        );
+        const response = await fetch("/data/zip-data.json.gz");
         const arrayBuffer = await response.arrayBuffer();
         const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), {
           to: "string",
