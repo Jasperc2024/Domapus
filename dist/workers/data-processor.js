@@ -214,9 +214,7 @@ self.onmessage = async function (e) {
             type: "PROGRESS",
             data: { phase: "loading_geojson" },
           });
-          const response = await fetch(
-            "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz",
-          );
+          const response = await fetch("/data/us-zip-codes.geojson.gz");
           const arrayBuffer = await response.arrayBuffer();
           const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), {
             to: "string",
