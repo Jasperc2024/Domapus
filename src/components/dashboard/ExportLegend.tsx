@@ -148,7 +148,7 @@ export function ExportLegend({
           className="h-4 rounded-lg"
           style={{
             background:
-              "linear-gradient(to right, #497eaf, #5fa4ca, #b4d4ec, #ffecd4, #fac790, #e97000)",
+              "linear-gradient(to right, #FFF9B0, #FFA873, #E84C61, #922C7E, #2E0B59)",
           }}
         />
         <div className="flex justify-between text-xs text-gray-600 mt-1">
@@ -161,11 +161,11 @@ export function ExportLegend({
       <div className="grid grid-cols-5 gap-2 mb-3">
         {quintiles.map((value, index) => {
           const colors = [
-            "#497eaf",
-            "#5fa4ca",
-            "#b4d4ec",
-            "#fac790",
-            "#e97000",
+            "#FFF9B0",
+            "#FFA873",
+            "#E84C61",
+            "#922C7E",
+            "#2E0B59",
           ];
           return (
             <div key={index} className="text-center">
