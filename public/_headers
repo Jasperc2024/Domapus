@@ -7,6 +7,12 @@
   Content-Type: application/json
 
 # Other data files - 6 months cache
+/tiles/*/*.pbf
+  Content-Type: application/x-protobuf
+  Content-Encoding: gzip
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=15552000
+
 /data/*.gz
   Cache-Control: public, max-age=15552000
   Content-Encoding: gzip

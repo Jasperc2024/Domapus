@@ -4,7 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { scaleLinear } from "d3-scale";
 import { getMetricValue, getMetricDisplay } from "./map/utils";
 import { MapProps } from "./map/types";
-
+import { createMap } from "./map/MapInitializer.ts";
 // Custom hook for web worker
 function useDataWorker() {
   const workerRef = useRef<Worker | null>(null);
@@ -198,12 +198,20 @@ export function MapLibreMap({
   const [colorScale, setColorScale] = useState<any>(null);
   const [hoveredZip, setHoveredZip] = useState<string | null>(null);
   const [containerReady, setContainerReady] = useState(false);
+<<<<<<< HEAD
 
+=======
+  const zipLayerAddedRef = useRef(false);
+>>>>>>> origin/main
   const { processData, isLoading, progress } = useDataWorker();
 
   // Ensure container is visible and has dimensions before initializing map
   useEffect(() => {
+<<<<<<< HEAD
     if (!mapContainer.current) return;
+=======
+     if (!mapContainer.current) return;
+>>>>>>> origin/main
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -244,6 +252,7 @@ export function MapLibreMap({
     }
 
     try {
+<<<<<<< HEAD
       map.current = new maplibregl.Map({
         container: mapContainer.current,
         style: {
@@ -306,6 +315,9 @@ export function MapLibreMap({
 
       // Add navigation control
       map.current.addControl(new maplibregl.NavigationControl(), "top-right");
+=======
+      map.current = createMap(mapContainer.current);
+>>>>>>> origin/main
 
       map.current.on("load", () => {
         // Validate container and manually trigger resize safely
@@ -438,7 +450,8 @@ export function MapLibreMap({
       !map.current ||
       !mapLoaded ||
       !colorScale ||
-      Object.keys(zipData).length === 0
+      Object.keys(zipData).length === 0 ||
+      zipLayerAddedRef.current
     )
       return;
 
@@ -506,7 +519,8 @@ export function MapLibreMap({
               "fill-opacity": 0.7,
             },
           });
-
+          zipLayerAddedRef.current = true;
+          
           // Add border layer with thicker outline
           map.current?.addLayer({
             id: "zip-codes-border",
@@ -524,7 +538,11 @@ export function MapLibreMap({
                 "case",
                 ["==", ["get", "GEOID10"], hoveredZip || ""],
                 4,
+<<<<<<< HEAD
                 2,
+=======
+                2, 
+>>>>>>> origin/main
               ],
             },
           });
