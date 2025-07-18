@@ -197,18 +197,87 @@ export function MapLibreMap({
   const [citiesData, setCitiesData] = useState<Record<string, any>>({});
   const [colorScale, setColorScale] = useState<any>(null);
   const [hoveredZip, setHoveredZip] = useState<string | null>(null);
+  const [containerReady, setContainerReady] = useState(false);
 
   const { processData, isLoading, progress } = useDataWorker();
 
   // Initialize map
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+     if (!mapContainer.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          const rect = entry.boundingClientRect;
+          if (rect.width > 0 && rect.height > 0) {
+            setContainerReady(true);
+            observer.disconnect();
+          }
+        }
+      },
+      { threshold: 0.1 },
+    );
+
+    observer.observe(mapContainer.current);
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Initialize map with extra validation
+  useEffect(() => {
+    if (!mapContainer.current || map.current || !containerReady) return;
+
+    const container = mapContainer.current;
+
+    // Ensure container is properly attached and visible
+    if (!document.body.contains(container)) {
+      console.warn("Container not in DOM");
+      return;
+    }
+
+    // Ensure container has dimensions before initializing map
+    const rect = container.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      console.warn("Map container has no dimensions, delaying initialization");
+      return;
+    }
 
     try {
       map.current = createMap(mapContainer.current);
 
       map.current.on("load", () => {
-        setMapLoaded(true);
+        // Validate container and manually trigger resize safely
+        if (mapContainer.current && map.current) {
+          const rect = mapContainer.current.getBoundingClientRect();
+          if (rect.width && rect.height) {
+            // Manual resize after load to ensure proper matrix calculation
+            try {
+              map.current.resize();
+              setMapLoaded(true);
+            } catch (resizeError) {
+              console.warn("Error during manual resize:", resizeError);
+              // Retry after a delay
+              setTimeout(() => {
+                if (map.current) {
+                  try {
+                    map.current.resize();
+                    setMapLoaded(true);
+                  } catch (retryError) {
+                    console.error(
+                      "Failed to resize map after retry:",
+                      retryError,
+                    );
+                    setMapLoaded(true); // Proceed anyway
+                  }
+                }
+              }, 200);
+            }
+          } else {
+            console.warn("Map loaded but container has no dimensions");
+            setMapLoaded(true); // Proceed anyway to avoid infinite blocking
+          }
+        }
       });
 
       map.current.on("error", (e) => {
