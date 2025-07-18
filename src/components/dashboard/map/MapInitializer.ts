@@ -72,8 +72,7 @@ export function createMapLibreMap(container: HTMLElement): maplibregl.Map {
     "bottom-left",
   );
 
-  /* ---------- interaction tweaks to mimic Leaflet ---------- */
-  // gentler wheel response ≈ zoomDelta 0.5
+  
   map.scrollZoom.setWheelZoomRate(0.5);
 
   // zoomSnap: round live zoom to nearest step when wheel / trackpad stops
