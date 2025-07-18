@@ -198,20 +198,12 @@ export function MapLibreMap({
   const [colorScale, setColorScale] = useState<any>(null);
   const [hoveredZip, setHoveredZip] = useState<string | null>(null);
   const [containerReady, setContainerReady] = useState(false);
-<<<<<<< HEAD
-
-=======
   const zipLayerAddedRef = useRef(false);
->>>>>>> origin/main
   const { processData, isLoading, progress } = useDataWorker();
 
-  // Ensure container is visible and has dimensions before initializing map
+  // Initialize map
   useEffect(() => {
-<<<<<<< HEAD
     if (!mapContainer.current) return;
-=======
-     if (!mapContainer.current) return;
->>>>>>> origin/main
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -252,72 +244,7 @@ export function MapLibreMap({
     }
 
     try {
-<<<<<<< HEAD
-      map.current = new maplibregl.Map({
-        container: mapContainer.current,
-        style: {
-          version: 8,
-          sources: {
-            "carto-positron-nolabels": {
-              type: "raster",
-              tiles: [
-                "https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-                "https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-                "https://c.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-                "https://d.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-              ],
-              tileSize: 256,
-              attribution:
-                '&copy; <a href="https://carto.com/attributions">CARTO</a>',
-            },
-            "carto-positron-labels": {
-              type: "raster",
-              tiles: [
-                "https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-                "https://b.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-                "https://c.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-                "https://d.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-              ],
-              tileSize: 256,
-              attribution:
-                '&copy; <a href="https://carto.com/attributions">CARTO</a>',
-            },
-          },
-          layers: [
-            {
-              id: "background",
-              type: "background",
-              paint: {
-                "background-color": "#f8f9fa",
-              },
-            },
-            {
-              id: "carto-positron-base",
-              type: "raster",
-              source: "carto-positron-nolabels",
-              minzoom: 0,
-              maxzoom: 18,
-            },
-          ],
-        },
-        center: [-98.5795, 39.8283],
-        zoom: 4,
-        minZoom: 3,
-        maxZoom: 12,
-        maxBounds: [
-          [-180, -85],
-          [180, 85],
-        ],
-        attributionControl: false,
-        trackResize: false, // Disable automatic resize to prevent matrix errors
-        preserveDrawingBuffer: true,
-      });
-
-      // Add navigation control
-      map.current.addControl(new maplibregl.NavigationControl(), "top-right");
-=======
       map.current = createMap(mapContainer.current);
->>>>>>> origin/main
 
       map.current.on("load", () => {
         // Validate container and manually trigger resize safely
@@ -362,12 +289,10 @@ export function MapLibreMap({
     }
 
     return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
+      map.current?.remove();
+      map.current = null;
     };
-  }, [containerReady]);
+  }, []);
 
   // Load and process data
   useEffect(() => {
@@ -405,7 +330,8 @@ export function MapLibreMap({
               const colors = [
                 "#497eaf",
                 "#5fa4ca",
-                "#ffffff",
+                "#b4d4ec",
+                "#ffecd4",
                 "#fac790",
                 "#e97000",
               ];
@@ -455,63 +381,44 @@ export function MapLibreMap({
     )
       return;
 
-    const loadMBTiles = async () => {
+    const loadGeoJSON = async () => {
       try {
-        // Use mbtiles format instead of compressed geojson
-        const mbtileUrl =
-          "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.mbtiles";
+        const response = await fetch(
+          "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz",
+        );
+        const arrayBuffer = await response.arrayBuffer();
 
-        console.log("Loading zip codes from mbtiles:", mbtileUrl);
+        // Use web worker to decompress and process
+        const processedGeoJSON = await processData({
+          type: "PROCESS_GEOJSON",
+          data: {
+            geojsonData: { features: [] }, // Will be processed in worker
+            zipData,
+            selectedMetric,
+          },
+        });
 
-        // Add mbtiles source if it doesn't exist
+        // Add source if it doesn't exist
         if (!map.current?.getSource("zip-codes")) {
           map.current?.addSource("zip-codes", {
-            type: "vector",
-            url: mbtileUrl,
+            type: "geojson",
+            data: processedGeoJSON as any,
+            lineMetrics: true,
           });
 
-          // Process zip data to create feature-state based styling
-          const processZipDataForStyling = () => {
-            Object.entries(zipData).forEach(([zipCode, data]) => {
-              const metricValue = getMetricValue(data as any, selectedMetric);
-              if (map.current && metricValue > 0) {
-                try {
-                  map.current.setFeatureState(
-                    {
-                      source: "zip-codes",
-                      sourceLayer: "zip_codes",
-                      id: zipCode,
-                    },
-                    { metricValue },
-                  );
-                } catch (error) {
-                  // Ignore errors for missing features
-                }
-              }
-            });
-          };
-
-          // Process data after source is loaded
-          map.current.on("sourcedata", (e) => {
-            if (e.sourceId === "zip-codes" && e.isSourceLoaded) {
-              processZipDataForStyling();
-            }
-          });
-
-          // Add fill layer (choropleth)
+          // Add fill layer
           map.current?.addLayer({
             id: "zip-codes-fill",
             type: "fill",
             source: "zip-codes",
-            "source-layer": "zip_codes", // Specify the layer name in the mbtiles
             paint: {
               "fill-color": [
                 "case",
-                [">", ["feature-state", "metricValue"], 0],
+                ["has", "metricValue"],
                 [
                   "interpolate",
                   ["linear"],
-                  ["feature-state", "metricValue"],
+                  ["get", "metricValue"],
                   ...createColorStops(colorScale, zipData, selectedMetric),
                 ],
                 "rgba(200, 200, 200, 0.1)",
@@ -520,40 +427,26 @@ export function MapLibreMap({
             },
           });
           zipLayerAddedRef.current = true;
-          
+
           // Add border layer with thicker outline
           map.current?.addLayer({
             id: "zip-codes-border",
             type: "line",
             source: "zip-codes",
-            "source-layer": "zip_codes",
             paint: {
               "line-color": [
                 "case",
-                ["==", ["get", "GEOID10"], hoveredZip || ""],
+                ["==", ["get", "zipCode"], hoveredZip || ""],
                 "#333333",
                 "rgba(255, 255, 255, 0.8)",
               ],
               "line-width": [
                 "case",
-                ["==", ["get", "GEOID10"], hoveredZip || ""],
+                ["==", ["get", "zipCode"], hoveredZip || ""],
                 4,
-<<<<<<< HEAD
                 2,
-=======
-                2, 
->>>>>>> origin/main
               ],
             },
-          });
-
-          // Add labels layer on top
-          map.current?.addLayer({
-            id: "carto-positron-labels",
-            type: "raster",
-            source: "carto-positron-labels",
-            minzoom: 0,
-            maxzoom: 18,
           });
 
           // Add hover interactions with throttling
@@ -573,7 +466,7 @@ export function MapLibreMap({
               hoverTimeout = setTimeout(() => {
                 if (e.features && e.features[0]) {
                   const feature = e.features[0];
-                  const zipCode = feature.properties?.GEOID10;
+                  const zipCode = feature.properties?.zipCode;
 
                   if (zipCode && zipData[zipCode]) {
                     setHoveredZip(zipCode);
@@ -636,7 +529,7 @@ export function MapLibreMap({
 
             if (e.features && e.features[0]) {
               const feature = e.features[0];
-              const zipCode = feature.properties?.GEOID10;
+              const zipCode = feature.properties?.zipCode;
 
               if (zipCode && zipData[zipCode]) {
                 const zipInfo = zipData[zipCode];
@@ -671,7 +564,7 @@ export function MapLibreMap({
       }
     };
 
-    loadMBTiles();
+    loadGeoJSON();
   }, [
     mapLoaded,
     colorScale,
@@ -721,63 +614,26 @@ export function MapLibreMap({
     if (map.current?.getLayer("zip-codes-border")) {
       map.current.setPaintProperty("zip-codes-border", "line-color", [
         "case",
-        ["==", ["get", "GEOID10"], hoveredZip || ""],
+        ["==", ["get", "zipCode"], hoveredZip || ""],
         "#333333",
         "rgba(255, 255, 255, 0.8)",
       ]);
 
       map.current.setPaintProperty("zip-codes-border", "line-width", [
         "case",
-        ["==", ["get", "GEOID10"], hoveredZip || ""],
+        ["==", ["get", "zipCode"], hoveredZip || ""],
         4,
         2,
       ]);
     }
   }, [hoveredZip]);
 
-  // Handle container resize to fix matrix calculation issues
-  useEffect(() => {
-    if (!map.current || !mapLoaded) return;
-
-    let resizeTimeout: NodeJS.Timeout;
-
-    const handleResize = () => {
-      if (resizeTimeout) clearTimeout(resizeTimeout);
-
-      resizeTimeout = setTimeout(() => {
-        if (map.current && mapContainer.current) {
-          const rect = mapContainer.current.getBoundingClientRect();
-          if (rect.width && rect.height) {
-            try {
-              // Only resize if container has meaningful dimensions
-              if (rect.width > 100 && rect.height > 100) {
-                map.current.resize();
-              }
-            } catch (error) {
-              console.warn("Map resize error:", error);
-            }
-          }
-        }
-      }, 100); // Debounce resize events
-    };
-
-    const resizeObserver = new ResizeObserver(handleResize);
-    if (mapContainer.current) {
-      resizeObserver.observe(mapContainer.current);
-    }
-
-    return () => {
-      resizeObserver.disconnect();
-      if (resizeTimeout) clearTimeout(resizeTimeout);
-    };
-  }, [mapLoaded]);
-
   return (
     <div className="absolute inset-0 w-full h-full">
       <div
         ref={mapContainer}
         className="w-full h-full"
-        style={{ minHeight: "400px", minWidth: "300px" }}
+        style={{ minHeight: "400px" }}
       />
 
       {(isLoading || !mapLoaded) && (
@@ -819,7 +675,14 @@ function createColorStops(
   if (values.length === 0) return [0, "#cccccc"];
 
   const stops: (number | string)[] = [];
-  const colors = ["#497eaf", "#5fa4ca", "#ffffff", "#fac790", "#e97000"];
+  const colors = [
+    "#497eaf",
+    "#5fa4ca",
+    "#b4d4ec",
+    "#ffecd4",
+    "#fac790",
+    "#e97000",
+  ];
 
   for (let i = 0; i < colors.length; i++) {
     const value =
