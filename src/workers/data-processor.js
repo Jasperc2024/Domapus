@@ -605,50 +605,24 @@ export function MapLibreMap({
         ref={mapContainer}
         className="w-full h-full"
         style={{ minHeight: "400px" }}
-      />
+      ></div>
 
       {(isLoading || !mapLoaded) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-10">
           <div className="text-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
             <div className="space-y-1">
               <p className="text-sm font-medium">
-              {progress.phase === "idle" && "Initializing..."}
-              {progress.phase === "loading_zip_data" && "Loading ZIP data..."}
-              {progress.phase === "processing_zip_data" && "Processing ZIP data..."}
-              {progress.phase === "loading_cities_data" && "Loading cities data..."}
-              {progress.phase === "processing_data" && "Processing data..."}
-              {progress.phase === "geojson" && "Processing map layers..."}
-              </p>              
+                {progress.phase === "idle" && "Initializing..."}
+                {progress.phase === "loading_zip_data" && "Loading ZIP data..."}
+                {progress.phase === "processing_zip_data" && "Processing ZIP data..."}
+                {progress.phase === "loading_cities_data" && "Loading cities data..."}
+                {progress.phase === "processing_data" && "Processing data..."}
+                {progress.phase === "geojson" && "Processing map layers..."}
+              </p>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-}
-
-// Helper function to create color stops for MapLibre
-function createColorStops(
-  colorScale: any,
-  zipData: Record<string, any>,
-  selectedMetric: string,
-) {
-  const values = Object.values(zipData)
-    .map((data: any) => getMetricValue(data, selectedMetric))
-    .filter((v) => v > 0)
-    .sort((a, b) => a - b);
-
-  if (values.length === 0) return [0, "#cccccc"];
-
-  const stops: (number | string)[] = [];
-  const colors = ["#FFF9B0", "#FFA873", "#E84C61", "#922C7E", "#2E0B59"];
-
-  for (let i = 0; i < colors.length; i++) {
-    const value =
-      values[Math.floor((values.length - 1) * (i / (colors.length - 1)))];
-    stops.push(value, colors[i]);
-  }
-
-  return stops;
-}
