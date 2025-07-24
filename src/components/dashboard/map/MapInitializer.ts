@@ -1,4 +1,3 @@
-// createMapLibreMap.ts
 import maplibregl from "maplibre-gl";
 
 /** Build a MapLibre‑GL map that feels like the original Leaflet setup. */

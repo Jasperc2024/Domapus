@@ -1,84 +1,56 @@
+import { ZipData } from "./types"; 
 
-export const getMetricValue = (data: any, metric: string): number => {
-  switch (metric) {
-    case 'median-sale-price': return data.median_sale_price || 0;
-    case 'median-list-price': return data.median_list_price || 0;
-    case 'median-dom': return data.median_dom || 0;
-    case 'inventory': return data.inventory || 0;
-    case 'new-listings': return data.new_listings || 0;
-    case 'homes-sold': return data.homes_sold || 0;
-    case 'sale-to-list-ratio': return data.avg_sale_to_list_ratio || 0;
-    case 'homes-sold-above-list': return data.sold_above_list || 0;
-    case 'off-market-2-weeks': return data.off_market_in_two_weeks || 0;
-    default: return 0;
-  }
-};
-
-export const getMetricDisplay = (data: any, metric: string): string => {
-  const value = getMetricValue(data, metric);
-  switch (metric) {
-    case 'median-sale-price':
-    case 'median-list-price':
-      return `$${value.toLocaleString()}`;
-    case 'median-dom':
-      return `${value} days`;
-    case 'sale-to-list-ratio':
-      return `${(value * 100).toFixed(1)}%`;
-    case 'homes-sold-above-list':
-    case 'off-market-2-weeks':
-      return `${value}%`;
-    default:
-      return value.toString();
-  }
-};
-
-import { styleCache } from './styleCache';
-
-export const getZipStyle = (feature: any, zoom: number, colorScale: any, zipData: Record<string, any>, selectedMetric: string) => {
-  const zipCode = feature?.properties?.ZCTA5CE20 || feature?.properties?.GEOID20 || feature?.properties?.ZCTA5CE20;
-  const value = zipCode && zipData[zipCode] ? getMetricValue(zipData[zipCode], selectedMetric) : 0;
-  
-  // Check cache first
-  const cacheKey = styleCache.getCacheKey(zipCode || 'no-zip', zoom, selectedMetric, value);
-  const cachedStyle = styleCache.get(cacheKey);
-  if (cachedStyle) {
-    return cachedStyle;
+export function getMetricDisplay(data: ZipData, selectedMetric: string): string {
+  if (!data || !data.zipCode) {
+    return `<div class="p-2">No data available</div>`;
   }
 
-  let fillColor;
-  if (!zipCode || !zipData[zipCode] || value === 0) {
-    fillColor = '#9ca3af'; // Gray for no data
-  } else {
-    fillColor = colorScale(value);
-  }
-  
-  // Reduced outline thickness - dynamic based on zoom level
-  let weight;
-  let opacity = 0.8; // Visible outlines
-  
-  if (zoom >= 10) {
-    weight = 1.5;
-  } else if (zoom >= 8) {
-    weight = 1.2;
-  } else if (zoom >= 6) {
-    weight = 0.8;
-  } else if (zoom >= 5) {
-    weight = 0.3; // Reduced for default zoom
-  } else if (zoom >= 4) {
-    weight = 0.2;
-  } else {
-    weight = 0.1;
-  }
-  
-  const style = {
-    fillColor,
-    weight,
-    color: '#ffffff', // White outline
-    fillOpacity: (!zipCode || !zipData[zipCode] || value === 0) ? 0.3 : 0.8,
-    opacity,
+  // This map translates the UI metric name to the actual data key and provides formatting rules.
+  const metricMap: Record<string, { key: keyof ZipData; label: string; format: 'currency' | 'number' | 'percent' | 'ratio' }> = {
+    "median-sale-price": { key: "median_sale_price", label: "Median Sale Price", format: 'currency' },
+    "median-list-price": { key: "median_list_price", label: "Median List Price", format: 'currency' },
+    "median-dom": { key: "median_dom", label: "Median Days on Market", format: 'number' },
+    "inventory": { key: "inventory", label: "Inventory", format: 'number' },
+    "new-listings": { key: "new_listings", label: "New Listings", format: 'number' },
+    "homes-sold": { key: "homes_sold", label: "Homes Sold", format: 'number' },
+    "sale-to-list-ratio": { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", format: 'ratio' },
+    "homes-sold-above-list": { key: "sold_above_list", label: "% Sold Above List", format: 'percent' },
+    "off-market-2-weeks": { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", format: 'percent' },
   };
 
-  // Cache the computed style
-  styleCache.set(cacheKey, style);
-  return style;
-};
+  const metricInfo = metricMap[selectedMetric];
+  // The data object is already complete, so we access the key directly.
+  const value = metricInfo ? data[metricInfo.key] : null;
+
+  let formattedValue = "N/A";
+  if (typeof value === 'number' && isFinite(value)) {
+    switch (metricInfo.format) {
+      case 'currency':
+        formattedValue = `$${value.toLocaleString()}`;
+        break;
+      case 'percent':
+        // Assumes the value is already a percentage number, e.g., 34.5
+        formattedValue = `${value.toFixed(1)}%`;
+        break;
+      case 'ratio':
+        // Assumes the value is a decimal ratio, e.g., 0.98
+        formattedValue = `${(value * 100).toFixed(1)}%`;
+        break;
+      case 'number':
+        formattedValue = value.toLocaleString();
+        break;
+    }
+  }
+
+  // Returns the final, styled HTML for the map tooltip.
+  return `
+    <div class="p-2 bg-white rounded shadow-lg border text-black font-sans">
+      <div class="font-bold text-base">${data.zipCode}</div>
+      <div class="text-sm text-gray-600">${data.city || "Unknown City"}, ${data.state}</div>
+      <div class="text-sm mt-2">
+        <span class="font-semibold">${metricInfo?.label || selectedMetric}:</span>
+        <span class="font-normal"> ${formattedValue}</span>
+      </div>
+    </div>
+  `;
+}
