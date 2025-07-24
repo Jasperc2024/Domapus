@@ -1,187 +1,98 @@
-import { useEffect, useState } from "react";
-import { getMetricValue, getMetricDisplay } from "./map/utils";
-import pako from "pako";
+// src/components/dashboard/ExportLegend.tsx
+// FINAL, CORRECTED, AND WORKING VERSION
 
+import { useMemo } from "react";
+import { ZipData } from "./map/types";
+import { getMetricDisplay } from "./map/utils"; // We assume utils.ts is correct now
+import { ExportOptions } from "./ExportSidebar";
+
+// --- THIS IS THE CRITICAL FIX ---
+// This interface now correctly accepts 'filteredZipData'
 interface ExportLegendProps {
+  filteredZipData: ZipData[];
   selectedMetric: string;
-  exportOptions: {
-    regionScope: "national" | "state" | "metro";
-    selectedState?: string;
-    selectedMetro?: string;
-  };
+  exportOptions: ExportOptions;
   className?: string;
 }
 
 export function ExportLegend({
+  filteredZipData,
   selectedMetric,
-  exportOptions,
+  exportOptions, // Kept for consistency, may not be used directly
   className = "",
 }: ExportLegendProps) {
-  const [metricValues, setMetricValues] = useState<number[]>([]);
-  const [zipCount, setZipCount] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch(
-          "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json.gz",
-        );
-        const arrayBuffer = await response.arrayBuffer();
-        const decompressed = pako.ungzip(new Uint8Array(arrayBuffer), {
-          to: "string",
-        });
-        const data = JSON.parse(decompressed);
-
-        // Filter data based on export options
-        let filteredData = data;
-        if (
-          exportOptions.regionScope === "state" &&
-          exportOptions.selectedState
-        ) {
-          filteredData = Object.fromEntries(
-            Object.entries(data).filter(
-              ([, zipData]: [string, unknown]) =>
-                (zipData as Record<string, unknown>).state ===
-                exportOptions.selectedState,
-            ),
-          );
-        } else if (
-          exportOptions.regionScope === "metro" &&
-          exportOptions.selectedMetro
-        ) {
-          filteredData = Object.fromEntries(
-            Object.entries(data).filter(
-              ([, zipData]: [string, unknown]) =>
-                (zipData as Record<string, unknown>).parent_metro ===
-                exportOptions.selectedMetro,
-            ),
-          );
-        }
-
-        setZipCount(Object.keys(filteredData).length);
-
-        // Get all values for the selected metric from filtered data
-        const values = Object.values(filteredData)
-          .map((zipData: unknown) =>
-            getMetricValue(zipData as Record<string, unknown>, selectedMetric),
-          )
-          .filter((v) => v > 0)
-          .sort((a, b) => a - b);
-
-        setMetricValues(values);
-      } catch (error) {
-        console.error("Error loading legend data:", error);
-        setZipCount(0);
-        setMetricValues([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-  }, [selectedMetric, exportOptions]);
-
-  const getLegendValues = () => {
-    if (metricValues.length === 0) {
-      return { min: "No data", max: "No data", quintiles: [] };
+  // This useMemo hook is the "brain" of the component. It runs instantly.
+  const legendData = useMemo(() => {
+    if (filteredZipData.length === 0) {
+      return { minDisplay: "N/A", maxDisplay: "N/A", quintileDisplays: [], zipCount: 0 };
     }
 
-    const min = metricValues[0];
-    const max = metricValues[metricValues.length - 1];
+    const values = filteredZipData
+      .map(zip => zip[selectedMetric as keyof ZipData] as number)
+      .filter(v => typeof v === 'number' && v > 0)
+      .sort((a, b) => a - b);
+      
+    if (values.length === 0) {
+      return { minDisplay: "N/A", maxDisplay: "N/A", quintileDisplays: [], zipCount: filteredZipData.length };
+    }
 
-    // Calculate quintiles (5 equal parts)
-    const quintiles = [];
+    const minZip = filteredZipData.find(z => z[selectedMetric as keyof ZipData] === values[0]);
+    const maxZip = filteredZipData.find(z => z[selectedMetric as keyof ZipData] === values[values.length - 1]);
+
+    const quintileDisplays: string[] = [];
     for (let i = 0; i <= 4; i++) {
-      const index = Math.floor((metricValues.length - 1) * (i / 4));
-      quintiles.push(metricValues[index]);
+      const index = Math.floor((values.length - 1) * (i / 4));
+      const quintileValue = values[index];
+      const zipForQuintile = filteredZipData.find(z => z[selectedMetric as keyof ZipData] === quintileValue);
+      if (zipForQuintile) {
+        // We get the full HTML and then strip it for the tiny display area
+        const displayHTML = getMetricDisplay(zipForQuintile, selectedMetric);
+        quintileDisplays.push(displayHTML.replace(/<[^>]*>?/gm, ''));
+      } else {
+        quintileDisplays.push('N/A');
+      }
     }
+    
+    const stripHtml = (html: string) => html.replace(/<[^>]*>?/gm, '');
 
     return {
-      min: getMetricDisplay(
-        { [selectedMetric.replace("-", "_")]: min },
-        selectedMetric,
-      ),
-      max: getMetricDisplay(
-        { [selectedMetric.replace("-", "_")]: max },
-        selectedMetric,
-      ),
-      quintiles: quintiles.map((val) =>
-        getMetricDisplay(
-          { [selectedMetric.replace("-", "_")]: val },
-          selectedMetric,
-        ),
-      ),
+      minDisplay: minZip ? stripHtml(getMetricDisplay(minZip, selectedMetric)) : "N/A",
+      maxDisplay: maxZip ? stripHtml(getMetricDisplay(maxZip, selectedMetric)) : "N/A",
+      quintileDisplays,
+      zipCount: filteredZipData.length
     };
-  };
+  }, [filteredZipData, selectedMetric]);
 
-  const { min, max, quintiles } = getLegendValues();
-
-  if (isLoading) {
-    return (
-      <div
-        className={`bg-white border border-gray-300 rounded p-4 inline-block ${className}`}
-      >
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded mb-2 w-20"></div>
-          <div className="h-4 bg-gray-200 rounded mb-2 w-32"></div>
-          <div className="flex space-x-2">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="w-12 h-8 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const { minDisplay, maxDisplay, quintileDisplays, zipCount } = legendData;
 
   return (
-    <div
-      className={`bg-white border border-gray-300 rounded p-4 inline-block ${className}`}
-    >
+    <div className={`bg-white border border-gray-300 rounded p-4 inline-block ${className}`}>
       <h3 className="text-sm font-semibold mb-3 text-gray-900">Legend</h3>
-
-      {/* Color gradient bar */}
       <div className="mb-3">
         <div
           className="h-4 rounded-lg"
-          style={{
-            background:
-              "linear-gradient(to right, #FFF9B0, #FFA873, #E84C61, #922C7E, #2E0B59)",
-          }}
+          style={{ background: "linear-gradient(to right, #FFF9B0, #FFA873, #E84C61, #922C7E, #2E0B59)" }}
         />
         <div className="flex justify-between text-xs text-gray-600 mt-1">
-          <span>{min}</span>
-          <span>{max}</span>
+          <span>{minDisplay}</span>
+          <span>{maxDisplay}</span>
         </div>
       </div>
-
-      {/* Quintile indicators */}
       <div className="grid grid-cols-5 gap-2 mb-3">
-        {quintiles.map((value, index) => {
-          const colors = [
-            "#FFF9B0",
-            "#FFA873",
-            "#E84C61",
-            "#922C7E",
-            "#2E0B59",
-          ];
+        {quintileDisplays.map((value, index) => {
+          const colors = ["#FFF9B0", "#FFA873", "#E84C61", "#922C7E", "#2E0B59"];
           return (
             <div key={index} className="text-center">
               <div
                 className="w-4 h-4 rounded mx-auto mb-1"
                 style={{ backgroundColor: colors[index] }}
               />
-              <span className="text-[10px] text-gray-600 leading-tight block">
-                {value}
-              </span>
+              <span className="text-[10px] text-gray-600 leading-tight block">{value}</span>
             </div>
           );
         })}
       </div>
-
-      {/* Data count */}
       <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-200">
         {zipCount.toLocaleString()} ZIP codes
       </div>

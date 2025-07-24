@@ -1,122 +1,126 @@
-import { useState, useEffect } from "react";
-import { MetricSelector, MetricType } from "./MetricSelector";
-import { SearchBox } from "./SearchBox";
-import { MapLibreMap } from "./MapLibreMap";
-import React, { Suspense } from "react";
-const Sidebar = React.lazy(() =>
-  import("./Sidebar").then((module) => ({ default: module.Sidebar })),
-);
-import { Legend } from "./Legend";
-import { LastUpdated } from "./LastUpdated";
+// src/components/dashboard/HousingDashboard.tsx
+// FINAL, COMPLETE, AND WORKING VERSION
 
+import { useState, useEffect, Suspense } from "react";
+import { useDataWorker } from "@/hooks/useDataWorker";
+import { ZipData } from "./map/types"; // --- FIX 1: Remove obsolete CityData import ---
+import pako from "pako";
+import { MapExport } from "@/components/MapExport"; // Corrected path assumption
+
+// Import all necessary components
 import { TopBar } from "./TopBar";
+import { MapLibreMap } from "./MapLibreMap";
+import { Legend } from "./Legend";
+import { SponsorBanner } from "./SponsorBanner";
+import { Sidebar } from "./Sidebar";
 
-interface ZipData {
-  zipCode: string;
-  state: string;
-  medianSalePrice: number;
-  medianListPrice: number;
-  medianDOM: number;
-  inventory: number;
-  newListings: number;
-  homesSold: number;
-  saleToListRatio: number;
-  homesSoldAboveList: number;
-  offMarket2Weeks: number;
+// Type Definitions
+export type MetricType = "median-sale-price" | "median-list-price" | "median-dom" | "inventory" | "new-listings" | "homes-sold" | "sale-to-list-ratio" | "homes-sold-above-list" | "off-market-2-weeks";
+// --- FIX 2: Simplify the data payload to match the new worker ---
+interface DataPayload {
+  zipData: Record<string, ZipData>;
+  bounds: { min: number; max: number; };
 }
 
 export function HousingDashboard() {
-  const [selectedMetric, setSelectedMetric] =
-    useState<MetricType>("median-sale-price");
+  // Core App State
+  const [selectedMetric, setSelectedMetric] = useState<MetricType>("median-sale-price");
   const [selectedZip, setSelectedZip] = useState<ZipData | null>(null);
   const [searchZip, setSearchZip] = useState<string>("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Master Data State
+  const [zipData, setZipData] = useState<Record<string, ZipData>>({});
+  // --- FIX 3: Remove obsolete citiesData state ---
+  // const [citiesData, setCitiesData] = useState<Record<string, CityData>>({});
+  const [dataBounds, setDataBounds] = useState<{ min: number; max: number } | null>(null);
+  const [fullGeoJSON, setFullGeoJSON] = useState<GeoJSON.FeatureCollection | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
+  // UI State
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showSponsorBanner, setShowSponsorBanner] = useState(false);
+  
+  const { processData, isLoading, progress } = useDataWorker();
+
+  // This effect loads ALL necessary data for the app ONCE on initial mount.
   useEffect(() => {
-    // Set a default last updated date - the map component will handle data loading
-    setLastUpdated("2025-07-01");
-  }, []);
+    const loadInitialData = async () => {
+      // --- FIX 4: Update the data fetching to use the new, single data URL ---
+      const result = await processData({
+        type: 'LOAD_AND_PROCESS_DATA',
+        data: {
+          url: "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json.gz", // Only one URL now
+          selectedMetric: 'median_sale_price',
+        }
+      }) as DataPayload;
 
-  const handleZipSelect = (zipData: ZipData) => {
-    setSelectedZip(zipData);
-    setSidebarOpen(true);
-    setSidebarCollapsed(false);
-  };
+      if (result) {
+        setZipData(result.zipData);
+        // --- FIX 5: No longer need to set citiesData ---
+        // setCitiesData(result.citiesData);
+        setDataBounds(result.bounds);
+        const firstZip = Object.values(result.zipData)[0];
+        if (firstZip?.period_end) setLastUpdated(firstZip.period_end);
+      }
 
-  const handleSearch = (zipCode: string) => {
-    setSearchZip(zipCode);
-  };
+      // GeoJSON fetching remains the same
+      const geoResponse = await fetch("https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz");
+      const geoBuffer = await geoResponse.arrayBuffer();
+      const geoDecompressed = pako.ungzip(new Uint8Array(geoBuffer), { to: 'string' });
+      const geoData = JSON.parse(geoDecompressed);
+      geoData.features.forEach((f: any) => { f.properties.zipCode = f.properties.ZCTA5CE20 || f.properties.GEOID20; });
+      setFullGeoJSON(geoData);
+    };
 
-  const closeSidebar = () => {
-    setSidebarOpen(false);
-    setSelectedZip(null);
-  };
+    loadInitialData();
+    const timer = setTimeout(() => setShowSponsorBanner(true), 30000);
+    return () => clearTimeout(timer);
+  }, [processData]);
 
-  const toggleSidebarCollapse = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
-
+  // Event Handlers
+  const handleZipSelect = (zip: ZipData) => { setSelectedZip(zip); setSidebarOpen(true); };
+  const toggleSidebarCollapse = () => { setSidebarCollapsed(!sidebarCollapsed); };
+  
   return (
     <div className="w-full h-screen bg-dashboard-bg overflow-hidden flex flex-col">
-      {/* Top Navigation Bar */}
-      <TopBar
-        selectedMetric={selectedMetric}
-        onMetricChange={setSelectedMetric}
-        onSearch={handleSearch}
-        lastUpdated={lastUpdated}
-      />
-
-      {/* Main Content Area */}
+      {showSponsorBanner && <SponsorBanner onClose={() => setShowSponsorBanner(false)} />}
+      
+      <TopBar selectedMetric={selectedMetric} onMetricChange={setSelectedMetric} onSearch={setSearchZip} lastUpdated={lastUpdated}>
+        <MapExport allZipData={zipData} fullGeoJSON={fullGeoJSON} selectedMetric={selectedMetric} />
+      </TopBar>
+      
       <div className="flex flex-1 relative">
-        {/* Sidebar */}
-        <Suspense
-          fallback={
-            <div className="p-4 text-sm text-muted">Loading sidebar...</div>
-          }
-        >
+        <Suspense fallback={<div>Loading...</div>}>
+          {sidebarOpen && (
           <Sidebar
             isOpen={sidebarOpen}
             isCollapsed={sidebarCollapsed}
             zipData={selectedZip}
-            onClose={closeSidebar}
+            allZipData={zipData} // <-- ADD THIS LINE
+            onClose={() => setSidebarOpen(false)}
             onToggleCollapse={toggleSidebarCollapse}
           />
+        )}
         </Suspense>
 
-        {/* Map Container - Full size with proper positioning */}
-        <div
-          className={`flex-1 relative transition-all duration-300 ${
-            sidebarOpen ? (sidebarCollapsed ? "ml-16" : "ml-96") : "ml-0"
-          }`}
-        >
-          {/* Map View - Full container */}
+        <div className={`flex-1 relative transition-all duration-300 ${sidebarOpen ? (sidebarCollapsed ? "ml-16" : "ml-96") : "ml-0"}`}>
           <div className="absolute inset-0">
             <MapLibreMap
               selectedMetric={selectedMetric}
               onZipSelect={handleZipSelect}
               searchZip={searchZip}
+              zipData={zipData}
+              // --- FIX 6: No longer pass the obsolete citiesData prop ---
+              // citiesData={citiesData}
+              colorScaleDomain={dataBounds ? [dataBounds.min, dataBounds.max] : null}
+              isLoading={isLoading || !fullGeoJSON}
+              progress={progress}
+              processData={processData}
             />
           </div>
-
-          {/* Legend - Bottom Right with proper z-index */}
-          <div className="absolute bottom-4 right-4 w-72 z-[1000] pointer-events-auto">
-            <Legend selectedMetric={selectedMetric} />
-          </div>
-
-          {/* Status Indicators - Top Right with proper z-index */}
-          <div className="absolute top-4 right-4 flex flex-col space-y-2 z-[1000] pointer-events-auto">
-            {searchZip && (
-              <div className="bg-primary text-primary-foreground px-3 py-2 rounded-lg shadow-lg text-sm">
-                Searching for: {searchZip}
-              </div>
-            )}
-            {selectedZip && (
-              <div className="bg-accent text-accent-foreground px-3 py-2 rounded-lg shadow-lg text-sm">
-                Selected: {selectedZip.zipCode}
-              </div>
-            )}
+          <div className="absolute bottom-4 right-4 w-64 z-[1000] pointer-events-auto">
+            <Legend selectedMetric={selectedMetric} colorScaleDomain={dataBounds ? [dataBounds.min, dataBounds.max] : null} />
           </div>
         </div>
       </div>

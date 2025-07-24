@@ -32,6 +32,13 @@ jobs:
       run: |
         python -u scripts/parse_redfin_zip_data.py
 
+    - name: Display Logs
+      if: always() 
+      run: |
+        echo "--- Displaying contents of data_pipeline.log ---"
+        cat data_pipeline.log
+        echo "--- End of log ---"
+
     - name: Check for changes in ZIP data file
       id: check_changes
       run: |

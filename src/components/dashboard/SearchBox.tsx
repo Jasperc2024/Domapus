@@ -1,25 +1,23 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-// Debounce function for search
-const useDebounce = (callback: Function, delay: number) => {
-  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout>();
+const useDebounce = (value: string, delay: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
 
-  const debouncedCallback = useCallback((...args: any[]) => {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-    }
-    
-    const newTimer = setTimeout(() => {
-      callback(...args);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
     }, delay);
-    
-    setDebounceTimer(newTimer);
-  }, [callback, delay, debounceTimer]);
 
-  return debouncedCallback;
+    
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]); 
+
+  return debouncedValue;
 };
 
 interface SearchBoxProps {
@@ -28,20 +26,21 @@ interface SearchBoxProps {
 
 export function SearchBox({ onSearch }: SearchBoxProps) {
   const [searchValue, setSearchValue] = useState("");
+  
+  // Use our new, robust debounce hook
+  const debouncedSearchTerm = useDebounce(searchValue, 300);
 
-  // Debounced search function
-  const debouncedSearch = useDebounce((value: string) => {
-    if (value.trim() && value.length >= 3) {
-      onSearch(value.trim());
+  // This effect runs ONLY when the debounced search term changes
+  useEffect(() => {
+    if (debouncedSearchTerm.trim() && debouncedSearchTerm.length >= 3) {
+      onSearch(debouncedSearchTerm.trim());
     }
-  }, 300);
+  }, [debouncedSearchTerm, onSearch]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    // Only allow digits and limit length
+    const value = e.target.value.replace(/\D/g, '');
     setSearchValue(value);
-    
-    // Trigger debounced search on input change
-    debouncedSearch(value);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -52,24 +51,24 @@ export function SearchBox({ onSearch }: SearchBoxProps) {
   };
 
   return (
-    <div className="bg-dashboard-panel border border-dashboard-border rounded-lg p-3 shadow-sm">
-      <form onSubmit={handleSubmit} className="flex items-center space-x-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-dashboard-text-secondary" />
-          <Input
-            type="text"
-            placeholder="Enter ZIP code..."
-            value={searchValue}
-            onChange={handleInputChange}
-            className="pl-10 w-48"
-            maxLength={5}
-            aria-label="Search for ZIP code"
-          />
-        </div>
-        <Button type="submit" variant="outline" size="sm" aria-label="Search for ZIP code">
-          Search
-        </Button>
-      </form>
-    </div>
+    <form onSubmit={handleSubmit} className="flex items-center space-x-2">
+      <div className="relative flex-1">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-dashboard-text-secondary" />
+        <Input
+          type="text" // Use "text" with pattern for better mobile keyboard support
+          pattern="[0-9]*"
+          inputMode="numeric"
+          placeholder="Enter ZIP code..."
+          value={searchValue}
+          onChange={handleInputChange}
+          className="pl-10 w-48"
+          maxLength={5}
+          aria-label="Search for ZIP code"
+        />
+      </div>
+      <Button type="submit" variant="outline" size="sm" aria-label="Search">
+        Search
+      </Button>
+    </form>
   );
 }
