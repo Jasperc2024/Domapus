@@ -17,204 +17,57 @@
     <!-- End Google Tag Manager -->
 
     <!-- Google tag (gtag.js) -->
-    <script
-      async
-      src="https://www.googletagmanager.com/gtag/js?id=G-DTMCSD6L91"
-    ></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-DTMCSD6L91"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
+      function gtag() { dataLayer.push(arguments); }
       gtag("js", new Date());
-
       gtag("config", "G-DTMCSD6L91");
     </script>
 
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Domapus: ZIP Code Housing Data Map</title>
-    <meta
-      name="description"
-      content="Explore the U.S. housing market with our interactive ZIP code map. Access real-time data on sale prices, inventory, and more for over 24,000 ZIP codes."
-    />
+    <meta name="description" content="Explore the U.S. housing market with our interactive ZIP code map. Access real-time data on sale prices, inventory, and more for over 24,000 ZIP codes." />
     <meta name="author" content="Jasper Chen" />
 
     <!-- Performance optimizations -->
-    <!-- Preconnect to critical domains -->
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
-    <link
-      rel="preconnect"
-      href="https://www.googletagmanager.com"
-      crossorigin
-    />
-    <link
-      rel="preconnect"
-      href="https://www.google-analytics.com"
-      crossorigin
-    />
-
-    <!-- DNS prefetch for tile providers -->
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />
+    <link rel="preconnect" href="https://www.google-analytics.com" crossorigin />
     <link rel="dns-prefetch" href="//a.basemaps.cartocdn.com" />
     <link rel="dns-prefetch" href="//b.basemaps.cartocdn.com" />
     <link rel="dns-prefetch" href="//c.basemaps.cartocdn.com" />
     <link rel="dns-prefetch" href="//d.basemaps.cartocdn.com" />
 
-    <!-- Preload critical data files -->
-    <link
-      rel="prefetch"
-      href="https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json.gz"
-      as="fetch"
-      crossorigin
-    />
-    
-    <link
-      rel="prefetch"
-      href="https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz"
-      as="fetch"
-      crossorigin
-    />
+    <!-- Preload critical data and CSS -->
+    <link rel="preload" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" as="style" crossorigin />
 
-    <!-- Preload MapLibre GL CSS -->
-    <link
-      rel="preload"
-      href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
-      as="style"
-      crossorigin
-    />
-
-    <!-- Preload web worker -->
-    <link
-      rel="prefetch"
-      href="/Domapus/workers/data-processor.js"
-      as="worker"
-      crossorigin
-    />
-
-    <!-- Preload Pako for compression -->
-    <link
-      rel="prefetch"
-      href="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"
-      as="script"
-      crossorigin
-    />
-
-    <!-- Favicon -->
+    <!-- Favicon and Manifest links (using root-relative paths for Vite) -->
     <link rel="icon" href="/Domapus/favicon.ico" type="image/x-icon" />
-    <link
-      rel="apple-touch-icon"
-      sizes="180x180"
-      href="/Domapus/apple-touch-icon.png"
-    />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="32x32"
-      href="/Domapus/favicon-32x32.png"
-    />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="16x16"
-      href="/Domapus/favicon-16x16.png"
-    />
+    <link rel="apple-touch-icon" sizes="180x180" href="/Domapus/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/Domapus/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/Domapus/favicon-16x16.png" />
     <link rel="manifest" href="/Domapus/site.webmanifest" />
 
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "Dataset",
-            "name": "Interactive U.S. ZIP Code Housing Data Map",
-            "description": "Explore ZIP-level real estate trends including median sale price, inventory, and more—visualized on a live interactive map.",
-            "url": "https://jasperc2024.github.io/Domapus/",
-            "creator": {
-              "@type": "Person",
-              "name": "Jasper Chen"
-            },
-            "keywords": [
-              "ZIP code",
-              "real estate",
-              "Redfin",
-              "housing data",
-              "home prices",
-              "map visualization"
-            ],
-            "distribution": {
-              "@type": "DataDownload",
-              "encodingFormat": "application/json",
-              "contentUrl": "https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip_data.json.gz"
-            },
-            "license": "https://github.com/Jasperc2024/Domapus/blob/main/LICENSE",
-            "isAccessibleForFree": true,
-            "spatialCoverage": {
-              "@type": "Place",
-              "name": "United States"
-            }
-          },
-          {
-            "@type": "WebSite",
-            "name": "Domapus",
-            "url": "https://jasperc2024.github.io/Domapus/",
-            "author": {
-              "@type": "Person",
-              "name": "Jasper Chen"
-            },
-            "inLanguage": "en",
-            "description": "Domapus is a real-time ZIP-code-level housing data visualization site using Redfin data. Explore trends in prices, inventory, and more across 24,000+ ZIPs.",
-            "publisher": {
-              "@type": "Person",
-              "name": "Jasper Chen"
-            }
-          }
-        ]
-      }
-    </script>
-
-    <!-- Open Graph / Facebook -->
+    <!-- SEO and Social Media Meta Tags -->
+    <script type="application/ld+json">{ "@context": "https://schema.org", "@graph": [ { "@type": "Dataset", "name": "Interactive U.S. ZIP Code Housing Data Map", "description": "Explore ZIP-level real estate trends including median sale price, inventory, and more—visualized on a live interactive map.", "url": "https://jasperc2024.github.io/Domapus/", "creator": { "@type": "Person", "name": "Jasper Chen" }, "keywords": [ "ZIP code", "real estate", "Redfin", "housing data", "home prices", "map visualization" ], "distribution": { "@type": "DataDownload", "encodingFormat": "application/json", "contentUrl": "/data/zip_data.json.gz" }, "license": "https://github.com/Jasperc2024/Domapus/blob/main/LICENSE", "isAccessibleForFree": true, "spatialCoverage": { "@type": "Place", "name": "United States" } }, { "@type": "WebSite", "name": "Domapus", "url": "https://jasperc2024.github.io/Domapus/", "author": { "@type": "Person", "name": "Jasper Chen" }, "inLanguage": "en", "description": "Domapus is a real-time ZIP-code-level housing data visualization site using Redfin data. Explore trends in prices, inventory, and more across 24,000+ ZIPs.", "publisher": { "@type": "Person", "name": "Jasper Chen" } } ] }</script>
     <meta property="og:title" content="Domapus - ZIP Code Housing Map" />
-    <meta
-      property="og:description"
-      content="Explore housing prices across US ZIP codes with this interactive map."
-    />
-    <meta
-      property="og:image"
-      content="https://jasperc2024.github.io/Domapus/preview.png"
-    />
+    <meta property="og:description" content="Explore housing prices across US ZIP codes with this interactive map." />
+    <meta property="og:image" content="https://jasperc2024.github.io/Domapus/preview.png" />
     <meta property="og:url" content="https://jasperc2024.github.io/Domapus/" />
     <meta property="og:type" content="website" />
-
-    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Domapus - ZIP Code Housing Map" />
-    <meta
-      name="twitter:description"
-      content="Explore housing prices across US ZIP codes with this interactive map."
-    />
-    <meta
-      name="twitter:image"
-      content="https://jasperc2024.github.io/Domapus/preview.png"
-    />
+    <meta name="twitter:description" content="Explore housing prices across US ZIP codes with this interactive map." />
+    <meta name="twitter:image" content="https://jasperc2024.github.io/Domapus/preview.png" />
     <meta name="twitter:creator" content="@Jasperchen925" />
-
-    <script type="module" crossorigin src="/Domapus/assets/index-B6fOR4Fz.js"></script>
+    <script type="module" crossorigin src="/Domapus/assets/index-CCxB4NnJ.js"></script>
     <link rel="stylesheet" crossorigin href="/Domapus/assets/index-BIZgXhOd.css">
   </head>
-
   <body>
     <!-- Google Tag Manager (noscript) -->
-    <noscript>
-      <iframe
-        src="https://www.googletagmanager.com/ns.html?id=GTM-PNP9L5ZD"
-        height="0"
-        width="0"
-        style="display: none; visibility: hidden"
-      ></iframe>
-    </noscript>
-    <!-- End Google Tag Manager (noscript) -->
-
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PNP9L5ZD" height="0" width="0" style="display: none; visibility: hidden"></iframe></noscript>
+    
     <div id="root"></div>
   </body>
 </html>
