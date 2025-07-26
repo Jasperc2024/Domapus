@@ -1,5 +1,22 @@
 import { ZipData } from "./types"; 
 
+export function formatMetricValue(value: number, format: 'currency' | 'number' | 'percent' | 'ratio'): string {
+  if (value === null || value === undefined || isNaN(value)) return "N/A";
+  
+  switch (format) {
+    case 'currency':
+      return `$${value.toLocaleString()}`;
+    case 'percent':
+      return `${value.toFixed(1)}%`;
+    case 'ratio':
+      return `${(value * 100).toFixed(1)}%`;
+    case 'number':
+      return value.toLocaleString();
+    default:
+      return value.toString();
+  }
+}
+
 export function getMetricDisplay(data: ZipData, selectedMetric: string): string {
   if (!data || !data.zipCode) {
     return `<div class="p-2">No data available</div>`;
