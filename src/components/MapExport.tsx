@@ -81,7 +81,7 @@ export function MapExport({ allZipData, fullGeoJSON, selectedMetric }: MapExport
         {/* The main area is a placeholder, as the real work happens in the hidden renderer */}
         <div className="flex-1 flex items-center justify-center p-8">
             <div className="bg-white p-8 rounded-lg shadow-lg border text-center space-y-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+              <div role="progressbar" aria-label="Loading export map data" className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
               <div>
                 <h3 className="font-semibold text-lg">Generating Your Export</h3>
                 <p className="text-sm text-gray-600">

@@ -64,7 +64,8 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose, onT
 
   return (
     <div className={`fixed left-0 top-0 h-full bg-dashboard-panel border-r border-dashboard-border shadow-lg z-40 transition-all duration-300 ${isCollapsed ? "w-16" : "w-96"}`}>
-      <div className="flex items-center justify-between p-4 border-b border-dashboard-border">
+      <div className="flex items-center justify-between p-4 border-b border-dashboard-border"
+           role="banner">
         {!isCollapsed && (<div><h2 className="text-lg font-semibold">{zipData.zipCode}</h2><p className="text-sm text-muted-foreground">{zipData.city}</p></div>)}
         <div className="flex items-center space-x-2">
           <Button variant="ghost" size="sm" onClick={onToggleCollapse} aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}>{isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</Button>

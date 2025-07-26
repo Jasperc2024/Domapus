@@ -1,6 +1,6 @@
 import maplibregl from "maplibre-gl";
 
-/** Build a MapLibre‑GL map that feels like the original Leaflet setup. */
+
 export function createMapLibreMap(container: HTMLElement): maplibregl.Map {
   /* ---------- core map ---------- */
   const map = new maplibregl.Map({

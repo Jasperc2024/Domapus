@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from "react";
-import maplibregl from "maplibre-gl";
+import maplibregl, { LngLatLike } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { scaleLinear, ScaleLinear } from "d3-scale";
 import { getMetricDisplay } from "./map/utils";
@@ -18,161 +18,143 @@ interface MapProps {
 }
 
 export function MapLibreMap({
-  selectedMetric,
-  onZipSelect,
-  searchZip,
-  zipData,
-  colorScaleDomain,
-  isLoading,
-  progress,
-  processData
+  selectedMetric, onZipSelect, searchZip, zipData, colorScaleDomain, isLoading, progress, processData
 }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const [mapLoaded, setMapLoaded] = useState<boolean>(false);
+  const [isMapReady, setIsMapReady] = useState(false); // A single state for map readiness
   const [loadingError, setLoadingError] = useState<string | null>(null);
-  const interactionsSetup = useRef<boolean>(false);
+  const interactionsSetup = useRef(false);
 
-  
+  // This is the definitive fix for all initialization and rendering crashes.
   useEffect(() => {
-    if (map.current || !mapContainer.current) return;
+    if (map.current || !mapContainer.current) return; // Prevent re-initialization
 
-    // maplibre is stupid
+    const currentMapContainer = mapContainer.current;
+    let isMounted = true;
 
-    map.current = createMap(mapContainer.current);
-    const currentMap = map.current;
-
-    currentMap.on("load", () => setMapLoaded(true));
-    currentMap.on("error", (e) => {
-      console.error("MapLibre error:", e);
-      setLoadingError("Map failed to initialize");
+    const observer = new ResizeObserver(() => {
+      if (map.current) map.current.resize();
     });
+    observer.observe(currentMapContainer);
 
-    // Create a ResizeObserver to watch the map container
-    const resizeObserver = new ResizeObserver(() => {
-      // This function will be called whenever the container's size changes.
-      // The `resize` method tells MapLibre to re-calculate its dimensions,
-      // which is the correct way to handle layout shifts and prevent crashes.
-      currentMap.resize();
-    });
+    // We use a small timeout to push the map creation to the end of the event loop.
+    // This guarantees that React has finished rendering and the div has its final dimensions.
+    const timerId = setTimeout(() => {
+      if (isMounted && currentMapContainer.clientWidth > 0) {
+        map.current = createMap(currentMapContainer);
+        map.current.on("load", () => {
+          if (isMounted) setIsMapReady(true);
+        });
+        map.current.on("error", (e) => {
+          console.error("MapLibre initialization error:", e);
+          if (isMounted) setLoadingError("Map failed to initialize.");
+        });
+      }
+    }, 100); // A small delay is sufficient to ensure the DOM is stable.
 
-    // Start observing the map container
-    resizeObserver.observe(mapContainer.current);
-
-    // This is the cleanup function. It's critical for preventing memory leaks.
-    return () => { 
-      resizeObserver.disconnect();
-      currentMap.remove();
-      map.current = null;
+    return () => {
+      isMounted = false;
+      clearTimeout(timerId);
+      observer.disconnect();
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
     };
-  }, []); // Empty dependency array ensures this runs only once.
-
+  }, []); // Empty dependency array ensures this runs only ONCE.
 
   const colorScale = useMemo(() => {
-    if (!colorScaleDomain) return null;
+    if (!colorScaleDomain || colorScaleDomain.length < 2) return null;
     return scaleLinear<string>().domain(colorScaleDomain).range(["#FFF9B0", "#E84C61", "#2E0B59"]);
   }, [colorScaleDomain]);
 
   useEffect(() => {
     const mapInstance = map.current;
-    if (!mapInstance || !mapLoaded || !colorScale || Object.keys(zipData).length === 0) return;
+    if (!isMapReady || !mapInstance || !colorScale || Object.keys(zipData).length === 0) return;
     
     const controller = new AbortController();
     const setupOrUpdateLayers = async () => {
       try {
         setLoadingError(null);
-        const geojsonResponse = await fetch("https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/us-zip-codes.geojson.gz", { signal: controller.signal });
+        const geojsonResponse = await fetch("/data/us-zip-codes.geojson.gz", { signal: controller.signal });
         if (!geojsonResponse.ok) throw new Error("Failed to fetch GeoJSON");
         const geojsonArrayBuffer = await geojsonResponse.arrayBuffer();
         if (controller.signal.aborted) return;
 
-        const processedGeoJSON = await processData({
-            type: "PROCESS_GEOJSON",
-            data: { geojsonArrayBuffer, zipData, selectedMetric },
-        });
-
+        const processedGeoJSON = await processData({ type: "PROCESS_GEOJSON", data: { geojsonArrayBuffer, zipData, selectedMetric } });
         if (controller.signal.aborted || !mapInstance.isStyleLoaded()) return;
 
-        const source = mapInstance.getSource("zip-codes") as maplibregl.GeoJSONSource;
+        const source = mapInstance.getSource("zips") as maplibregl.GeoJSONSource;
         if (source) {
           source.setData(processedGeoJSON);
         } else {
-          mapInstance.addSource("zip-codes", { type: "geojson", data: processedGeoJSON });
-          mapInstance.addLayer({ id: "zip-codes-fill", type: "fill", source: "zip-codes", paint: { "fill-color": ["case", ["has", "metricValue"], ["interpolate", ["linear"], ["get", "metricValue"], ...createColorStops(colorScale)], "rgba(200, 200, 200, 0.1)"], "fill-opacity": 0.75 } });
-          mapInstance.addLayer({ id: "zip-codes-border", type: "line", source: "zip-codes", paint: { "line-color": "#FFFFFF", "line-width": 0.5, "line-opacity": 0.5 } });
+          mapInstance.addSource("zips", { type: "geojson", data: processedGeoJSON });
+          mapInstance.addLayer({ id: "zips-fill", type: "fill", source: "zips", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": ["case", ["has", "metricValue"], ["interpolate", ["linear"], ["get", "metricValue"], ...createColorStops(colorScale)], "#ccc"], "fill-opacity": 0.75 } });
+          mapInstance.addLayer({ id: "zips-border", type: "line", source: "zips", filter: ["==", ["geometry-type"], "Polygon"], paint: { "line-color": "#fff", "line-width": 0.5 } });
+          mapInstance.addLayer({ id: "zips-points", type: "circle", source: "zips", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-color": ["case", ["has", "metricValue"], ["interpolate", ["linear"], ["get", "metricValue"], ...createColorStops(colorScale)], "#ccc"], "circle-radius": 5, "circle-stroke-width": 1, "circle-stroke-color": "#fff" } });
         }
         
         if (!interactionsSetup.current) {
           setupMapInteractions(mapInstance);
           interactionsSetup.current = true;
         }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          console.error("Failed to set up map layers:", error);
-          setLoadingError("Failed to load map layers");
-        }
-      }
+      } catch (error) { if (!controller.signal.aborted) { console.error("Layer setup failed:", error); setLoadingError("Failed to load map layers"); } }
     };
     setupOrUpdateLayers();
     return () => controller.abort();
-  }, [mapLoaded, colorScale, zipData, selectedMetric, processData]);
+  }, [isMapReady, colorScale, zipData, selectedMetric, processData]);
 
   useEffect(() => {
-    if (!map.current || !searchZip || !zipData[searchZip]) return;
-    const locationData = zipData[searchZip];
-    if (locationData.longitude && locationData.latitude) {
-      map.current.flyTo({ center: [locationData.longitude, locationData.latitude], zoom: 10 });
-    }
-  }, [searchZip, zipData]);
+    if (!isMapReady || !map.current || !searchZip || !zipData[searchZip]) return;
+    const { longitude, latitude } = zipData[searchZip];
+    if (longitude && latitude) { map.current.flyTo({ center: [longitude, latitude], zoom: 10 }); }
+  }, [isMapReady, searchZip, zipData]);
 
   const setupMapInteractions = (mapInstance: maplibregl.Map) => {
     let currentPopup: maplibregl.Popup | null = null;
-    mapInstance.on("mousemove", "zip-codes-fill", (e) => {
+    const interactiveLayers = ["zips-fill", "zips-points"];
+    mapInstance.on("mousemove", interactiveLayers, (e) => {
       if (e.features?.length) {
         mapInstance.getCanvas().style.cursor = "pointer";
-        const { zipCode } = e.features[0].properties;
-        if (zipCode && zipData[zipCode]) {
-            currentPopup?.remove();
-            const { lng, lat } = e.lngLat;
-            const zipInfo = zipData[zipCode];
-            currentPopup = new maplibregl.Popup({ closeButton: false, offset: [0, -10], className: "map-tooltip" }).setLngLat([lng, lat]).setHTML(getMetricDisplay(zipInfo, selectedMetric)).addTo(mapInstance);
+        const props = e.features[0].properties;
+        if (props?.zipCode && zipData[props.zipCode]) {
+          currentPopup?.remove();
+          const coords = e.features[0].geometry.type === 'Point' ? (e.features[0].geometry.coordinates as LngLatLike) : e.lngLat;
+          currentPopup = new maplibregl.Popup({ closeButton: false, offset: [0, -10] }).setLngLat(coords).setHTML(getMetricDisplay(zipData[props.zipCode], selectedMetric)).addTo(mapInstance);
         }
       }
     });
-    mapInstance.on("mouseleave", "zip-codes-fill", () => {
-      mapInstance.getCanvas().style.cursor = "";
-      currentPopup?.remove();
-      currentPopup = null;
-    });
-    mapInstance.on("click", "zip-codes-fill", (e) => {
+    mapInstance.on("mouseleave", interactiveLayers, () => { mapInstance.getCanvas().style.cursor = ""; currentPopup?.remove(); });
+    mapInstance.on("click", interactiveLayers, (e) => {
       if (e.features?.length) {
-        const { zipCode } = e.features[0].properties;
-        if (zipCode && zipData[zipCode]) {
-          onZipSelect(zipData[zipCode]);
-        }
+        const props = e.features[0].properties;
+        if (props?.zipCode && zipData[props.zipCode]) { onZipSelect(zipData[props.zipCode]); }
       }
     });
   };
 
   return (
     <div className="absolute inset-0 w-full h-full">
-      <div ref={mapContainer} className="w-full h-full" style={{ minHeight: "400px" }} />
-      {(isLoading || !mapLoaded || loadingError) && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-10">
-          {loadingError ? <div className="text-red-600 font-bold text-lg">{loadingError}</div> : <div className="text-center space-y-4"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div><p className="text-sm font-medium">{progress.phase}...</p></div>}
+      <div ref={mapContainer} data-testid="map-container" role="application" className="w-full h-full" />
+      {(isLoading || !isMapReady || loadingError) && (
+        <div role="status" aria-label="Loading..." className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+          {loadingError ? <div className="text-red-500 font-bold">{loadingError}</div> : <div role="progressbar" aria-label="Loading map data" className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />}
         </div>
       )}
     </div>
   );
 }
 
-function createColorStops(colorScale: ScaleLinear<string, string>): (number | string)[] {
+function createColorStops(colorScale: ScaleLinear<string, string> | null): (number | string)[] {
     if (!colorScale) return [];
-    const [min, max] = colorScale.domain();
+    const domain = colorScale.domain();
+    if (domain.length < 2) return [];
+    const [min, max] = domain;
     const stops: (number | string)[] = [];
     for (let i = 0; i <= 8; i++) {
-        const value = min + (max - min) * (i / 8);
-        stops.push(value, colorScale(value));
+      const value = min + (max - min) * (i / 8);
+      stops.push(value, colorScale(value));
     }
     return stops;
 }

@@ -22,7 +22,7 @@ function formatLegendValue(value: number, metric: string): string {
 export function Legend({ selectedMetric, colorScaleDomain }: LegendProps) {
 
   const legendDisplay = useMemo(() => {
-    if (!colorScaleDomain || colorScaleDomain[0] === null || colorScaleDomain[1] === null) {
+    if (!colorScaleDomain) {
       return { min: "N/A", max: "N/A" };
     }
     const [min, max] = colorScaleDomain;
