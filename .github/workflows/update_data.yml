@@ -6,8 +6,7 @@ permissions:
 
 on:
   schedule:
-    # Run on Thursday of the 3rd full week of each month at 10:00 AM UTC
-    - cron: '0 10 * * 4'
+    - cron: '0 10 15-21 * 3'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
@@ -42,7 +41,9 @@ jobs:
     - name: Check for changes in ZIP data file
       id: check_changes
       run: |
-        if git diff --quiet HEAD -- public/data/zip-data.json.gz; then
+        if [ ! -f public/data/zip-data.json.gz ]; then
+          echo "changes=true" >> $GITHUB_OUTPUT
+        elif git diff --quiet HEAD -- public/data/zip-data.json.gz; then
           echo "changes=false" >> $GITHUB_OUTPUT
         else
           echo "changes=true" >> $GITHUB_OUTPUT
@@ -51,11 +52,12 @@ jobs:
     - name: Commit and push if changed or missing
       if: steps.check_changes.outputs.changes == 'true'
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --local user.email "data-bot@users.noreply.github.com"
+        git config --local user.name "Redfin Data Bot"
         git add public/data/zip-data.json.gz
-        git commit -m "Update Redfin ZIP data - $(date +'%Y-%m-%d')"
-        git push
+        if ! git diff --cached --quiet; then
+          git commit -m "Update Redfin ZIP data - $(date +'%Y-%m-%d')"
+          git push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
