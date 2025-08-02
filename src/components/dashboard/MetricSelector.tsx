@@ -1,26 +1,26 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export type MetricType = 
-  | "median-sale-price"
-  | "median-list-price" 
-  | "median-dom"
+  | "median_sale_price"
+  | "median_list_price" 
+  | "median_dom"
   | "inventory"
-  | "new-listings"
-  | "homes-sold"
-  | "sale-to-list-ratio"
-  | "homes-sold-above-list"
-  | "off-market-2-weeks";
+  | "new_listings"
+  | "homes_sold"
+  | "avg_sale_to_list_ratio"
+  | "sold_above_list"
+  | "off_market_in_two_weeks";
 
 export const METRICS = {
-  "median-sale-price": "Median Sale Price",
-  "median-list-price": "Median List Price", 
-  "median-dom": "Median Days on Market",
+  "median_sale_price": "Median Sale Price",
+  "median_list_price": "Median List Price", 
+  "median_dom": "Median Days on Market",
   "inventory": "Inventory",
-  "new-listings": "New Listings",
-  "homes-sold": "Homes Sold",
-  "sale-to-list-ratio": "Sale-to-List Price Ratio",
-  "homes-sold-above-list": "% Homes Sold Above List",
-  "off-market-2-weeks": "% Off-Market in 2 Weeks"
+  "new_listings": "New Listings",
+  "homes_sold": "Homes Sold",
+  "avg_sale_to_list_ratio": "Sale-to-List Price Ratio",
+  "sold_above_list": "% Homes Sold Above List",
+  "off_market_in_two_weeks": "% Off-Market in 2 Weeks"
 } as const;
 
 interface MetricSelectorProps {

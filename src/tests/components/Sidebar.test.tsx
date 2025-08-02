@@ -1,8 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { Sidebar } from '../../components/dashboard/Sidebar';
 import { createMockZipData } from '../__mocks__/mock-data';
-import React from 'react';
 
 describe('Sidebar Component', () => {
   it('should render the ZIP code and city correctly in the header', () => {

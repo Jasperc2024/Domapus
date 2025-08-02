@@ -4,7 +4,7 @@
 import { useEffect, useRef, useMemo } from "react";
 import maplibregl, { LngLatLike } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { scaleLinear, ScaleLinear } from "d3-scale";
+import { scaleLinear } from "d3-scale";
 import { ZipData } from "./map/types";
 
 // --- FIX: Define a clear interface for our map configurations ---
@@ -58,10 +58,10 @@ export function ExportMap({ filteredData, geoJSON, selectedMetric, regionScope, 
   useEffect(() => {
     // --- FIX: Apply our new interface to the configs array ---
     const mapConfigs: MapConfig[] = [
-      { key: 'main', ref: mainMapRef, center: [-98.5, 39.8] as [number, number], zoom: 3.5, data: continental },
+      { key: 'main', ref: mainMapRef, center: [-98.5, 39.8] as [number, number], zoom: 3.5, data: continental as GeoJSON.FeatureCollection },
       ...(regionScope === 'national' ? [
-        { key: 'alaska', ref: alaskaMapRef, center: [-152, 64] as [number, number], zoom: 2.5, data: alaska },
-        { key: 'hawaii', ref: hawaiiMapRef, center: [-157, 21] as [number, number], zoom: 5, data: hawaii },
+        { key: 'alaska', ref: alaskaMapRef, center: [-152, 64] as [number, number], zoom: 2.5, data: alaska as GeoJSON.FeatureCollection },
+        { key: 'hawaii', ref: hawaiiMapRef, center: [-157, 21] as [number, number], zoom: 5, data: hawaii as GeoJSON.FeatureCollection },
       ] : [])
     ];
     
