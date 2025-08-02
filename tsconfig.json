@@ -18,8 +18,12 @@
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
-    "moduleResolution": "Node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": true,         
+    "noUnusedParameters": true,     
+    "noFallthroughCasesInSwitch": true, 
+    "noEmit": true
   }
 }

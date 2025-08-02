@@ -139,7 +139,10 @@ def main():
         output_dir.mkdir(parents=True, exist_ok=True)
         output_file = output_dir / "zip-data.json.gz"
         json_string = json.dumps(final_output)
-        compressed_json = gzip.compress(json_string.encode('utf-8'))
+        buffer = BytesIO()
+        with gzip.GzipFile(fileobj=buffer, mode='wb', mtime=0) as gz:
+            gz.write(json_string.encode('utf-8'))
+        compressed_json = buffer.getvalue()
         with open(output_file, 'wb') as f: f.write(compressed_json)
         
         logging.info(f"Successfully wrote {len(output_data_content)} ZIP codes to {output_file}")
