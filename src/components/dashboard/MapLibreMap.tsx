@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import maplibregl, { LngLatLike } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { scaleLinear, ScaleLinear } from "d3-scale";
+import { scaleLinear } from "d3-scale";
 import { getMetricDisplay } from "./map/utils";
 import { ZipData } from "./map/types";
 import { createMap } from "./map/MapInitializer.ts";
@@ -63,7 +63,10 @@ export function MapLibreMap({
   /* Color scale */
   const colorScale = useMemo(() => {
     if (!colorScaleDomain || colorScaleDomain.length < 2) return null;
-    return scaleLinear<string>().domain(colorScaleDomain).range(["#FFF9B0", "#E84C61", "#2E0B59"]);
+    return scaleLinear<string>()
+      .domain(colorScaleDomain)
+      .range(["#FFF9B0", "#E84C61", "#2E0B59"])
+      .clamp(true);
   }, [colorScaleDomain]);
 
   /* Load base GeoJSON once */
@@ -103,10 +106,24 @@ export function MapLibreMap({
           type: "PROCESS_GEOJSON",
           data: { geojson: baseGeoJSON, zipData, selectedMetric },
         });
+        
         if (controller.signal.aborted || !map.current?.isStyleLoaded()) return;
 
+        // Add color information to features
+        const enhancedFeatures = processed.features.map((feature: any) => {
+          if (feature.properties?.metricValue && feature.properties.metricValue > 0) {
+            feature.properties.metricColor = colorScale(feature.properties.metricValue);
+          }
+          return feature;
+        });
+
         const source = map.current.getSource("zips") as maplibregl.GeoJSONSource;
-        if (source) source.setData(processed);
+        if (source) {
+          source.setData({ 
+            type: "FeatureCollection", 
+            features: enhancedFeatures 
+          });
+        }
 
         // Setup interactions once
         if (!interactionsSetup.current) {

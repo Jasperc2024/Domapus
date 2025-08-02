@@ -1,27 +1,10 @@
 import { ZipData } from "../components/dashboard/map/types";
+import { WorkerMessage, LoadDataRequest, ProcessGeoJSONRequest } from "./worker-types";
 
-type WorkerMessage = {
-  id: string;
-  type: "LOAD_AND_PROCESS_DATA" | "PROCESS_GEOJSON";
-  data: any;
-};
-
-function getMetricValue(data: ZipData, metric: string): number {
+export function getMetricValue(data: ZipData, metric: string): number {
   if (!data) return 0;
-  const metricMap: Record<string, keyof ZipData> = {
-    "median-sale-price": "median_sale_price",
-    "median-list-price": "median_list_price",
-    "median-dom": "median_dom",
-    "inventory": "inventory",
-    "new-listings": "new_listings",
-    "homes-sold": "homes_sold",
-    "sale-to-list-ratio": "avg_sale_to_list_ratio",
-    "homes-sold-above-list": "sold_above_list",
-    "off-market-2-weeks": "off_market_in_two_weeks",
-  };
-  const key = metricMap[metric];
-  if (!key || !data) return 0;
-  const value = data[key];
+  // Direct access since we're using snake_case consistently
+  const value = data[metric as keyof ZipData];
   return typeof value === "number" && isFinite(value) ? value : 0;
 }
 
@@ -30,7 +13,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   try {
     switch (type) {
       case "LOAD_AND_PROCESS_DATA": {
-        const { url, selectedMetric } = data;
+        const { url, selectedMetric } = data as LoadDataRequest;
         self.postMessage({
           type: "PROGRESS",
           data: { phase: "Fetching market data..." },
@@ -45,11 +28,32 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         if (!rawZipData)
           throw new Error("Data file is missing 'zip_codes' key.");
 
+        self.postMessage({
+          type: "PROGRESS",
+          data: { phase: "Processing ZIP code data..." },
+        });
+
         const zipData: Record<string, ZipData> = {};
+        let processed = 0;
+        const total = Object.keys(rawZipData).length;
+
         for (const [zipCode, rawValue] of Object.entries(rawZipData)) {
           (rawValue as ZipData).zipCode = zipCode;
           zipData[zipCode] = rawValue as ZipData;
+          
+          processed++;
+          if (processed % 1000 === 0) {
+            self.postMessage({
+              type: "PROGRESS",
+              data: { phase: "Processing ZIP code data...", processed, total },
+            });
+          }
         }
+
+        self.postMessage({
+          type: "PROGRESS",
+          data: { phase: "Calculating metric bounds..." },
+        });
 
         const metricValues: number[] = [];
         for (const zipInfo of Object.values(zipData)) {
@@ -71,26 +75,20 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       }
 
       case "PROCESS_GEOJSON": {
-        const { geojson, zipData, selectedMetric } = data;
+        const { geojson, zipData, selectedMetric } = data as ProcessGeoJSONRequest;
 
         if (!geojson || !Array.isArray(geojson.features)) {
-          console.error(
-            "[Worker] Invalid or missing GeoJSON data received.",
-            geojson
-          );
-          self.postMessage({
-            type: "ERROR",
-            id,
-            error: "Invalid GeoJSON data provided to worker.",
-          });
-          return;
+          throw new Error("Invalid GeoJSON data provided to worker.");
         }
 
         self.postMessage({
           type: "PROGRESS",
-          data: { phase: "Processing map shapes" },
+          data: { phase: "Processing map shapes..." },
         });
+
         const features: GeoJSON.Feature[] = [];
+        let processed = 0;
+        const total = geojson.features.length;
 
         for (const feature of geojson.features) {
           if (!feature.geometry) continue;
@@ -102,8 +100,15 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           feature.properties!.zipCode = zipCode;
           feature.properties!.metricValue = metricValue;
 
-          // Keep every feature (Polygon or Point) as-is
           features.push(feature);
+          
+          processed++;
+          if (processed % 5000 === 0) {
+            self.postMessage({
+              type: "PROGRESS",
+              data: { phase: "Processing map shapes...", processed, total },
+            });
+          }
         }
 
         self.postMessage({
@@ -115,14 +120,14 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       }
 
       default:
-        console.warn(`[Worker] Unknown message type: ${type}`);
+        throw new Error(`Unknown message type: ${type}`);
     }
   } catch (error) {
-    console.error("❌ [Worker] A critical error occurred:", error);
+    console.error("❌ [Worker] Error:", error);
     self.postMessage({
       type: "ERROR",
       id,
-      error: error instanceof Error ? error.message : "An unknown worker error.",
+      error: error instanceof Error ? error.message : "Unknown worker error",
     });
   }
 };

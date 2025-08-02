@@ -22,17 +22,17 @@ export function getMetricDisplay(data: ZipData, selectedMetric: string): string 
     return `<div class="p-2">No data available</div>`;
   }
 
-  // This map translates the UI metric name to the actual data key and provides formatting rules.
+  // Direct mapping since we're using snake_case consistently
   const metricMap: Record<string, { key: keyof ZipData; label: string; format: 'currency' | 'number' | 'percent' | 'ratio' }> = {
-    "median-sale-price": { key: "median_sale_price", label: "Median Sale Price", format: 'currency' },
-    "median-list-price": { key: "median_list_price", label: "Median List Price", format: 'currency' },
-    "median-dom": { key: "median_dom", label: "Median Days on Market", format: 'number' },
+    "median_sale_price": { key: "median_sale_price", label: "Median Sale Price", format: 'currency' },
+    "median_list_price": { key: "median_list_price", label: "Median List Price", format: 'currency' },
+    "median_dom": { key: "median_dom", label: "Median Days on Market", format: 'number' },
     "inventory": { key: "inventory", label: "Inventory", format: 'number' },
-    "new-listings": { key: "new_listings", label: "New Listings", format: 'number' },
-    "homes-sold": { key: "homes_sold", label: "Homes Sold", format: 'number' },
-    "sale-to-list-ratio": { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", format: 'ratio' },
-    "homes-sold-above-list": { key: "sold_above_list", label: "% Sold Above List", format: 'percent' },
-    "off-market-2-weeks": { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", format: 'percent' },
+    "new_listings": { key: "new_listings", label: "New Listings", format: 'number' },
+    "homes_sold": { key: "homes_sold", label: "Homes Sold", format: 'number' },
+    "avg_sale_to_list_ratio": { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", format: 'ratio' },
+    "sold_above_list": { key: "sold_above_list", label: "% Sold Above List", format: 'percent' },
+    "off_market_in_two_weeks": { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", format: 'percent' },
   };
 
   const metricInfo = metricMap[selectedMetric];

@@ -2,11 +2,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MapLibreMap } from '../../components/dashboard/MapLibreMap';
-import React from 'react';
 
 describe('MapLibreMap Component', () => {
   const defaultProps = {
-    selectedMetric: 'median-sale-price',
+    selectedMetric: 'median_sale_price',
     onZipSelect: vi.fn(),
     zipData: { '90210': { zipCode: '90210' } } as any,
     colorScaleDomain: [100000, 500000] as [number, number],

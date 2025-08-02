@@ -106,9 +106,9 @@ export function ExportPreviewMap({
       filteredGeoJSON.features.forEach(feature => {
         // Simple bounding box for points, more complex for polygons if needed
         if (feature.geometry.type === "Polygon") {
-          feature.geometry.coordinates[0].forEach((coord: [number, number]) => bounds.extend(coord));
+          feature.geometry.coordinates[0].forEach((coord: any) => bounds.extend(coord as [number, number]));
         } else if (feature.geometry.type === "MultiPolygon") {
-          feature.geometry.coordinates.forEach(poly => poly[0].forEach((coord: [number, number]) => bounds.extend(coord)));
+          feature.geometry.coordinates.forEach(poly => poly[0].forEach((coord: any) => bounds.extend(coord as [number, number])));
         }
       });
       if (!bounds.isEmpty()) {

@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TopBar } from '../../components/dashboard/TopBar';
 import { MetricType } from '../../components/dashboard/HousingDashboard';
-import React from 'react';
 
 // Mock child components to test TopBar in isolation
 vi.mock('../../components/dashboard/MetricSelector', () => ({ MetricSelector: () => <div data-testid="metric-selector" /> }));
@@ -11,7 +10,7 @@ vi.mock('../../components/dashboard/LastUpdated', () => ({ LastUpdated: () => <d
 
 describe('TopBar Component', () => {
   const defaultProps = {
-    selectedMetric: 'median-sale-price' as MetricType,
+    selectedMetric: 'median_sale_price' as MetricType,
     onMetricChange: vi.fn(),
     onSearch: vi.fn(),
     lastUpdated: '2025-07-25T12:00:00Z',

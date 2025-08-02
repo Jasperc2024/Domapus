@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { useDataWorker } from "@/hooks/useDataWorker";
 import { ZipData } from "./map/types";
 import { MapExport } from "@/components/MapExport";
@@ -9,7 +9,7 @@ import { Legend } from "./Legend";
 import { SponsorBanner } from "./SponsorBanner";
 import { Sidebar } from "./Sidebar";
 
-export type MetricType = "median-sale-price" | "median-list-price" | "median-dom" | "inventory" | "new-listings" | "homes-sold" | "sale-to-list-ratio" | "homes-sold-above-list" | "off-market-2-weeks";
+export type MetricType = "median_sale_price" | "median_list_price" | "median_dom" | "inventory" | "new_listings" | "homes_sold" | "avg_sale_to_list_ratio" | "sold_above_list" | "off_market_in_two_weeks";
 interface DataPayload { 
   last_updated_utc: string;
   zip_codes: Record<string, ZipData>;
@@ -19,7 +19,7 @@ interface DataPayload {
 const BASE_PATH = import.meta.env.BASE_URL;
 
 export function HousingDashboard() {
-  const [selectedMetric, setSelectedMetric] = useState<MetricType>("median-sale-price");
+  const [selectedMetric, setSelectedMetric] = useState<MetricType>("median_sale_price");
   const [selectedZip, setSelectedZip] = useState<ZipData | null>(null);
   const [searchZip, setSearchZip] = useState<string>("");
   const [zipData, setZipData] = useState<Record<string, ZipData>>({});
