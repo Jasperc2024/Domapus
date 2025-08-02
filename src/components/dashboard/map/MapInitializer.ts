@@ -1,10 +1,9 @@
 import maplibregl from "maplibre-gl";
 
-
-export function createMapLibreMap(container: HTMLElement): maplibregl.Map {
-  /* ---------- core map ---------- */
+export function createMap(container: HTMLElement): maplibregl.Map {
   const map = new maplibregl.Map({
     container,
+    style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
     center: [-98.5795, 39.8283],
     zoom: 5,
     minZoom: 3,
@@ -13,55 +12,10 @@ export function createMapLibreMap(container: HTMLElement): maplibregl.Map {
       [-180, -85],
       [180, 85],
     ],
-    attributionControl: false,        // we’ll add a custom one below
-    style: {
-      version: 8,
-      sources: {
-        // base raster tiles (no labels)
-        "carto-light": {
-          type: "raster",
-          tiles: [
-            "https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-            "https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-            "https://c.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-            "https://d.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-          ],
-          tileSize: 256,
-        },
-        // labels – separate layer so pointer events pass through
-        "carto-light-labels": {
-          type: "raster",
-          tiles: [
-            "https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-            "https://b.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-            "https://c.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-            "https://d.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-          ],
-          tileSize: 256,
-        },
-      },
-      layers: [
-        { id: "background", type: "background", paint: { "background-color": "#f8f9fa" } },
-        {
-          id: "carto-light-layer",
-          type: "raster",
-          source: "carto-light",
-          minzoom: 0,
-          maxzoom: 18,
-        },
-        // labels on top of everything
-        {
-          id: "carto-light-labels-layer",
-          type: "raster",
-          source: "carto-light-labels",
-          minzoom: 0,
-          maxzoom: 18,
-        },
-      ],
-    },
+    attributionControl: false,
   });
 
-  /* ---------- controls ---------- */
+  /* Controls */
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
   map.addControl(
     new maplibregl.AttributionControl({
@@ -71,29 +25,68 @@ export function createMapLibreMap(container: HTMLElement): maplibregl.Map {
     "bottom-left",
   );
 
-  
-  map.scrollZoom.setWheelZoomRate(0.5);
-
-  // zoomSnap: round live zoom to nearest step when wheel / trackpad stops
-  const SNAP = 0.25;
-  let targetZoom = map.getZoom();
-  function applySnap() {
-    const raw = map.getZoom();
-    // don’t quantise while actively zooming (keeps smooth pinch)
-    if (!map.isMoving() && Math.abs(raw - targetZoom) > 1e-6) {
-      targetZoom = Math.round(raw / SNAP) * SNAP;
-      map.zoomTo(targetZoom, { duration: 0 });
+  map.on("load", () => {
+    /* Register empty ZIP source */
+    if (!map.getSource("zips")) {
+      map.addSource("zips", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
     }
-  }
-  map.on("moveend", applySnap);
-  map.on("wheel", () => {
-    // debounce – snap after scroll inertia ends
-    clearTimeout((applySnap as any)._t);
-    (applySnap as any)._t = setTimeout(applySnap, 80);
+
+    /* Add ZIP choropleth layers (fill + border) */
+    if (!map.getLayer("zips-fill")) {
+      map.addLayer({
+        id: "zips-fill",
+        type: "fill",
+        source: "zips",
+        paint: {
+          "fill-color": "#ccc",
+          "fill-opacity": 0.7,
+        },
+      });
+      map.addLayer({
+        id: "zips-border",
+        type: "line",
+        source: "zips",
+        paint: {
+          "line-color": "#fff",
+          "line-width": 0.5,
+        },
+      });
+      map.addLayer({
+        id: "zips-points",
+        type: "circle",
+        source: "zips",
+        filter: ["all", ["==", ["geometry-type"], "Point"]],
+        minzoom: 8,
+        paint: {
+          "circle-color": ["case", ["has", "metricValue"], ["get", "metricColor"], "#ccc"],
+          "circle-radius": 5,
+          "circle-stroke-width": 1,
+          "circle-stroke-color": "#fff",
+        },
+      });
+    }
+
+    /* Ensure ordering:
+       - ZIP fill under labels and roads
+       - State boundary on top of ZIP fill
+    */
+    const style = map.getStyle();
+
+    // Move built-in state boundary (`boundary_state`) above zips
+    if (style.layers.find((l) => l.id === "boundary_state")) {
+      map.moveLayer("boundary_state", "zips-border");
+    }
+
+    // Move labels above ZIP fill (all symbol layers)
+    style.layers.forEach((layer) => {
+      if (layer.type === "symbol" && map.getLayer(layer.id)) {
+        map.moveLayer(layer.id);
+      }
+    });
   });
 
   return map;
 }
-
-/* optional: legacy re‑export so imports stay unchanged */
-export const createMap = createMapLibreMap;

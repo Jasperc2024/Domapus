@@ -1,6 +1,3 @@
-// src/utils/dataValidation.ts
-// FINAL, COMPLETE, AND WORKING VERSION
-
 import { ZipData } from '@/components/dashboard/map/types';
 
 // This is a raw representation of the data we might get, before validation.
@@ -21,7 +18,7 @@ const US_STATES_AND_TERRITORIES = new Set([ 'Alabama', 'AL', 'Alaska', 'AK', 'Ar
 // --- VALIDATION HELPERS ---
 export const isValidZipCode = (zip: unknown): boolean => typeof zip === 'string' && /^\d{5}$/.test(zip);
 export const isValidState = (state: unknown): boolean => typeof state === 'string' && US_STATES_AND_TERRITORIES.has(state);
-export const isValidNumber = (num: unknown): boolean => typeof num === 'number' && isFinite(num);
+export const isValidNumber = (num: unknown): num is number => typeof num === 'number' && isFinite(num);
 export const isValidDate = (date: unknown): boolean => typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date);
 
 /**

@@ -27,10 +27,6 @@
   Content-Encoding: gzip
   Content-Type: application/json
 
-/data/zip-city-mapping.csv.gz
-  Cache-Control: public, max-age=15552000
-  Content-Encoding: gzip
-  Content-Type: text/csv
 
 # Static assets
 /assets/*
