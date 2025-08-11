@@ -58,6 +58,7 @@ jobs:
         if ! git diff --cached --quiet; then
           git commit -m "Update Redfin ZIP data - $(date +'%Y-%m-%d')"
           git push
+        fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
