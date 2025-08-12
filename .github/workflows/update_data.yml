@@ -55,9 +55,11 @@ jobs:
         git config --local user.email "data-bot@users.noreply.github.com"
         git config --local user.name "Redfin Data Bot"
         git add public/data/zip-data.json.gz
-        if ! git diff --cached --quiet; then
+        if ! git diff --quiet HEAD -- public/data/zip-data.json.gz; then
           git commit -m "Update Redfin ZIP data - $(date +'%Y-%m-%d')"
           git push
+        else
+          echo "No content changes detected, skipping commit."
         fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
