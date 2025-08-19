@@ -6,8 +6,8 @@ permissions:
 
 on:
   schedule:
-    - cron: '0 5 15-21 * 4'
-  workflow_dispatch: # Allow manual trigger
+    - cron: '0 5 20 * *' 
+  workflow_dispatch:
 
 jobs:
   update-data:
