@@ -55,7 +55,6 @@ jobs:
         git config --local user.email "data-bot@users.noreply.github.com"
         git config --local user.name "Redfin Data Bot"
 
-        # Compare decompressed data against current repo version
         if git show HEAD:public/data/zip-data.json.gz >/dev/null 2>&1; then
           if cmp -s <(gzip -cd public/data/zip-data.json.gz) <(git show HEAD:public/data/zip-data.json.gz | gzip -cd); then
             echo "No data changes, skipping commit."
@@ -63,7 +62,7 @@ jobs:
           fi
         fi
 
-        git add public/data/zip-data.json.gz
+        git add public/data/zip-data.json.gz public/data/last_updated.json
         git commit -m "Update Redfin ZIP data - $(date +'%Y-%m-%d %H:%M:%S' --utc)"
         git push
       env:
