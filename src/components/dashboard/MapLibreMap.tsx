@@ -50,13 +50,18 @@ export function MapLibreMap({
       setLoadingError("Map failed to initialize.");
     });
 
-    const observer = new ResizeObserver(() => map.current?.resize());
-    observer.observe(mapContainer.current);
+    const observer = new ResizeObserver(() => {
+      if (map.current) {
+        map.current.resize();
+      }
+    });
+    if (mapContainer.current) observer.observe(mapContainer.current);
 
     return () => {
       observer.disconnect();
-      map.current?.remove();
-      map.current = null;
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
     };
   }, []);
 
