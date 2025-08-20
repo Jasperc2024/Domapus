@@ -62,9 +62,10 @@ export function MapLibreMap({
       if (map.current) {
         map.current.remove();
         map.current = null;
+    }
     };
-  }, []);
-
+  });
+  
   /* Color scale */
   const colorScale = useMemo(() => {
     if (!colorScaleDomain || colorScaleDomain.length < 2) return null;
