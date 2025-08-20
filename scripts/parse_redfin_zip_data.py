@@ -130,22 +130,26 @@ def main():
         df_latest = df_full.sort_values('period_end').groupby('zip_code').tail(1)
         
         output_data_content = format_final_json(df_latest, zip_mapping)
+
         final_output = {
-            "last_updated_utc": datetime.now(timezone.utc).isoformat(),
             "zip_codes": output_data_content
         }
         
         output_dir = Path("public/data")
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / "zip-data.json.gz"
-        json_string = json.dumps(final_output)
+
+        json_string = json.dumps(final_output, sort_keys=True, separators=(",", ":"))
         buffer = BytesIO()
         with gzip.GzipFile(fileobj=buffer, mode='wb', mtime=0) as gz:
             gz.write(json_string.encode('utf-8'))
         compressed_json = buffer.getvalue()
-        with open(output_file, 'wb') as f: f.write(compressed_json)
-        
-        logging.info(f"Successfully wrote {len(output_data_content)} ZIP codes to {output_file}")
+        with open(output_dir / "zip-data.json.gz", 'wb') as f:
+            f.write(compressed_json)
+
+        with open(output_dir / "last_updated.json", 'w') as f:
+            json.dump({"last_updated_utc": datetime.now(timezone.utc).isoformat()}, f, indent=2)
+
+        logging.info(f"Successfully wrote {len(output_data_content)} ZIP codes to zip-data.json.gz")
 
         if output_data_content:
             sample_zip = random.choice(list(output_data_content.keys()))
@@ -156,6 +160,7 @@ def main():
     except Exception as e:
         logging.error(f"An error occurred: {e}")
         raise
+
 
 if __name__ == "__main__":
     main()
