@@ -6,7 +6,82 @@ const CARTO_POSITRON_BASE =
 const CARTO_POSITRON_LABELS =
   "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 
+// Security and performance constants
+const REQUEST_TIMEOUT = 10000; // 10 seconds
+const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+
+// Style cache to avoid repeated fetching
+const styleCache = new Map<string, any>();
+
+// Utility function for secure fetch with validation
+async function secureFetch(url: string, retryCount = 0): Promise<any> {
+  console.log(`[MapInit] Starting secure fetch for: ${url} (attempt ${retryCount + 1})`);
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    console.warn(`[MapInit] Request timeout for: ${url}`);
+    controller.abort();
+  }, REQUEST_TIMEOUT);
+
+  try {
+    // Check cache first
+    if (styleCache.has(url)) {
+      console.log(`[MapInit] Using cached style for: ${url}`);
+      clearTimeout(timeoutId);
+      return styleCache.get(url);
+    }
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'Accept': 'application/json',
+        'Cache-Control': 'max-age=3600'
+      }
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Check response size
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > MAX_RESPONSE_SIZE) {
+      throw new Error(`Response too large: ${contentLength} bytes`);
+    }
+
+    const data = await response.json();
+    
+    // Basic JSON structure validation
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid JSON structure received');
+    }
+
+    // Cache the result
+    styleCache.set(url, data);
+    console.log(`[MapInit] Successfully fetched and cached style: ${url}`);
+    
+    return data;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    console.error(`[MapInit] Fetch error for ${url}:`, error);
+    
+    if (retryCount < MAX_RETRIES && !(error instanceof TypeError && error.message.includes('aborted'))) {
+      console.log(`[MapInit] Retrying fetch for ${url} in ${RETRY_DELAY}ms...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
+      return secureFetch(url, retryCount + 1);
+    }
+    
+    throw error;
+  }
+}
+
 export function createMap(container: HTMLElement): maplibregl.Map {
+  console.log('[MapInit] Creating new map instance...');
+  
   const map = new maplibregl.Map({
     container,
     style: CARTO_POSITRON_BASE, // Start with no-labels base
@@ -18,40 +93,68 @@ export function createMap(container: HTMLElement): maplibregl.Map {
       [-180, -85],
       [180, 85],
     ],
-    attributionControl: false,
+    attributionControl: false
   });
 
+  console.log('[MapInit] Map instance created successfully');
+
   /* Controls */
-  map.addControl(
-    new maplibregl.NavigationControl({ visualizePitch: false }),
-    "top-right"
-  );
-  map.addControl(
-    new maplibregl.AttributionControl({
-      customAttribution: "© <a href='https://carto.com/attributions'>CARTO</a>",
-      compact: true,
-    }),
-    "bottom-left"
-  );
+  try {
+    console.log('[MapInit] Adding navigation controls...');
+    map.addControl(
+      new maplibregl.NavigationControl({ visualizePitch: false }),
+      "top-right"
+    );
+    
+    console.log('[MapInit] Adding attribution controls...');
+    map.addControl(
+      new maplibregl.AttributionControl({
+        customAttribution: "© <a href='https://carto.com/attributions'>CARTO</a>",
+        compact: true,
+      }),
+      "bottom-left"
+    );
+    console.log('[MapInit] Controls added successfully');
+  } catch (error) {
+    console.error('[MapInit] Error adding controls:', error);
+  }
 
-  // Error listener
-  map.on("error", (e) => console.warn("[Map error]", e && (e.error || e)));
+  // Enhanced error listener with detailed logging
+  map.on("error", (e) => {
+    console.error("[MapInit] Map error occurred:", {
+      error: e?.error || e,
+      type: e?.type,
+      target: e?.target,
+      timestamp: new Date().toISOString()
+    });
+  });
 
-  // Load callback
+  // Enhanced load callback with comprehensive error handling
   map.on("load", async () => {
-    console.log("[Map] glyphs:", map.getStyle()?.glyphs);
-    console.log("[Map] has zips source:", Boolean(map.getSource("zips")));
+    console.log("[MapInit] Map load event triggered");
+    console.log("[MapInit] Map style loaded, glyphs:", map.getStyle()?.glyphs);
+    console.log("[MapInit] Checking existing sources:", Object.keys(map.getStyle()?.sources || {}));
 
     try {
-      /* Register empty ZIP source */
+      /* Register empty ZIP source with validation */
+      console.log("[MapInit] Setting up ZIP data source...");
       if (!map.getSource("zips")) {
         map.addSource("zips", {
           type: "geojson",
           data: { type: "FeatureCollection", features: [] },
+          buffer: 0,
+          maxzoom: 12,
+          tolerance: 0.375
         });
+        console.log("[MapInit] ZIP source added successfully");
+      } else {
+        console.log("[MapInit] ZIP source already exists");
       }
 
-      /* Add ZIP choropleth layers (fill + border) */
+      /* Add ZIP choropleth layers (fill + border) with error handling */
+      console.log("[MapInit] Adding ZIP visualization layers...");
+      
+      // Add layers individually to avoid type issues
       if (!map.getLayer("zips-fill")) {
         map.addLayer({
           id: "zips-fill",
@@ -63,11 +166,14 @@ export function createMap(container: HTMLElement): maplibregl.Map {
               ["has", "metricValue"],
               ["get", "metricColor"],
               "#e0e0e0",
-            ],
+            ] as any,
             "fill-opacity": 0.7,
           },
         });
+        console.log("[MapInit] Added layer: zips-fill");
+      }
 
+      if (!map.getLayer("zips-border")) {
         map.addLayer({
           id: "zips-border",
           type: "line",
@@ -78,7 +184,10 @@ export function createMap(container: HTMLElement): maplibregl.Map {
             "line-opacity": 0.8,
           },
         });
+        console.log("[MapInit] Added layer: zips-border");
+      }
 
+      if (!map.getLayer("zips-points")) {
         map.addLayer({
           id: "zips-points",
           type: "circle",
@@ -91,69 +200,168 @@ export function createMap(container: HTMLElement): maplibregl.Map {
               ["has", "metricValue"],
               ["get", "metricColor"],
               "#e0e0e0",
-            ],
+            ] as any,
             "circle-radius": 5,
             "circle-stroke-width": 1,
             "circle-stroke-color": "#ffffff",
           },
         });
+        console.log("[MapInit] Added layer: zips-points");
       }
 
-      /* Load and add Carto Positron labels layer on top (safe version) */
-      const labelsResponse = await fetch(CARTO_POSITRON_LABELS);
-      if (labelsResponse.ok) {
-        const labelsStyle = await labelsResponse.json();
+
+      /* Load and add Carto Positron labels layer on top (secure version) */
+      console.log("[MapInit] Loading Carto Positron labels...");
+      
+      try {
+        const labelsStyle = await secureFetch(CARTO_POSITRON_LABELS);
+        console.log("[MapInit] Labels style loaded, processing layers...");
 
         const currentGlyphs = map.getStyle()?.glyphs;
         const canAddSymbols = Boolean(currentGlyphs || labelsStyle.glyphs);
+        console.log("[MapInit] Can add symbol layers:", canAddSymbols);
+
+        // Validate style structure
+        if (!labelsStyle.layers || !Array.isArray(labelsStyle.layers)) {
+          throw new Error("Invalid labels style structure: missing layers array");
+        }
+
+        if (!labelsStyle.sources || typeof labelsStyle.sources !== "object") {
+          throw new Error("Invalid labels style structure: missing sources object");
+        }
 
         const byId: Record<string, any> = {};
-        for (const lyr of labelsStyle.layers) byId[lyr.id] = lyr;
+        for (const lyr of labelsStyle.layers) {
+          if (lyr && lyr.id) {
+            byId[lyr.id] = lyr;
+          }
+        }
 
         const pick = (lyr: any) =>
-          lyr.type === "symbol" ||
-          (lyr.type === "line" &&
-            (lyr.id.includes("boundary") || lyr.id.includes("admin")));
+          lyr && lyr.type && (
+            lyr.type === "symbol" ||
+            (lyr.type === "line" &&
+              (lyr.id.includes("boundary") || lyr.id.includes("admin")))
+          );
+
+        let addedLayers = 0;
+        let skippedLayers = 0;
+        let errorLayers = 0;
 
         for (const raw of labelsStyle.layers) {
-          if (!pick(raw)) continue;
-
-          // Add source if missing
-          if (raw.source && !map.getSource(raw.source)) {
-            const srcDef = labelsStyle.sources[raw.source];
-            if (srcDef) map.addSource(raw.source, srcDef);
+          if (!pick(raw)) {
+            skippedLayers++;
+            continue;
           }
 
-          let layer = { ...raw };
-          if (layer.ref) {
-            const base = byId[layer.ref];
-            if (!base) continue;
-            layer = {
-              ...base,
-              id: raw.id,
-              type: raw.type ?? base.type,
-              source: raw.source ?? base.source,
-              ["source-layer"]: raw["source-layer"] ?? base["source-layer"],
-              layout: { ...(base.layout || {}), ...(raw.layout || {}) },
-              paint: { ...(base.paint || {}), ...(raw.paint || {}) },
-              filter: raw.filter ?? base.filter,
-            };
-            delete layer.ref;
+          try {
+            // Add source if missing with validation
+            if (raw.source && !map.getSource(raw.source)) {
+              const srcDef = labelsStyle.sources[raw.source];
+              if (srcDef && typeof srcDef === "object") {
+                console.log(`[MapInit] Adding source: ${raw.source}`);
+                map.addSource(raw.source, srcDef);
+              } else {
+                console.warn(`[MapInit] Invalid source definition for: ${raw.source}`);
+                continue;
+              }
+            }
+
+            let layer = { ...raw };
+            if (layer.ref) {
+              const base = byId[layer.ref];
+              if (!base) {
+                console.warn(`[MapInit] Referenced layer not found: ${layer.ref}`);
+                continue;
+              }
+              layer = {
+                ...base,
+                id: raw.id,
+                type: raw.type ?? base.type,
+                source: raw.source ?? base.source,
+                ["source-layer"]: raw["source-layer"] ?? base["source-layer"],
+                layout: { ...(base.layout || {}), ...(raw.layout || {}) },
+                paint: { ...(base.paint || {}), ...(raw.paint || {}) },
+                filter: raw.filter ?? base.filter,
+              };
+              delete layer.ref;
+            }
+
+            if (layer.type === "symbol" && !canAddSymbols) {
+              console.log(`[MapInit] Skipping symbol layer (no glyph support): ${layer.id}`);
+              skippedLayers++;
+              continue;
+            }
+
+            const newId = `labels-${layer.id}`;
+            if (map.getLayer(newId)) {
+              console.log(`[MapInit] Layer already exists: ${newId}`);
+              skippedLayers++;
+              continue;
+            }
+
+            const finalLayer = { ...layer, id: newId };
+            
+            // Validate layer before adding
+            if (!finalLayer.source || !finalLayer.type) {
+              console.warn(`[MapInit] Invalid layer definition: ${newId}`);
+              errorLayers++;
+              continue;
+            }
+
+            map.addLayer(finalLayer);
+            addedLayers++;
+            console.log(`[MapInit] Successfully added layer: ${newId}`);
+          } catch (layerError) {
+            console.error(`[MapInit] Failed to add layer ${raw.id}:`, layerError);
+            errorLayers++;
           }
-
-          if (layer.type === "symbol" && !canAddSymbols) continue;
-
-          const newId = `labels-${layer.id}`;
-          if (map.getLayer(newId)) continue;
-
-          const finalLayer = { ...layer, id: newId };
-          map.addLayer(finalLayer);
         }
+
+        console.log(`[MapInit] Label layer processing complete - Added: ${addedLayers}, Skipped: ${skippedLayers}, Errors: ${errorLayers}`);
+        
+        // Clean up large objects to free memory
+        setTimeout(() => {
+          styleCache.clear();
+          console.log("[MapInit] Style cache cleared");
+        }, 5000);
+
+      } catch (error) {
+        console.error("[MapInit] Failed to load label layers:", error);
+        // Fallback: continue without labels rather than failing completely
+        console.log("[MapInit] Continuing without label layers...");
       }
     } catch (error) {
-      console.warn("Failed to load label layers:", error);
+      console.error("[MapInit] Critical error in map setup:", error);
+      // Re-throw critical errors that should stop map initialization
+      throw error;
     }
   });
 
+  // Add cleanup handlers for memory management
+  const cleanup = () => {
+    console.log("[MapInit] Cleaning up map resources...");
+    styleCache.clear();
+    if (map && map.remove) {
+      try {
+        map.remove();
+        console.log("[MapInit] Map instance removed successfully");
+      } catch (error) {
+        console.error("[MapInit] Error removing map:", error);
+      }
+    }
+  };
+
+  // Store cleanup function on map for external access
+  (map as any)._cleanup = cleanup;
+
+  console.log("[MapInit] Map initialization complete");
   return map;
+}
+
+// Export cleanup function for external use
+export function cleanupMap(map: maplibregl.Map) {
+  if ((map as any)._cleanup) {
+    (map as any)._cleanup();
+  }
 }
