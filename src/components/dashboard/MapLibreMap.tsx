@@ -28,43 +28,67 @@ export function MapLibreMap({
   processData,
 }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<maplibregl.Map | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
-  const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const interactionsSetup = useRef(false);
   const [baseGeoJSON, setBaseGeoJSON] = useState<GeoJSON.FeatureCollection | null>(null);
-  const BASE_PATH = import.meta.env.BASE_URL;
 
-  /* Initialize map */
+  // Initialize map with enhanced error handling
   useEffect(() => {
-    if (map.current || !mapContainer.current) return;
+    if (!mapContainer.current || mapRef.current) return;
 
-    map.current = createMap(mapContainer.current);
+    try {
+      console.log("[MapLibreMap] Initializing map...");
+      const newMap = createMap(mapContainer.current);
+      mapRef.current = newMap;
 
-    map.current.once("load", () => {
-      setIsMapReady(true);
-    });
+      newMap.on("load", () => {
+        console.log("[MapLibreMap] Map loaded successfully");
+        setIsMapReady(true);
+      });
 
-    map.current.on("error", (e) => {
-      console.error("MapLibre error:", e);
-      setLoadingError("Map failed to initialize.");
-    });
+      newMap.on("error", (e) => {
+        console.error("[MapLibreMap] Map error:", e);
+        setError("Failed to load map. Please refresh the page.");
+      });
 
-    const observer = new ResizeObserver(() => {
-      if (map.current) {
-        map.current.resize();
-      }
-    });
-    if (mapContainer.current) observer.observe(mapContainer.current);
+      // Handle resize with error boundary
+      const handleResize = () => {
+        try {
+          if (newMap && newMap.resize) {
+            newMap.resize();
+            console.log("[MapLibreMap] Map resized");
+          }
+        } catch (error) {
+          console.error("[MapLibreMap] Error during resize:", error);
+        }
+      };
+      
+      window.addEventListener("resize", handleResize);
 
-    return () => {
-      observer.disconnect();
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
+      return () => {
+        console.log("[MapLibreMap] Cleaning up map...");
+        window.removeEventListener("resize", handleResize);
+        if (newMap) {
+          try {
+            // Use cleanup function if available
+            if ((newMap as any)._cleanup) {
+              (newMap as any)._cleanup();
+            } else {
+              newMap.remove();
+            }
+            console.log("[MapLibreMap] Map cleanup completed");
+          } catch (error) {
+            console.error("[MapLibreMap] Error during cleanup:", error);
+          }
+        }
+      };
+    } catch (error) {
+      console.error("[MapLibreMap] Failed to initialize map:", error);
+      setError("Failed to initialize map. Please refresh the page.");
     }
-    };
-  });
+  }, []);
   
   /* Color scale */
   const colorScale = useMemo(() => {
@@ -75,133 +99,252 @@ export function MapLibreMap({
       .clamp(true);
   }, [colorScaleDomain]);
 
-  /* Load base GeoJSON once */
+  // Load base GeoJSON data with enhanced security
   useEffect(() => {
-    if (!baseGeoJSON && isMapReady) {
+    if (!isMapReady || baseGeoJSON) return;
+
+    async function loadGeoJSON() {
       const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.warn("[MapLibreMap] GeoJSON load timeout");
+        controller.abort();
+      }, 30000); // 30 second timeout for large file
 
-      (async () => {
-        try {
-          const url = new URL(`${BASE_PATH}data/us-zip-codes.geojson.gz`, window.location.origin).href;
-          const response = await fetch(url, { signal: controller.signal });
-          if (!response.ok) throw new Error(`Failed to fetch GeoJSON. Status: ${response.status}`);
-          const geojson = await response.json();
-          setBaseGeoJSON(geojson);
-        } catch (err) {
-          if (!controller.signal.aborted) {
-            console.error("Error loading base GeoJSON:", err);
-            setLoadingError("Failed to load base GeoJSON");
+      try {
+        console.log("[MapLibreMap] Loading base GeoJSON...");
+        const response = await fetch("/data/us-zip-codes.geojson.gz", {
+          signal: controller.signal,
+          headers: {
+            'Accept': 'application/octet-stream',
+            'Cache-Control': 'max-age=86400' // Cache for 24 hours
           }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to load GeoJSON: ${response.status} ${response.statusText}`);
         }
-      })();
 
-      return () => controller.abort();
+        // Check file size
+        const contentLength = response.headers.get('content-length');
+        if (contentLength && parseInt(contentLength) > 50 * 1024 * 1024) { // 50MB limit
+          throw new Error(`GeoJSON file too large: ${contentLength} bytes`);
+        }
+        
+        console.log("[MapLibreMap] GeoJSON response received, decompressing...");
+        const gzipData = await response.arrayBuffer();
+        const { inflate } = await import('pako');
+        const jsonData = inflate(gzipData, { to: "string" });
+        
+        console.log("[MapLibreMap] Parsing GeoJSON...");
+        const geoJSON = JSON.parse(jsonData);
+        
+        // Basic validation
+        if (!geoJSON || geoJSON.type !== "FeatureCollection" || !Array.isArray(geoJSON.features)) {
+          throw new Error("Invalid GeoJSON structure");
+        }
+        
+        console.log(`[MapLibreMap] GeoJSON loaded successfully with ${geoJSON.features.length} features`);
+        setBaseGeoJSON(geoJSON);
+      } catch (error) {
+        clearTimeout(timeoutId);
+        console.error("[MapLibreMap] Error loading GeoJSON:", error);
+        if (error instanceof Error && error.name === 'AbortError') {
+          setError("Map data loading timed out. Please refresh the page.");
+        } else {
+          setError("Failed to load map data. Please check your connection and refresh.");
+        }
+      }
     }
+
+    loadGeoJSON();
   }, [isMapReady, baseGeoJSON]);
 
-  /* Update ZIP data when metrics change */
+  // Process and update map data with enhanced error handling
   useEffect(() => {
     if (!isMapReady || !baseGeoJSON || !colorScale || Object.keys(zipData).length === 0) return;
 
     const controller = new AbortController();
+    console.log("[MapLibreMap] Processing zip data for map update...");
 
     (async () => {
       try {
-        setLoadingError(null);
+        setError(null);
+        console.log("[MapLibreMap] Starting data processing...");
+        
         const processed = await processData({
           type: "PROCESS_GEOJSON",
           data: { geojson: baseGeoJSON, zipData, selectedMetric },
         });
         
-        if (controller.signal.aborted || !map.current?.isStyleLoaded()) return;
+        if (controller.signal.aborted) {
+          console.log("[MapLibreMap] Data processing aborted");
+          return;
+        }
 
-        // Add color information to features
+        if (!mapRef.current?.isStyleLoaded()) {
+          console.warn("[MapLibreMap] Map style not loaded, skipping update");
+          return;
+        }
+
+        console.log(`[MapLibreMap] Processing ${processed.features?.length || 0} features for visualization...`);
+
+        // Add color information to features with validation
         const enhancedFeatures = processed.features.map((feature: any) => {
-          if (feature.properties?.metricValue && feature.properties.metricValue > 0) {
+          if (feature.properties?.metricValue && 
+              typeof feature.properties.metricValue === 'number' && 
+              feature.properties.metricValue > 0) {
             feature.properties.metricColor = colorScale(feature.properties.metricValue);
           }
           return feature;
         });
 
-        const source = map.current.getSource("zips") as maplibregl.GeoJSONSource;
+        console.log("[MapLibreMap] Updating map source with processed data...");
+        const source = mapRef.current.getSource("zips") as maplibregl.GeoJSONSource;
         if (source) {
           source.setData({ 
             type: "FeatureCollection", 
             features: enhancedFeatures 
           });
+          console.log("[MapLibreMap] Map source updated successfully");
+        } else {
+          console.error("[MapLibreMap] ZIP source not found on map");
+          setError("Map data source not available");
+          return;
         }
 
-        // Setup interactions once
+        // Setup interactions once with error handling
         if (!interactionsSetup.current) {
-          setupMapInteractions(map.current!);
-          interactionsSetup.current = true;
+          try {
+            setupMapInteractions(mapRef.current);
+            interactionsSetup.current = true;
+            console.log("[MapLibreMap] Map interactions setup completed");
+          } catch (interactionError) {
+            console.error("[MapLibreMap] Failed to setup map interactions:", interactionError);
+          }
         }
       } catch (err) {
         if (!controller.signal.aborted) {
-          console.error("Failed to update map layers:", err);
-          setLoadingError("Failed to update map layers");
+          console.error("[MapLibreMap] Failed to update map layers:", err);
+          setError("Failed to update map visualization. Please try refreshing.");
         }
       }
     })();
 
-    return () => controller.abort();
+    return () => {
+      console.log("[MapLibreMap] Aborting data processing...");
+      controller.abort();
+    };
   }, [isMapReady, baseGeoJSON, colorScale, zipData, selectedMetric, processData]);
 
-  /* Fly to searched ZIP */
+  // Navigate to searched ZIP with error handling
   useEffect(() => {
-    if (!isMapReady || !map.current || !searchZip || !zipData[searchZip]) return;
-    const { longitude, latitude } = zipData[searchZip];
-    if (longitude && latitude) {
-      map.current.flyTo({ center: [longitude, latitude], zoom: 10 });
+    if (!isMapReady || !mapRef.current || !searchZip || !zipData[searchZip]) return;
+    
+    try {
+      const { longitude, latitude } = zipData[searchZip];
+      if (typeof longitude === 'number' && typeof latitude === 'number') {
+        console.log(`[MapLibreMap] Navigating to ZIP ${searchZip} at [${longitude}, ${latitude}]`);
+        mapRef.current.flyTo({ 
+          center: [longitude, latitude], 
+          zoom: 10,
+          duration: 2000
+        });
+      } else {
+        console.warn(`[MapLibreMap] Invalid coordinates for ZIP ${searchZip}:`, { longitude, latitude });
+      }
+    } catch (error) {
+      console.error(`[MapLibreMap] Error navigating to ZIP ${searchZip}:`, error);
     }
   }, [isMapReady, searchZip, zipData]);
 
-  /* Popup & click */
+  // Setup map interactions with comprehensive error handling
   const setupMapInteractions = (mapInstance: maplibregl.Map) => {
+    console.log("[MapLibreMap] Setting up map interactions...");
     let popup: maplibregl.Popup | null = null;
     const layers = ["zips-fill"];
 
-    mapInstance.on("mousemove", layers, (e) => {
-      mapInstance.getCanvas().style.cursor = e.features?.length ? "pointer" : "";
-      if (e.features?.[0]?.properties?.zipCode) {
-        const props = e.features[0].properties;
-        const coords =
-          e.features[0].geometry.type === "Point"
-            ? (e.features[0].geometry.coordinates as LngLatLike)
-            : e.lngLat;
+    try {
+      mapInstance.on("mousemove", layers, (e) => {
+        try {
+          mapInstance.getCanvas().style.cursor = e.features?.length ? "pointer" : "";
+          if (e.features?.[0]?.properties?.zipCode) {
+            const props = e.features[0].properties;
+            const zipCode = props.zipCode;
+            
+            if (!zipData[zipCode]) {
+              console.warn(`[MapLibreMap] No data found for ZIP: ${zipCode}`);
+              return;
+            }
 
-        popup?.remove();
-        popup = new maplibregl.Popup({ closeButton: false, offset: [0, -10] })
-          .setLngLat(coords)
-          .setHTML(getMetricDisplay(zipData[props.zipCode], selectedMetric))
-          .addTo(mapInstance);
-      }
-    });
+            const coords =
+              e.features[0].geometry.type === "Point"
+                ? (e.features[0].geometry.coordinates as LngLatLike)
+                : e.lngLat;
 
-    mapInstance.on("mouseleave", layers, () => {
-      mapInstance.getCanvas().style.cursor = "";
-      popup?.remove();
-    });
+            popup?.remove();
+            popup = new maplibregl.Popup({ 
+              closeButton: false, 
+              offset: [0, -10],
+              maxWidth: '300px'
+            })
+              .setLngLat(coords)
+              .setHTML(getMetricDisplay(zipData[zipCode], selectedMetric))
+              .addTo(mapInstance);
+          }
+        } catch (error) {
+          console.error("[MapLibreMap] Error in mousemove handler:", error);
+        }
+      });
 
-    mapInstance.on("click", layers, (e) => {
-      const props = e.features?.[0]?.properties;
-      if (props?.zipCode && zipData[props.zipCode]) {
-        onZipSelect(zipData[props.zipCode]);
-      }
-    });
+      mapInstance.on("mouseleave", layers, () => {
+        try {
+          mapInstance.getCanvas().style.cursor = "";
+          popup?.remove();
+        } catch (error) {
+          console.error("[MapLibreMap] Error in mouseleave handler:", error);
+        }
+      });
+
+      mapInstance.on("click", layers, (e) => {
+        try {
+          const props = e.features?.[0]?.properties;
+          if (props?.zipCode && zipData[props.zipCode]) {
+            console.log(`[MapLibreMap] ZIP selected: ${props.zipCode}`);
+            onZipSelect(zipData[props.zipCode]);
+          }
+        } catch (error) {
+          console.error("[MapLibreMap] Error in click handler:", error);
+        }
+      });
+
+      console.log("[MapLibreMap] Map interactions setup successfully");
+    } catch (error) {
+      console.error("[MapLibreMap] Failed to setup map interactions:", error);
+      throw error;
+    }
   };
 
   return (
     <div className="absolute inset-0 w-full h-full">
       <div ref={mapContainer} data-testid="map-container" role="application" className="w-full h-full" />
-      {(isLoading || !isMapReady || loadingError) && (
+      {(isLoading || !isMapReady || error) && (
         <div
           role="status"
           aria-label="Loading..."
           className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-10"
         >
-          {loadingError ? (
-            <div className="text-red-500 font-bold">{loadingError}</div>
+          {error ? (
+            <div className="text-center space-y-4">
+              <div className="text-red-500 font-bold">{error}</div>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
+              >
+                Refresh Page
+              </button>
+            </div>
           ) : (
             <div className="text-center space-y-4">
               <div
