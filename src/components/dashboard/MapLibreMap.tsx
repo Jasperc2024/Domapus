@@ -36,12 +36,38 @@ export function MapLibreMap({
 
   // Initialize map with enhanced error handling
   useEffect(() => {
-    if (!mapContainer.current || mapRef.current) return;
+    console.log("[MapLibreMap] Map initialization useEffect triggered");
+    console.log("[MapLibreMap] Container ref:", mapContainer.current);
+    console.log("[MapLibreMap] Existing map ref:", mapRef.current);
+    
+    if (!mapContainer.current) {
+      console.warn("[MapLibreMap] Map container not ready, skipping initialization");
+      return;
+    }
+    
+    if (mapRef.current) {
+      console.log("[MapLibreMap] Map already exists, skipping initialization");
+      return;
+    }
 
-    try {
-      console.log("[MapLibreMap] Initializing map...");
-      const newMap = createMap(mapContainer.current);
-      mapRef.current = newMap;
+    // Add small delay to ensure container is fully mounted
+    const timeoutId = setTimeout(() => {
+      if (!mapContainer.current) {
+        console.error("[MapLibreMap] Container disappeared during timeout");
+        return;
+      }
+      
+      console.log("[MapLibreMap] Container dimensions:", {
+        width: mapContainer.current.offsetWidth,
+        height: mapContainer.current.offsetHeight,
+        clientWidth: mapContainer.current.clientWidth,
+        clientHeight: mapContainer.current.clientHeight
+      });
+
+      try {
+        console.log("[MapLibreMap] Initializing map...");
+        const newMap = createMap(mapContainer.current);
+        mapRef.current = newMap;
 
       newMap.on("load", () => {
         console.log("[MapLibreMap] Map loaded successfully");
@@ -67,27 +93,33 @@ export function MapLibreMap({
       
       window.addEventListener("resize", handleResize);
 
-      return () => {
-        console.log("[MapLibreMap] Cleaning up map...");
-        window.removeEventListener("resize", handleResize);
-        if (newMap) {
-          try {
-            // Use cleanup function if available
-            if ((newMap as any)._cleanup) {
-              (newMap as any)._cleanup();
-            } else {
-              newMap.remove();
+        return () => {
+          console.log("[MapLibreMap] Cleaning up map...");
+          window.removeEventListener("resize", handleResize);
+          if (newMap) {
+            try {
+              // Use cleanup function if available
+              if ((newMap as any)._cleanup) {
+                (newMap as any)._cleanup();
+              } else {
+                newMap.remove();
+              }
+              console.log("[MapLibreMap] Map cleanup completed");
+            } catch (error) {
+              console.error("[MapLibreMap] Error during cleanup:", error);
             }
-            console.log("[MapLibreMap] Map cleanup completed");
-          } catch (error) {
-            console.error("[MapLibreMap] Error during cleanup:", error);
           }
-        }
-      };
-    } catch (error) {
-      console.error("[MapLibreMap] Failed to initialize map:", error);
-      setError("Failed to initialize map. Please refresh the page.");
-    }
+        };
+      } catch (error) {
+        console.error("[MapLibreMap] Failed to initialize map:", error);
+        setError("Failed to initialize map. Please refresh the page.");
+      }
+    }, 100); // 100ms delay to ensure container is ready
+
+    return () => {
+      console.log("[MapLibreMap] Clearing initialization timeout");
+      clearTimeout(timeoutId);
+    };
   }, []);
   
   /* Color scale */

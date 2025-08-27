@@ -19,11 +19,30 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           data: { phase: "Fetching market data..." },
         });
 
+        console.log(`🔍 [Worker] Fetching data from: ${url}`);
         const response = await fetch(url);
         if (!response.ok)
           throw new Error(`Fetch failed with status: ${response.status}`);
 
-        const fullPayload = await response.json();
+        console.log(`📦 [Worker] Response headers:`, {
+          contentType: response.headers.get('content-type'),
+          contentEncoding: response.headers.get('content-encoding'),
+          contentLength: response.headers.get('content-length')
+        });
+
+        let fullPayload;
+        const contentEncoding = response.headers.get('content-encoding') || '';
+        
+        if (contentEncoding.includes('gzip') || url.includes('.gz')) {
+          console.log(`🗜️ [Worker] Decompressing gzipped data...`);
+          const gzipData = await response.arrayBuffer();
+          const { inflate } = await import('pako');
+          const jsonData = inflate(gzipData, { to: "string" });
+          fullPayload = JSON.parse(jsonData);
+        } else {
+          console.log(`📄 [Worker] Parsing regular JSON...`);
+          fullPayload = await response.json();
+        }
         const { last_updated_utc, zip_codes: rawZipData } = fullPayload;
         if (!rawZipData)
           throw new Error("Data file is missing 'zip_codes' key.");
