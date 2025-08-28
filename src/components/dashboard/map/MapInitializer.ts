@@ -1,10 +1,7 @@
 import maplibregl from "maplibre-gl";
 
-// Carto Positron styles - we'll use these to create the layered approach
-const CARTO_POSITRON_BASE =
-  "https://basemaps.cartocdn.com/gl/positron-nolabels-gl-style/style.json";
-const CARTO_POSITRON_LABELS =
-  "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+// MapTiler Basic Light style
+const MAPTILER_BASIC_LIGHT = "https://api.maptiler.com/maps/basic-v2-light/style.json?key=jp8Rob4zHWmMhtCP3kyX";
 
 // Security and performance constants
 const REQUEST_TIMEOUT = 10000; // 10 seconds
@@ -84,7 +81,7 @@ export function createMap(container: HTMLElement): maplibregl.Map {
   
   const map = new maplibregl.Map({
     container,
-    style: CARTO_POSITRON_BASE, // Start with no-labels base
+    style: MAPTILER_BASIC_LIGHT, // MapTiler Basic Light style
     center: [-98.5795, 39.8283],
     zoom: 5,
     minZoom: 3,
@@ -109,7 +106,7 @@ export function createMap(container: HTMLElement): maplibregl.Map {
     console.log('[MapInit] Adding attribution controls...');
     map.addControl(
       new maplibregl.AttributionControl({
-        customAttribution: "© <a href='https://carto.com/attributions'>CARTO</a>",
+        customAttribution: "© <a href='https://www.maptiler.com/copyright/'>MapTiler</a> © <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a>",
         compact: true,
       }),
       "bottom-left"
@@ -210,126 +207,61 @@ export function createMap(container: HTMLElement): maplibregl.Map {
       }
 
 
-      /* Load and add Carto Positron labels layer on top (secure version) */
-      console.log("[MapInit] Loading Carto Positron labels...");
+      /* Reposition MapTiler label layers to be on top of choropleth */
+      console.log("[MapInit] Repositioning MapTiler label layers on top...");
       
       try {
-        const labelsStyle = await secureFetch(CARTO_POSITRON_LABELS);
-        console.log("[MapInit] Labels style loaded, processing layers...");
+        const maptilerStyle = await secureFetch(MAPTILER_BASIC_LIGHT);
+        console.log("[MapInit] MapTiler style reloaded for label processing...");
 
-        const currentGlyphs = map.getStyle()?.glyphs;
-        const canAddSymbols = Boolean(currentGlyphs || labelsStyle.glyphs);
-        console.log("[MapInit] Can add symbol layers:", canAddSymbols);
-
-        // Validate style structure
-        if (!labelsStyle.layers || !Array.isArray(labelsStyle.layers)) {
-          throw new Error("Invalid labels style structure: missing layers array");
-        }
-
-        if (!labelsStyle.sources || typeof labelsStyle.sources !== "object") {
-          throw new Error("Invalid labels style structure: missing sources object");
-        }
-
-        const byId: Record<string, any> = {};
-        for (const lyr of labelsStyle.layers) {
-          if (lyr && lyr.id) {
-            byId[lyr.id] = lyr;
-          }
-        }
-
-        const pick = (lyr: any) =>
-          lyr && lyr.type && (
-            lyr.type === "symbol" ||
-            (lyr.type === "line" &&
-              (lyr.id.includes("boundary") || lyr.id.includes("admin")))
+        if (maptilerStyle?.layers) {
+          // Filter for label/text layers that should be on top of our choropleth
+          const labelLayers = maptilerStyle.layers.filter((layer: any) => 
+            layer.type === 'symbol' && 
+            layer.layout && 
+            (layer.layout['text-field'] || layer.layout['icon-image']) &&
+            (layer.id.includes('label') || 
+             layer.id.includes('text') || 
+             layer.id.includes('place') ||
+             layer.id.includes('poi') ||
+             layer.id.includes('name'))
           );
-
-        let addedLayers = 0;
-        let skippedLayers = 0;
-        let errorLayers = 0;
-
-        for (const raw of labelsStyle.layers) {
-          if (!pick(raw)) {
-            skippedLayers++;
-            continue;
-          }
-
-          try {
-            // Add source if missing with validation
-            if (raw.source && !map.getSource(raw.source)) {
-              const srcDef = labelsStyle.sources[raw.source];
-              if (srcDef && typeof srcDef === "object") {
-                console.log(`[MapInit] Adding source: ${raw.source}`);
-                map.addSource(raw.source, srcDef);
-              } else {
-                console.warn(`[MapInit] Invalid source definition for: ${raw.source}`);
-                continue;
+          
+          console.log(`[MapInit] Found ${labelLayers.length} label layers to reposition...`);
+          
+          let repositioned = 0;
+          
+          // Remove and re-add label layers to put them on top
+          for (const layer of labelLayers) {
+            try {
+              if (map.getLayer(layer.id)) {
+                console.log(`[MapInit] Repositioning label layer: ${layer.id}`);
+                
+                // Store layer definition
+                const layerDef = map.getLayer(layer.id);
+                
+                // Remove and re-add to move to top
+                map.removeLayer(layer.id);
+                map.addLayer(layerDef as any);
+                
+                repositioned++;
               }
+            } catch (layerError) {
+              console.warn(`[MapInit] Failed to reposition layer ${layer.id}:`, layerError);
             }
-
-            let layer = { ...raw };
-            if (layer.ref) {
-              const base = byId[layer.ref];
-              if (!base) {
-                console.warn(`[MapInit] Referenced layer not found: ${layer.ref}`);
-                continue;
-              }
-              layer = {
-                ...base,
-                id: raw.id,
-                type: raw.type ?? base.type,
-                source: raw.source ?? base.source,
-                ["source-layer"]: raw["source-layer"] ?? base["source-layer"],
-                layout: { ...(base.layout || {}), ...(raw.layout || {}) },
-                paint: { ...(base.paint || {}), ...(raw.paint || {}) },
-                filter: raw.filter ?? base.filter,
-              };
-              delete layer.ref;
-            }
-
-            if (layer.type === "symbol" && !canAddSymbols) {
-              console.log(`[MapInit] Skipping symbol layer (no glyph support): ${layer.id}`);
-              skippedLayers++;
-              continue;
-            }
-
-            const newId = `labels-${layer.id}`;
-            if (map.getLayer(newId)) {
-              console.log(`[MapInit] Layer already exists: ${newId}`);
-              skippedLayers++;
-              continue;
-            }
-
-            const finalLayer = { ...layer, id: newId };
-            
-            // Validate layer before adding
-            if (!finalLayer.source || !finalLayer.type) {
-              console.warn(`[MapInit] Invalid layer definition: ${newId}`);
-              errorLayers++;
-              continue;
-            }
-
-            map.addLayer(finalLayer);
-            addedLayers++;
-            console.log(`[MapInit] Successfully added layer: ${newId}`);
-          } catch (layerError) {
-            console.error(`[MapInit] Failed to add layer ${raw.id}:`, layerError);
-            errorLayers++;
           }
+          
+          console.log(`[MapInit] ✓ Repositioned ${repositioned} label layers on top of choropleth`);
         }
-
-        console.log(`[MapInit] Label layer processing complete - Added: ${addedLayers}, Skipped: ${skippedLayers}, Errors: ${errorLayers}`);
         
-        // Clean up large objects to free memory
+        // Clean up cache after processing
         setTimeout(() => {
           styleCache.clear();
           console.log("[MapInit] Style cache cleared");
         }, 5000);
 
       } catch (error) {
-        console.error("[MapInit] Failed to load label layers:", error);
-        // Fallback: continue without labels rather than failing completely
-        console.log("[MapInit] Continuing without label layers...");
+        console.warn("[MapInit] ⚠️ Failed to reposition label layers, continuing:", error);
       }
     } catch (error) {
       console.error("[MapInit] Critical error in map setup:", error);
