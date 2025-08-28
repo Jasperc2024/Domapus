@@ -93,6 +93,7 @@ export function createMap(container: HTMLElement): maplibregl.Map {
     attributionControl: false
   });
 
+  map.on("error", e => console.error("MapLibre internal error:", e.error));
   console.log('[MapInit] Map instance created successfully');
 
   /* Controls */
