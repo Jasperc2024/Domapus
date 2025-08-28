@@ -51,7 +51,21 @@ export function HousingDashboard() {
 
         const geoResponse = await fetch(geoJsonUrl);
         if (!geoResponse.ok) throw new Error(`Failed to fetch GeoJSON. Status: ${geoResponse.status}`);
-        const geoData = await geoResponse.json();
+        
+        // Check if the response is gzipped
+        const contentEncoding = geoResponse.headers.get('content-encoding') || '';
+        const isGzipped = contentEncoding.includes('gzip') || geoJsonUrl.includes('.gz');
+        
+        let geoData;
+        if (isGzipped) {
+          console.log(`🗜️ [HousingDashboard] Decompressing gzipped GeoJSON...`);
+          const { inflate } = await import('pako');
+          const gzipData = await geoResponse.arrayBuffer();
+          const jsonString = inflate(gzipData, { to: "string" });
+          geoData = JSON.parse(jsonString);
+        } else {
+          geoData = await geoResponse.json();
+        }
         
         setFullGeoJSON(geoData);
       } catch (error) {
