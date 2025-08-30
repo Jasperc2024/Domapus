@@ -49,13 +49,6 @@ export function MapLibreMap({
       console.log("[MapLibreMap] Map already exists, skipping initialization");
       return;
     }
-
-    // Add small delay to ensure container is fully mounted
-    const timeoutId = setTimeout(() => {
-      if (!mapContainer.current) {
-        console.error("[MapLibreMap] Container disappeared during timeout");
-        return;
-      }
       
       console.log("[MapLibreMap] Container dimensions:", {
         width: mapContainer.current.offsetWidth,
