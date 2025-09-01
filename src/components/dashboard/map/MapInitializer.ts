@@ -232,18 +232,14 @@ export function createMap(container: HTMLElement): maplibregl.Map {
           
           let repositioned = 0;
           
-          // Remove and re-add label layers to put them on top
+          // Use moveLayer to reposition label layers on top
           for (const layer of labelLayers) {
             try {
               if (map.getLayer(layer.id)) {
-                console.log(`[MapInit] Repositioning label layer: ${layer.id}`);
+                console.log(`[MapInit] Moving label layer to top: ${layer.id}`);
                 
-                // Store layer definition
-                const layerDef = map.getLayer(layer.id);
-                
-                // Remove and re-add to move to top
-                map.removeLayer(layer.id);
-                map.addLayer(layerDef as any);
+                // Use moveLayer instead of remove/add to avoid map state corruption
+                map.moveLayer(layer.id);
                 
                 repositioned++;
               }
