@@ -70,7 +70,7 @@ export function MapLibreMap({
       console.log("[MapLibreMap] Initializing map...");
       const newMap = createMap(mapContainer.current);
       mapRef.current = newMap;
-      setupMapCallbacks(newMap);
+      return setupMapCallbacks(newMap);
     } catch (error) {
       console.error("[MapLibreMap] Failed to initialize map:", error);
       setError("Failed to initialize map. Please refresh the page.");
@@ -384,7 +384,7 @@ export function MapLibreMap({
                 aria-label="Loading map data"
                 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"
               />
-              <p className="text-sm font-medium text-gray-700">{progress.phase}...</p>
+              <p className="text-sm font-medium text-gray-700">{progress.phase || "Loading"}...</p>
             </div>
           )}
         </div>
