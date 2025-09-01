@@ -4,7 +4,6 @@ import maplibregl from "maplibre-gl";
 const MAPTILER_BASIC_LIGHT = "https://api.maptiler.com/maps/basic-v2-light/style.json?key=jp8Rob4zHWmMhtCP3kyX";
 
 // Security and performance constants
-const REQUEST_TIMEOUT = 10000; // 10 seconds
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
@@ -17,16 +16,12 @@ async function secureFetch(url: string, retryCount = 0): Promise<any> {
   console.log(`[MapInit] Starting secure fetch for: ${url} (attempt ${retryCount + 1})`);
   
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    console.warn(`[MapInit] Request timeout for: ${url}`);
-    controller.abort();
-  }, REQUEST_TIMEOUT);
+
 
   try {
     // Check cache first
     if (styleCache.has(url)) {
       console.log(`[MapInit] Using cached style for: ${url}`);
-      clearTimeout(timeoutId);
       return styleCache.get(url);
     }
 
@@ -38,7 +33,6 @@ async function secureFetch(url: string, retryCount = 0): Promise<any> {
       }
     });
 
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -63,7 +57,6 @@ async function secureFetch(url: string, retryCount = 0): Promise<any> {
     
     return data;
   } catch (error) {
-    clearTimeout(timeoutId);
     console.error(`[MapInit] Fetch error for ${url}:`, error);
     
     if (retryCount < MAX_RETRIES && !(error instanceof TypeError && error.message.includes('aborted'))) {
@@ -232,14 +225,18 @@ export function createMap(container: HTMLElement): maplibregl.Map {
           
           let repositioned = 0;
           
-          // Use moveLayer to reposition label layers on top
+          // Remove and re-add label layers to put them on top
           for (const layer of labelLayers) {
             try {
               if (map.getLayer(layer.id)) {
-                console.log(`[MapInit] Moving label layer to top: ${layer.id}`);
+                console.log(`[MapInit] Repositioning label layer: ${layer.id}`);
                 
-                // Use moveLayer instead of remove/add to avoid map state corruption
-                map.moveLayer(layer.id);
+                // Store layer definition
+                const layerDef = map.getLayer(layer.id);
+                
+                // Remove and re-add to move to top
+                map.removeLayer(layer.id);
+                map.addLayer(layerDef as any);
                 
                 repositioned++;
               }
