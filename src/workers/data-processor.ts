@@ -1,6 +1,5 @@
 import { ZipData } from "../components/dashboard/map/types";
 import { WorkerMessage, LoadDataRequest, ProcessGeoJSONRequest } from "./worker-types";
-import { inflate } from 'pako';
 
 export function getMetricValue(data: ZipData, metric: string): number {
   if (!data) return 0;
@@ -37,6 +36,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         if (contentEncoding.includes('gzip') || url.includes('.gz')) {
           console.log(`🗜️ [Worker] Decompressing gzipped data...`);
           const gzipData = await response.arrayBuffer();
+          const { inflate } = await import('pako');
           const jsonData = inflate(gzipData, { to: "string" });
           fullPayload = JSON.parse(jsonData);
         } else {
