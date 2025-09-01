@@ -51,26 +51,35 @@ export function HousingDashboard() {
 
         const geoResponse = await fetch(geoJsonUrl);
         if (!geoResponse.ok) throw new Error(`Failed to fetch GeoJSON. Status: ${geoResponse.status}`);
-        
-        // Check if the response is gzipped
-        const contentEncoding = geoResponse.headers.get('content-encoding') || '';
-        const isGzipped = contentEncoding.includes('gzip') || geoJsonUrl.includes('.gz');
-        
-        let geoData;
-        if (isGzipped) {
-          console.log(`🗜️ [HousingDashboard] Decompressing gzipped GeoJSON...`);
-          const { inflate } = await import('pako');
-          const gzipData = await geoResponse.arrayBuffer();
-          const jsonString = inflate(gzipData, { to: "string" });
-          geoData = JSON.parse(jsonString);
-        } else {
-          geoData = await geoResponse.json();
+      
+          const contentEncoding = geoResponse.headers.get("content-encoding") || "";
+          const isGzipped =
+            contentEncoding.includes("gzip") || geoJsonUrl.endsWith(".gz");
+
+          let geoData;
+
+          if (isGzipped) {
+            console.log("🗜️ [HousingDashboard] Gzip detected, attempting parse...");
+
+            try {
+              geoData = await geoResponse.json();
+              console.log("📄 [HousingDashboard] Parsed as already-decoded JSON");
+            } catch (err) {
+              console.log("🗜️ [HousingDashboard] Fallback: manual inflate...");
+              const { inflate } = await import("pako");
+              const gzipData = await geoResponse.arrayBuffer();
+              const jsonString = inflate(new Uint8Array(gzipData), { to: "string" });
+              geoData = JSON.parse(jsonString);
+            }
+          } else {
+            geoData = await geoResponse.json();
+          }
+
+          setFullGeoJSON(geoData);
+        } catch (error) {
+          console.error(
+            "❌ [HousingDashboard] CRITICAL ERROR: Failed to load initial data.",error);
         }
-        
-        setFullGeoJSON(geoData);
-      } catch (error) {
-        console.error("❌ [HousingDashboard] CRITICAL ERROR: Failed to load initial data.", error);
-      }
     };
     loadInitialData();
     const timer = setTimeout(() => setShowSponsorBanner(true), 30000);

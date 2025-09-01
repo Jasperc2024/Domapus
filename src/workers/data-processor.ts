@@ -1,9 +1,9 @@
 import { ZipData } from "../components/dashboard/map/types";
 import { WorkerMessage, LoadDataRequest, ProcessGeoJSONRequest } from "./worker-types";
+import { inflate } from 'pako';
 
 export function getMetricValue(data: ZipData, metric: string): number {
   if (!data) return 0;
-  // Direct access since we're using snake_case consistently
   const value = data[metric as keyof ZipData];
   return typeof value === "number" && isFinite(value) ? value : 0;
 }
@@ -30,22 +30,30 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           contentLength: response.headers.get('content-length')
         });
 
-        let fullPayload;
-        const contentEncoding = response.headers.get('content-encoding') || '';
-        
-        if (contentEncoding.includes('gzip') || url.includes('.gz')) {
-          console.log(`🗜️ [Worker] Decompressing gzipped data...`);
-          const gzipData = await response.arrayBuffer();
-          const { inflate } = await import('pako');
-          const jsonData = inflate(gzipData, { to: "string" });
-          fullPayload = JSON.parse(jsonData);
+       let fullPayload;
+       const contentEncoding = response.headers.get("content-encoding") || "";
+
+        if (contentEncoding.includes("gzip")) {
+          console.log("🗜️ [Worker] Content-Encoding is gzip, checking...");
+
+          try {
+    // Browser may have auto-decompressed already
+            fullPayload = await response.json();
+            console.log("📄 [Worker] Parsed as already-decoded JSON");
+          } catch (err) {
+            console.log("🗜️ [Worker] Failed JSON parse, trying manual inflate...");
+            const buffer = await response.arrayBuffer();
+            const jsonData = inflate(new Uint8Array(buffer), { to: "string" });
+            fullPayload = JSON.parse(jsonData);
+            console.log("🗜️ [Worker] Successfully inflated gzip file");
+          }
         } else {
-          console.log(`📄 [Worker] Parsing regular JSON...`);
+          console.log("📄 [Worker] No gzip encoding, parsing JSON...");
           fullPayload = await response.json();
         }
+
         const { last_updated_utc, zip_codes: rawZipData } = fullPayload;
-        if (!rawZipData)
-          throw new Error("Data file is missing 'zip_codes' key.");
+        if (!rawZipData) throw new Error("Data file is missing 'zip_codes' key.");
 
         self.postMessage({
           type: "PROGRESS",
