@@ -3,6 +3,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Map container safety */
+[data-testid="map-container"] {
+  min-height: 300px;
+}
+
 @layer base {
   :root {
     /* Base colors */

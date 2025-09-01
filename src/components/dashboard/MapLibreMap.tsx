@@ -49,65 +49,78 @@ export function MapLibreMap({
       console.log("[MapLibreMap] Map already exists, skipping initialization");
       return;
     }
+
+    // Validate container has non-zero dimensions
+    const { clientWidth, clientHeight } = mapContainer.current;
+    console.log("[MapLibreMap] Container dimensions:", { clientWidth, clientHeight });
     
-    console.log("[MapLibreMap] Container dimensions:", {
-      width: mapContainer.current.offsetWidth,
-      height: mapContainer.current.offsetHeight,
-      clientWidth: mapContainer.current.clientWidth,
-      clientHeight: mapContainer.current.clientHeight
-    });
+    if (!clientWidth || !clientHeight) {
+      console.warn("Container has no size yet; delaying init");
+      const id = requestAnimationFrame(() => {
+        if (mapContainer.current && !mapRef.current) {
+          const newMap = createMap(mapContainer.current);
+          mapRef.current = newMap;
+          setupMapCallbacks(newMap);
+        }
+      });
+      return () => cancelAnimationFrame(id);
+    }
 
     try {
       console.log("[MapLibreMap] Initializing map...");
       const newMap = createMap(mapContainer.current);
       mapRef.current = newMap;
-
-      newMap.on("load", () => {
-        console.log("[MapLibreMap] Map loaded successfully");
-        setIsMapReady(true);
-      });
-
-      newMap.on("error", (e) => {
-        console.error("[MapLibreMap] Map error:", e);
-        setError("Failed to load map. Please refresh the page.");
-      });
-
-      // Handle resize with error boundary
-      const handleResize = () => {
-        try {
-          if (newMap && newMap.resize) {
-            newMap.resize();
-            console.log("[MapLibreMap] Map resized");
-          }
-        } catch (error) {
-          console.error("[MapLibreMap] Error during resize:", error);
-        }
-      };
-      
-      window.addEventListener("resize", handleResize);
-
-      return () => {
-        console.log("[MapLibreMap] Cleaning up map...");
-        window.removeEventListener("resize", handleResize);
-        if (newMap) {
-          try {
-            // Use cleanup function if available
-            if ((newMap as any)._cleanup) {
-              (newMap as any)._cleanup();
-            } else {
-              newMap.remove();
-            }
-            console.log("[MapLibreMap] Map cleanup completed");
-          } catch (error) {
-            console.error("[MapLibreMap] Error during cleanup:", error);
-          }
-        }
-      };
+      setupMapCallbacks(newMap);
     } catch (error) {
       console.error("[MapLibreMap] Failed to initialize map:", error);
       setError("Failed to initialize map. Please refresh the page.");
     }
   }, []);
+
+  const setupMapCallbacks = (newMap: maplibregl.Map) => {
+    newMap.on("error", (e) => {
+      console.error("[MapLibreMap] Map internal error:", e?.error);
+      setError("Map encountered an internal error. Please refresh the page.");
+    });
+
+    newMap.once("load", () => {
+      console.log("[MapLibreMap] Map loaded successfully");
+      newMap.resize(); // Call resize on load to prevent matrix calculation errors
+      setIsMapReady(true);
+    });
+
+    // Handle resize with error boundary
+    const handleResize = () => {
+      try {
+        if (newMap && newMap.resize) {
+          newMap.resize();
+          console.log("[MapLibreMap] Map resized");
+        }
+      } catch (error) {
+        console.error("[MapLibreMap] Error during resize:", error);
+      }
+    };
+    
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      console.log("[MapLibreMap] Cleaning up map...");
+      window.removeEventListener("resize", handleResize);
+      if (newMap) {
+        try {
+          // Use cleanup function if available
+          if ((newMap as any)._cleanup) {
+            (newMap as any)._cleanup();
+          } else {
+            newMap.remove();
+          }
+          console.log("[MapLibreMap] Map cleanup completed");
+        } catch (error) {
+          console.error("[MapLibreMap] Error during cleanup:", error);
+        }
+      }
+    };
+  };
   
   /* Color scale */
   const colorScale = useMemo(() => {
