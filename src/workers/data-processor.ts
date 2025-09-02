@@ -37,19 +37,28 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           console.log("🗜️ [Worker] Content-Encoding is gzip, checking...");
 
           try {
-    // Browser may have auto-decompressed already
             fullPayload = await response.json();
             console.log("📄 [Worker] Parsed as already-decoded JSON");
           } catch (err) {
-            console.log("🗜️ [Worker] Failed JSON parse, trying manual inflate...");
+            console.log("🗜️ [Worker] Plain JSON parse failed, trying manual inflate...");
             const buffer = await response.arrayBuffer();
             const jsonData = inflate(new Uint8Array(buffer), { to: "string" });
             fullPayload = JSON.parse(jsonData);
-            console.log("🗜️ [Worker] Successfully inflated gzip file");
+            console.log("🗜️ [Worker] Successfully inflated gzip data");
           }
         } else {
-          console.log("📄 [Worker] No gzip encoding, parsing JSON...");
-          fullPayload = await response.json();
+          console.log("📄 [Worker] No gzip encoding header, trying manual inflate first...");
+
+          try {
+            const buffer = await response.arrayBuffer();
+            const jsonData = inflate(new Uint8Array(buffer), { to: "string" });
+            fullPayload = JSON.parse(jsonData);
+            console.log("🗜️ [Worker] Successfully inflated gzip data without header");
+          } catch (err) {
+            console.log("📄 [Worker] Inflate failed, trying plain JSON parse...");
+            fullPayload = await response.json();
+            console.log("📄 [Worker] Parsed plain JSON successfully");
+          }
         }
 
         const { last_updated_utc, zip_codes: rawZipData } = fullPayload;
