@@ -57,24 +57,50 @@ export function HousingDashboard() {
             contentEncoding.includes("gzip") || geoJsonUrl.endsWith(".gz");
 
           let geoData;
+          const contentEncoding = geoResponse.headers.get("content-encoding") || "";
+          const isGzipped = contentEncoding.includes("gzip") || geoJsonUrl.endsWith(".gz");
 
           if (isGzipped) {
             console.log("🗜️ [HousingDashboard] Gzip detected, attempting parse...");
 
+  // First, get the raw body as an ArrayBuffer
+            const buffer = await geoResponse.arrayBuffer();
+
+  // Try to parse the body as JSON directly (since some browsers may auto-decompress)
             try {
-              geoData = await geoResponse.json();
+              geoData = JSON.parse(new TextDecoder().decode(buffer)); // Attempt to parse directly as JSON
               console.log("📄 [HousingDashboard] Parsed as already-decoded JSON");
             } catch (err) {
               console.log("🗜️ [HousingDashboard] Fallback: manual inflate...");
+
+              // Decompress the data using pako
               const { inflate } = await import("pako");
-              const gzipData = await geoResponse.arrayBuffer();
-              const jsonString = inflate(new Uint8Array(gzipData), { to: "string" });
+              const jsonString = inflate(new Uint8Array(buffer), { to: "string" });
+          
+              // Parse the decompressed JSON
               geoData = JSON.parse(jsonString);
+              console.log("🗜️ [HousingDashboard] Successfully inflated and parsed gzip data");
             }
           } else {
-            geoData = await geoResponse.json();
-          }
+            console.log("📄 [HousingDashboard] No gzip detected, attempting to decompress first...");
 
+  // First attempt to decompress the data (it could still be compressed)
+            const buffer = await geoResponse.arrayBuffer();
+          
+            try {
+              const { inflate } = await import("pako");
+              const jsonString = inflate(new Uint8Array(buffer), { to: "string" });
+              geoData = JSON.parse(jsonString); // Try to parse the decompressed data
+              console.log("🗜️ [HousingDashboard] Successfully inflated and parsed data");
+            } catch (err) {
+              console.log("📄 [HousingDashboard] Decompression failed, trying plain JSON parse...");
+
+    // If decompression fails, just parse as regular JSON
+              geoData = JSON.parse(new TextDecoder().decode(buffer));
+              console.log("📄 [HousingDashboard] Parsed plain JSON successfully");
+            }
+          }
+          
           setFullGeoJSON(geoData);
         } catch (error) {
           console.error(
