@@ -51,10 +51,6 @@ export function HousingDashboard() {
 
         const geoResponse = await fetch(geoJsonUrl);
         if (!geoResponse.ok) throw new Error(`Failed to fetch GeoJSON. Status: ${geoResponse.status}`);
-      
-          const contentEncoding = geoResponse.headers.get("content-encoding") || "";
-          const isGzipped =
-            contentEncoding.includes("gzip") || geoJsonUrl.endsWith(".gz");
 
           let geoData;
           const contentEncoding = geoResponse.headers.get("content-encoding") || "";
