@@ -56,7 +56,10 @@ jobs:
         git config --local user.name "GitHub Action"
 
         if git show HEAD:public/data/zip-data.json.gz >/dev/null 2>&1; then
-          if cmp -s <(gzip -cd public/data/zip-data.json.gz) <(git show HEAD:public/data/zip-data.json.gz | gzip -cd); then
+          git show HEAD:public/data/zip-data.json.gz > /tmp/old-data.json.gz
+          if gzip -cd /tmp/old-data.json.gz > /tmp/old-data.json && \
+             gzip -cd public/data/zip-data.json.gz > /tmp/new-data.json && \
+             cmp -s /tmp/old-data.json /tmp/new-data.json; then
             echo "No data changes, skipping commit."
             exit 0
           fi
