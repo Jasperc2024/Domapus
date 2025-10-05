@@ -36,7 +36,7 @@ export function MapLibreMap({
   const createAndInitializeMap = (container: HTMLDivElement): maplibregl.Map => {
     const map = new maplibregl.Map({
       container,
-      style: "https://api.maptiler.com/maps/streets-v2/style.json?key=WRbuDSZI6omsuxSFSlYC",
+      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
       center: [-98.5795, 39.8283],
       zoom: 3.5,
       minZoom: 3,
