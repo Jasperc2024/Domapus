@@ -138,18 +138,59 @@ def main():
         output_dir = Path("public/data")
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        json_string = json.dumps(final_output, sort_keys=True, separators=(",", ":"))
-        buffer = BytesIO()
-        with gzip.GzipFile(fileobj=buffer, mode='wb', mtime=0) as gz:
-            gz.write(json_string.encode('utf-8'))
-        compressed_json = buffer.getvalue()
-        with open(output_dir / "zip-data.json.gz", 'wb') as f:
-            f.write(compressed_json)
+        # Load previous data to compare changes
+        previous_data = None
+        zip_data_path = output_dir / "zip-data.json.gz"
+        try:
+            if zip_data_path.exists():
+                with gzip.open(zip_data_path, 'rt') as f:
+                    previous_data = json.load(f).get('zip_codes', {})
+        except Exception as e:
+            logging.warning(f"Could not load previous data for comparison: {e}")
 
+        # Calculate changes
+        zip_codes_changed = 0
+        data_points_changed = 0
+        
+        if previous_data:
+            new_zips = set(output_data_content.keys())
+            old_zips = set(previous_data.keys())
+            
+            # Count new or removed ZIP codes
+            zip_codes_changed = len(new_zips ^ old_zips)
+            
+            # Count changed data points in existing ZIP codes
+            for zip_code in new_zips & old_zips:
+                new_data = output_data_content[zip_code]
+                old_data = previous_data[zip_code]
+                
+                for key in new_data:
+                    if key in old_data and new_data[key] != old_data[key]:
+                        data_points_changed += 1
+
+        json_string = json.dumps(final_output, sort_keys=True, separators=(",", ":"))
+        json_bytes = json_string.encode('utf-8')
+        
+        # Write with explicit flush to avoid broken pipe
+        with open(zip_data_path, 'wb') as f:
+            with gzip.GzipFile(fileobj=f, mode='wb', mtime=0) as gz:
+                gz.write(json_bytes)
+            f.flush()
+
+        # Write last_updated.json with change statistics
+        update_info = {
+            "last_updated_utc": datetime.now(timezone.utc).isoformat(),
+            "total_zip_codes": len(output_data_content),
+            "zip_codes_changed": zip_codes_changed,
+            "data_points_changed": data_points_changed
+        }
+        
         with open(output_dir / "last_updated.json", 'w') as f:
-            json.dump({"last_updated_utc": datetime.now(timezone.utc).isoformat()}, f, indent=2)
+            json.dump(update_info, f, indent=2)
+            f.flush()
 
         logging.info(f"Successfully wrote {len(output_data_content)} ZIP codes to zip-data.json.gz")
+        logging.info(f"Changes: {zip_codes_changed} ZIP codes, {data_points_changed} data points")
 
         if output_data_content:
             sample_zip = random.choice(list(output_data_content.keys()))

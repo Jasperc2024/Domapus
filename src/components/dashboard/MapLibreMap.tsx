@@ -4,7 +4,6 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { scaleLinear } from "d3-scale";
 import { getMetricDisplay } from "./map/utils";
 import { ZipData } from "./map/types";
-import { createMap } from "./map/MapInitializer.ts";
 
 interface MapProps {
   selectedMetric: string;
@@ -34,93 +33,86 @@ export function MapLibreMap({
   const interactionsSetup = useRef(false);
   const [baseGeoJSON, setBaseGeoJSON] = useState<GeoJSON.FeatureCollection | null>(null);
 
+  const createAndInitializeMap = (container: HTMLDivElement): maplibregl.Map => {
+    const map = new maplibregl.Map({
+      container,
+      style: "https://api.maptiler.com/maps/streets-v2/style.json?key=WRbuDSZI6omsuxSFSlYC",
+      center: [-98.5795, 39.8283],
+      zoom: 3.5,
+      minZoom: 3,
+      maxZoom: 12,
+    });
+
+    map.on("error", (e) => {
+      console.error("[Map] Internal error:", e?.error);
+      setError("Map encountered an internal error. Please refresh the page.");
+    });
+
+    map.once("load", () => {
+      console.log("[Map] Loaded successfully");
+      map.resize();
+      setIsMapReady(true);
+
+      // Reposition labels using moveLayer
+      const labelLayers = [
+        "Place labels",
+        "Road labels",
+        "POI labels",
+        "Housenumber labels",
+      ];
+
+      labelLayers.forEach((layerId) => {
+        const layer = map.getLayer(layerId);
+        if (layer) {
+          try {
+            map.moveLayer(layerId);
+          } catch (err) {
+            console.warn(`Could not move layer ${layerId}:`, err);
+          }
+        }
+      });
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+    return map;
+  };
+
   // Initialize map with enhanced error handling
   useEffect(() => {
-    console.log("[MapLibreMap] Map initialization useEffect triggered");
-    console.log("[MapLibreMap] Container ref:", mapContainer.current);
-    console.log("[MapLibreMap] Existing map ref:", mapRef.current);
-    
-    if (!mapContainer.current) {
-      console.warn("[MapLibreMap] Map container not ready, skipping initialization");
-      return;
-    }
-    
-    if (mapRef.current) {
-      console.log("[MapLibreMap] Map already exists, skipping initialization");
-      return;
-    }
+    if (!mapContainer.current || mapRef.current) return;
 
-    // Validate container has non-zero dimensions
     const { clientWidth, clientHeight } = mapContainer.current;
-    console.log("[MapLibreMap] Container dimensions:", { clientWidth, clientHeight });
     
     if (!clientWidth || !clientHeight) {
       console.warn("Container has no size yet; delaying init");
       const id = requestAnimationFrame(() => {
         if (mapContainer.current && !mapRef.current) {
-          const newMap = createMap(mapContainer.current);
+          const newMap = createAndInitializeMap(mapContainer.current);
           mapRef.current = newMap;
-          setupMapCallbacks(newMap);
         }
       });
       return () => cancelAnimationFrame(id);
     }
 
     try {
-      console.log("[MapLibreMap] Initializing map...");
-      const newMap = createMap(mapContainer.current);
+      const newMap = createAndInitializeMap(mapContainer.current);
       mapRef.current = newMap;
-      return setupMapCallbacks(newMap);
+
+      return () => {
+        if (newMap) {
+          try {
+            newMap.remove();
+          } catch (error) {
+            console.error("[MapLibreMap] Error during cleanup:", error);
+          }
+        }
+      };
     } catch (error) {
       console.error("[MapLibreMap] Failed to initialize map:", error);
       setError("Failed to initialize map. Please refresh the page.");
     }
   }, []);
-
-  const setupMapCallbacks = (newMap: maplibregl.Map) => {
-    newMap.on("error", (e) => {
-      console.error("[MapLibreMap] Map internal error:", e?.error);
-      setError("Map encountered an internal error. Please refresh the page.");
-    });
-
-    newMap.once("load", () => {
-      console.log("[MapLibreMap] Map loaded successfully");
-      newMap.resize(); // Call resize on load to prevent matrix calculation errors
-      setIsMapReady(true);
-    });
-
-    // Handle resize with error boundary
-    const handleResize = () => {
-      try {
-        if (newMap && newMap.resize) {
-          newMap.resize();
-          console.log("[MapLibreMap] Map resized");
-        }
-      } catch (error) {
-        console.error("[MapLibreMap] Error during resize:", error);
-      }
-    };
-    
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      console.log("[MapLibreMap] Cleaning up map...");
-      window.removeEventListener("resize", handleResize);
-      if (newMap) {
-        try {
-          // Use cleanup function if available
-          if ((newMap as any)._cleanup) {
-            (newMap as any)._cleanup();
-          } else {
-            newMap.remove();
-          }
-          console.log("[MapLibreMap] Map cleanup completed");
-        } catch (error) {
-          console.error("[MapLibreMap] Error during cleanup:", error);
-        }
-      }
-    };
-  };
   
   /* Color scale */
   const colorScale = useMemo(() => {
