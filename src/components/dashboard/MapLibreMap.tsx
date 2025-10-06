@@ -33,6 +33,8 @@ export function MapLibreMap({
   const [error, setError] = useState<string | null>(null);
   const interactionsSetup = useRef(false);
   const [baseGeoJSON, setBaseGeoJSON] = useState<GeoJSON.FeatureCollection | null>(null);
+  const processingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const createAndInitializeMap = (container: HTMLDivElement): maplibregl.Map => {
     const map = new maplibregl.Map({
@@ -190,33 +192,32 @@ export function MapLibreMap({
   // Process and update map data with enhanced error handling
   useEffect(() => {
     if (!isMapReady || !baseGeoJSON || !colorScale || Object.keys(zipData).length === 0) return;
+    if (processingRef.current) return;
 
-    const controller = new AbortController();
+    processingRef.current = true;
+    abortControllerRef.current = new AbortController();
+    
     console.log("[MapLibreMap] Processing zip data for map update...");
 
     (async () => {
       try {
         setError(null);
-        console.log("[MapLibreMap] Starting data processing...");
         
         const processed = await processData({
           type: "PROCESS_GEOJSON",
           data: { geojson: baseGeoJSON, zipData, selectedMetric },
         });
         
-        if (controller.signal.aborted) {
-          console.log("[MapLibreMap] Data processing aborted");
+        if (abortControllerRef.current?.signal.aborted) {
+          console.log("[MapLibreMap] Processing aborted");
           return;
         }
 
         if (!mapRef.current?.isStyleLoaded()) {
-          console.warn("[MapLibreMap] Map style not loaded, skipping update");
+          console.warn("[MapLibreMap] Map style not loaded");
           return;
         }
 
-        console.log(`[MapLibreMap] Processing ${processed.features?.length || 0} features for visualization...`);
-
-        // Add color information to features with validation
         const enhancedFeatures = processed.features.map((feature: any) => {
           if (feature.properties?.metricValue && 
               typeof feature.properties.metricValue === 'number' && 
@@ -226,43 +227,43 @@ export function MapLibreMap({
           return feature;
         });
 
-        console.log("[MapLibreMap] Updating map source with processed data...");
         const source = mapRef.current.getSource("zips") as maplibregl.GeoJSONSource;
         if (source) {
           source.setData({ 
             type: "FeatureCollection", 
             features: enhancedFeatures 
           });
-          console.log("[MapLibreMap] Map source updated successfully");
         } else {
-          console.error("[MapLibreMap] ZIP source not found on map");
+          console.error("[MapLibreMap] ZIP source not found");
           setError("Map data source not available");
           return;
         }
 
-        // Setup interactions once with error handling
-        if (!interactionsSetup.current) {
+        if (!interactionsSetup.current && mapRef.current) {
           try {
             setupMapInteractions(mapRef.current);
             interactionsSetup.current = true;
-            console.log("[MapLibreMap] Map interactions setup completed");
           } catch (interactionError) {
-            console.error("[MapLibreMap] Failed to setup map interactions:", interactionError);
+            console.error("[MapLibreMap] Failed to setup interactions:", interactionError);
           }
         }
       } catch (err) {
-        if (!controller.signal.aborted) {
-          console.error("[MapLibreMap] Failed to update map layers:", err);
-          setError("Failed to update map visualization. Please try refreshing.");
+        if (!abortControllerRef.current?.signal.aborted) {
+          console.error("[MapLibreMap] Failed to update map:", err);
+          setError("Failed to update map visualization");
         }
+      } finally {
+        processingRef.current = false;
       }
     })();
 
     return () => {
-      console.log("[MapLibreMap] Aborting data processing...");
-      controller.abort();
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
     };
-  }, [isMapReady, baseGeoJSON, colorScale, zipData, selectedMetric, processData]);
+  }, [isMapReady, baseGeoJSON, colorScale, zipData, selectedMetric]);
 
   // Navigate to searched ZIP with error handling
   useEffect(() => {

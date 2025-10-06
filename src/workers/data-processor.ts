@@ -10,93 +10,81 @@ export function getMetricValue(data: ZipData, metric: string): number {
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const { id, type, data } = e.data;
+  
   try {
     switch (type) {
       case "LOAD_AND_PROCESS_DATA": {
         const { url, selectedMetric } = data as LoadDataRequest;
+        
         self.postMessage({
           type: "PROGRESS",
           data: { phase: "Fetching market data..." },
         });
 
-        console.log(`🔍 [Worker] Fetching data from: ${url}`);
         const response = await fetch(url);
-        if (!response.ok)
-          throw new Error(`Fetch failed with status: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`Fetch failed: ${response.status}`);
+        }
 
-        console.log(`📦 [Worker] Response headers:`, {
-          contentType: response.headers.get('content-type'),
-          contentEncoding: response.headers.get('content-encoding'),
-          contentLength: response.headers.get('content-length')
-        });
+        const contentEncoding = response.headers.get("content-encoding") || "";
+        const buffer = await response.arrayBuffer();
+        let fullPayload;
 
-       let fullPayload;
-       const contentEncoding = response.headers.get("content-encoding") || "";
-
-        if (contentEncoding.includes("gzip")) {
-          console.log("🗜️ [Worker] Content-Encoding is gzip, checking...");
-
-          try {
-            fullPayload = await response.json();
-            console.log("📄 [Worker] Parsed as already-decoded JSON");
-          } catch (err) {
-            console.log("🗜️ [Worker] Plain JSON parse failed, trying manual inflate...");
-            const buffer = await response.arrayBuffer();
-            const jsonData = inflate(new Uint8Array(buffer), { to: "string" });
-            fullPayload = JSON.parse(jsonData);
-            console.log("🗜️ [Worker] Successfully inflated gzip data");
+        try {
+          if (contentEncoding.includes("gzip")) {
+            try {
+              fullPayload = JSON.parse(new TextDecoder().decode(buffer));
+            } catch {
+              const jsonData = inflate(new Uint8Array(buffer), { to: "string" });
+              fullPayload = JSON.parse(jsonData);
+            }
+          } else {
+            try {
+              const jsonData = inflate(new Uint8Array(buffer), { to: "string" });
+              fullPayload = JSON.parse(jsonData);
+            } catch {
+              fullPayload = JSON.parse(new TextDecoder().decode(buffer));
+            }
           }
-        } else {
-          console.log("📄 [Worker] No gzip encoding header, trying manual inflate first...");
-
-          try {
-            const buffer = await response.arrayBuffer();
-            const jsonData = inflate(new Uint8Array(buffer), { to: "string" });
-            fullPayload = JSON.parse(jsonData);
-            console.log("🗜️ [Worker] Successfully inflated gzip data without header");
-          } catch (err) {
-            console.log("📄 [Worker] Inflate failed, trying plain JSON parse...");
-            fullPayload = await response.json();
-            console.log("📄 [Worker] Parsed plain JSON successfully");
-          }
+        } catch (parseError) {
+          throw new Error(`Failed to parse data: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
         }
 
         const { last_updated_utc, zip_codes: rawZipData } = fullPayload;
-        if (!rawZipData) throw new Error("Data file is missing 'zip_codes' key.");
+        if (!rawZipData) throw new Error("Missing zip_codes data");
 
         self.postMessage({
           type: "PROGRESS",
-          data: { phase: "Processing ZIP code data..." },
+          data: { phase: "Processing ZIP codes..." },
         });
 
         const zipData: Record<string, ZipData> = {};
-        let processed = 0;
-        const total = Object.keys(rawZipData).length;
+        const entries = Object.entries(rawZipData);
+        const total = entries.length;
 
-        for (const [zipCode, rawValue] of Object.entries(rawZipData)) {
+        for (let i = 0; i < total; i++) {
+          const [zipCode, rawValue] = entries[i];
           (rawValue as ZipData).zipCode = zipCode;
           zipData[zipCode] = rawValue as ZipData;
           
-          processed++;
-          if (processed % 1000 === 0) {
+          if (i % 2000 === 0 && i > 0) {
             self.postMessage({
               type: "PROGRESS",
-              data: { phase: "Processing ZIP code data...", processed, total },
+              data: { phase: "Processing ZIP codes...", processed: i, total },
             });
           }
         }
 
         self.postMessage({
           type: "PROGRESS",
-          data: { phase: "Calculating metric bounds..." },
+          data: { phase: "Calculating bounds..." },
         });
 
-        const metricValues: number[] = [];
-        for (const zipInfo of Object.values(zipData)) {
-          const value = getMetricValue(zipInfo, selectedMetric);
-          if (value > 0) metricValues.push(value);
-        }
-        metricValues.sort((a, b) => a - b);
+        const metricValues = Object.values(zipData)
+          .map(z => getMetricValue(z, selectedMetric))
+          .filter(v => v > 0)
+          .sort((a, b) => a - b);
+        
         const bounds = {
           min: metricValues[0] || 0,
           max: metricValues[metricValues.length - 1] || 0,
@@ -113,20 +101,20 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       case "PROCESS_GEOJSON": {
         const { geojson, zipData, selectedMetric } = data as ProcessGeoJSONRequest;
 
-        if (!geojson || !Array.isArray(geojson.features)) {
-          throw new Error("Invalid GeoJSON data provided to worker.");
+        if (!geojson?.features || !Array.isArray(geojson.features)) {
+          throw new Error("Invalid GeoJSON data");
         }
 
         self.postMessage({
           type: "PROGRESS",
-          data: { phase: "Processing map shapes..." },
+          data: { phase: "Processing shapes..." },
         });
 
         const features: GeoJSON.Feature[] = [];
-        let processed = 0;
         const total = geojson.features.length;
 
-        for (const feature of geojson.features) {
+        for (let i = 0; i < total; i++) {
+          const feature = geojson.features[i];
           if (!feature.geometry) continue;
 
           const zipCode = feature.properties?.ZCTA5CE20;
@@ -135,14 +123,12 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           const metricValue = getMetricValue(zipData[zipCode], selectedMetric);
           feature.properties!.zipCode = zipCode;
           feature.properties!.metricValue = metricValue;
-
           features.push(feature);
           
-          processed++;
-          if (processed % 5000 === 0) {
+          if (i % 5000 === 0 && i > 0) {
             self.postMessage({
               type: "PROGRESS",
-              data: { phase: "Processing map shapes...", processed, total },
+              data: { phase: "Processing shapes...", processed: i, total },
             });
           }
         }
@@ -156,14 +142,14 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       }
 
       default:
-        throw new Error(`Unknown message type: ${type}`);
+        throw new Error(`Unknown type: ${type}`);
     }
   } catch (error) {
-    console.error("❌ [Worker] Error:", error);
+    console.error("[Worker] Error:", error);
     self.postMessage({
       type: "ERROR",
       id,
-      error: error instanceof Error ? error.message : "Unknown worker error",
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
