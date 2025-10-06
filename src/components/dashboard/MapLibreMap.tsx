@@ -4,6 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { scaleLinear } from "d3-scale";
 import { getMetricDisplay } from "./map/utils";
 import { ZipData } from "./map/types";
+const BASE_PATH = import.meta.env.BASE_URL;
 
 interface MapProps {
   selectedMetric: string;
@@ -135,8 +136,9 @@ export function MapLibreMap({
       }, 30000); // 30 second timeout for large file
 
       try {
-        console.log("[MapLibreMap] Loading base GeoJSON...");
-        const response = await fetch("/data/us-zip-codes.geojson.gz", {
+        const geoJsonUrl = new URL( `${BASE_PATH}data/us-zip-codes.geojson.gz`, window.location.origin).href;
+        console.log('[MapLibreMap] Loading base GeoJSON...');
+        const response = await fetch(geoJsonUrl, {
           signal: controller.signal,
           headers: {
             'Accept': 'application/octet-stream',
