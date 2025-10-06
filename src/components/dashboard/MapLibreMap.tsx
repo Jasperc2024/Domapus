@@ -44,6 +44,10 @@ export function MapLibreMap({
       zoom: 3.5,
       minZoom: 3,
       maxZoom: 12,
+      maxBounds: [
+      [-180, -85],
+      [180, 85],
+    ],
     });
 
     map.on("error", (e) => {
