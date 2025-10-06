@@ -14,15 +14,17 @@ interface PendingRequest {
 
 export function useDataWorker() {
   const workerRef = useRef<Worker | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [progress, setProgress] = useState<ProgressState>({ phase: 'Initializing...' });
-
-  const requests = useRef<Map<string, PendingRequest>>(new Map());
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [progress, setProgress] = useState<ProgressState>({ phase: '' });
+  const requestsRef = useRef<Map<string, PendingRequest>>(new Map());
+  const isInitializedRef = useRef(false);
 
   useEffect(() => {
-
+    if (isInitializedRef.current) return;
+    
     const worker = new DataProcessorWorker();
     workerRef.current = worker;
+    isInitializedRef.current = true;
 
     worker.onmessage = (event: MessageEvent) => {
       const { id, type, data, error } = event.data;
@@ -34,20 +36,20 @@ export function useDataWorker() {
 
         case 'ERROR': {
           setIsLoading(false);
-          const pending = requests.current.get(id);
+          const pending = requestsRef.current.get(id);
           if (pending) {
             pending.reject(new Error(error));
-            requests.current.delete(id);
+            requestsRef.current.delete(id);
           }
           break;
         }
 
         default: {
           setIsLoading(false);
-          const pending = requests.current.get(id);
+          const pending = requestsRef.current.get(id);
           if (pending) {
             pending.resolve(data); 
-            requests.current.delete(id);
+            requestsRef.current.delete(id);
           }
           break;
         }
@@ -55,30 +57,33 @@ export function useDataWorker() {
     };
 
     worker.onerror = (err) => {
-      console.error("An unhandled error occurred in the data worker:", err);
+      console.error("[useDataWorker] Unhandled worker error:", err);
       setIsLoading(false);
-      requests.current.forEach(request => request.reject(err));
-      requests.current.clear();
+      requestsRef.current.forEach(request => request.reject(err));
+      requestsRef.current.clear();
     };
 
     return () => {
-      worker.terminate();
+      if (workerRef.current) {
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
+      isInitializedRef.current = false;
     };
   }, []);
 
   const processData = useCallback((message: { type: string; data?: any }) => {
     const worker = workerRef.current;
-    if (!worker) {
-      return Promise.reject(new Error("Worker is not available."));
+    if (!worker || !isInitializedRef.current) {
+      console.error("[useDataWorker] Worker not available");
+      return Promise.reject(new Error("Worker is not initialized"));
     }
 
     return new Promise((resolve, reject) => {
-      setIsLoading(true);
-      setProgress({ phase: 'Starting...' });
-
       const id = `${Date.now()}-${Math.random()}`;
-
-      requests.current.set(id, { resolve, reject });
+      
+      requestsRef.current.set(id, { resolve, reject });
+      setIsLoading(true);
 
       worker.postMessage({ id, ...message });
     });

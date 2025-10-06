@@ -33,6 +33,8 @@ export function HousingDashboard() {
   const { processData, isLoading, progress } = useDataWorker();
 
   useEffect(() => {
+    let isMounted = true;
+    
     const loadInitialData = async () => {
       const dataUrl = new URL(`${BASE_PATH}data/zip-data.json.gz`, window.location.origin).href;
       const geoJsonUrl = new URL(`${BASE_PATH}data/us-zip-codes.geojson.gz`, window.location.origin).href;
@@ -43,6 +45,8 @@ export function HousingDashboard() {
           data: { url: dataUrl, selectedMetric: 'median_sale_price' }
         }) as DataPayload;
 
+        if (!isMounted) return;
+        
         if (result) {
           setZipData(result.zip_codes);
           setDataBounds(result.bounds);
@@ -50,63 +54,49 @@ export function HousingDashboard() {
         }
 
         const geoResponse = await fetch(geoJsonUrl);
-        if (!geoResponse.ok) throw new Error(`Failed to fetch GeoJSON. Status: ${geoResponse.status}`);
+        if (!geoResponse.ok) throw new Error(`Failed to fetch GeoJSON: ${geoResponse.status}`);
 
-          let geoData;
-          const contentEncoding = geoResponse.headers.get("content-encoding") || "";
-          const isGzipped = contentEncoding.includes("gzip") || geoJsonUrl.endsWith(".gz");
+        if (!isMounted) return;
 
-          if (isGzipped) {
-            console.log("🗜️ [HousingDashboard] Gzip detected, attempting parse...");
+        const contentEncoding = geoResponse.headers.get("content-encoding") || "";
+        const isGzipped = contentEncoding.includes("gzip") || geoJsonUrl.endsWith(".gz");
+        const buffer = await geoResponse.arrayBuffer();
 
-  // First, get the raw body as an ArrayBuffer
-            const buffer = await geoResponse.arrayBuffer();
-
-  // Try to parse the body as JSON directly (since some browsers may auto-decompress)
-            try {
-              geoData = JSON.parse(new TextDecoder().decode(buffer)); // Attempt to parse directly as JSON
-              console.log("📄 [HousingDashboard] Parsed as already-decoded JSON");
-            } catch (err) {
-              console.log("🗜️ [HousingDashboard] Fallback: manual inflate...");
-
-              // Decompress the data using pako
-              const { inflate } = await import("pako");
-              const jsonString = inflate(new Uint8Array(buffer), { to: "string" });
-          
-              // Parse the decompressed JSON
-              geoData = JSON.parse(jsonString);
-              console.log("🗜️ [HousingDashboard] Successfully inflated and parsed gzip data");
-            }
-          } else {
-            console.log("📄 [HousingDashboard] No gzip detected, attempting to decompress first...");
-
-  // First attempt to decompress the data (it could still be compressed)
-            const buffer = await geoResponse.arrayBuffer();
-          
-            try {
-              const { inflate } = await import("pako");
-              const jsonString = inflate(new Uint8Array(buffer), { to: "string" });
-              geoData = JSON.parse(jsonString); // Try to parse the decompressed data
-              console.log("🗜️ [HousingDashboard] Successfully inflated and parsed data");
-            } catch (err) {
-              console.log("📄 [HousingDashboard] Decompression failed, trying plain JSON parse...");
-
-    // If decompression fails, just parse as regular JSON
-              geoData = JSON.parse(new TextDecoder().decode(buffer));
-              console.log("📄 [HousingDashboard] Parsed plain JSON successfully");
-            }
+        let geoData;
+        
+        if (isGzipped) {
+          try {
+            geoData = JSON.parse(new TextDecoder().decode(buffer));
+          } catch {
+            const { inflate } = await import("pako");
+            const jsonString = inflate(new Uint8Array(buffer), { to: "string" });
+            geoData = JSON.parse(jsonString);
           }
-          
-          setFullGeoJSON(geoData);
-        } catch (error) {
-          console.error(
-            "❌ [HousingDashboard] CRITICAL ERROR: Failed to load initial data.",error);
+        } else {
+          try {
+            const { inflate } = await import("pako");
+            const jsonString = inflate(new Uint8Array(buffer), { to: "string" });
+            geoData = JSON.parse(jsonString);
+          } catch {
+            geoData = JSON.parse(new TextDecoder().decode(buffer));
+          }
         }
+        
+        if (!isMounted) return;
+        setFullGeoJSON(geoData);
+      } catch (error) {
+        console.error("[HousingDashboard] Failed to load initial data:", error);
+      }
     };
+    
     loadInitialData();
     const timer = setTimeout(() => setShowSponsorBanner(true), 30000);
-    return () => clearTimeout(timer);
-  }, [processData]);
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, []);
   
   const handleZipSelect = (zip: ZipData) => { setSelectedZip(zip); setSidebarOpen(true); };
   const toggleSidebarCollapse = () => { setSidebarCollapsed(!sidebarCollapsed); };
