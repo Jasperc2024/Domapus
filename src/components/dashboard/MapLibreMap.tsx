@@ -195,79 +195,68 @@ export function MapLibreMap({
 
   // Process and update map data with enhanced error handling
   useEffect(() => {
-    if (!isMapReady || !baseGeoJSON || !colorScale || Object.keys(zipData).length === 0) return;
-    if (processingRef.current) return;
+    if (
+      !isMapReady ||
+      !baseGeoJSON ||
+      !colorScale ||
+      Object.keys(zipData).length === 0 ||
+      processingRef.current
+    ) {
+      return;
+    }
 
     processingRef.current = true;
-    abortControllerRef.current = new AbortController();
-    
-    console.log("[MapLibreMap] Processing zip data for map update...");
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
-    (async () => {
+    const updateMap = async () => {
       try {
         setError(null);
-        
         const processed = await processData({
           type: "PROCESS_GEOJSON",
           data: { geojson: baseGeoJSON, zipData, selectedMetric },
+          signal: abortController.signal,
         });
-        
-        if (abortControllerRef.current?.signal.aborted) {
-          console.log("[MapLibreMap] Processing aborted");
-          return;
-        }
-
+  
+        if (abortController.signal.aborted) return;
+  
         if (!mapRef.current?.isStyleLoaded()) {
-          console.warn("[MapLibreMap] Map style not loaded");
           return;
         }
 
-        const enhancedFeatures = processed.features.map((feature: any) => {
-          if (feature.properties?.metricValue && 
-              typeof feature.properties.metricValue === 'number' && 
-              feature.properties.metricValue > 0) {
-            feature.properties.metricColor = colorScale(feature.properties.metricValue);
+        const enhancedFeatures = processed.features.map((feature) => {
+          const metricValue = feature.properties?.metricValue;
+          if (typeof metricValue === "number" && metricValue > 0) {
+            feature.properties.metricColor = colorScale(metricValue);
           }
           return feature;
         });
 
-        const source = mapRef.current.getSource("zips") as maplibregl.GeoJSONSource;
-        if (source) {
-          source.setData({ 
-            type: "FeatureCollection", 
-            features: enhancedFeatures 
+        const mapSource = mapRef.current.getSource("geojson-source");
+        if (mapSource) {
+          mapSource.setData({
+            ...processed,
+            features: enhancedFeatures,
           });
-        } else {
-          console.error("[MapLibreMap] ZIP source not found");
-          setError("Map data source not available");
-          return;
         }
-
-        if (!interactionsSetup.current && mapRef.current) {
-          try {
-            setupMapInteractions(mapRef.current);
-            interactionsSetup.current = true;
-          } catch (interactionError) {
-            console.error("[MapLibreMap] Failed to setup interactions:", interactionError);
-          }
-        }
-      } catch (err) {
-        if (!abortControllerRef.current?.signal.aborted) {
-          console.error("[MapLibreMap] Failed to update map:", err);
-          setError("Failed to update map visualization");
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          console.error("Error processing map data:", error);
+          setError(error);
         }
       } finally {
         processingRef.current = false;
       }
-    })();
+    };
+
+    updateMap();
 
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
+      abortController.abort();
+      processingRef.current = false;
     };
   }, [isMapReady, baseGeoJSON, colorScale, zipData, selectedMetric]);
+
 
   // Navigate to searched ZIP with error handling
   useEffect(() => {
