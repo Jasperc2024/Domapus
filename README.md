@@ -1,15 +1,30 @@
-# <img src="https://jasperc2024.github.io/Domapus//android-chrome-512x512.png" width="40">  Domapus
-# Interactive U.S. Housing Market Dashboard
+<p align="center" style="margin: 0;">
+  <span style="display: inline-block; vertical-align: middle;">
+    <img src="https://jasperc2024.github.io/Domapus//android-chrome-512x512.png" width="90" alt="Logo" style="margin-right: 10px;">
+  </span>
+  <span style="display: inline-block; vertical-align: middle; text-align: left;">
+    <strong style="font-size: 20px; line-height: 1;">Domapus</strong><br>
+    <span style="font-size: 16px; font-weight: normal; line-height: 1;">Interactive U.S. Housing Market Dashboard</span>
+  </span>
+</p>
+<br>
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-blue)](https://jasperc2024.github.io/Domapus/)
-[![GitHub](https://img.shields.io/badge/GitHub-Repo-black)](https://github.com/Jasperc2024/Domapus)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Live Website](https://img.shields.io/badge/Live-Website-2596BE)](https://jasperc2024.github.io/Domapus/)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white&style=flat)
+![GitHub Pages](https://img.shields.io/badge/Deployed%20on-GitHub%20Pages-121013?style=flat)
+[![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/Jasperc2024/Domapus/blob/main/LICENSE.md)
+[![build](https://github.com/Jasperc2024/Domapus/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/Jasperc2024/Domapus/actions/workflows/pages/pages-build-deployment)
+![GitHub Stars](https://img.shields.io/github/stars/Jasperc2024/Domapus?style=flat)
+![Contributors](https://img.shields.io/github/contributors/Jasperc2024/Domapus?style=flat)
+[![](https://data.jsdelivr.com/v1/package/gh/Jasperc2024/Domapus/badge)](https://www.jsdelivr.com/package/gh/Jasperc2024/Domapus)
 
 
-> **Domapus** visualizes U.S. housing market data at the ZIP-code level.  
-> Built with **React**, **TypeScript**, and **MapLibre GL JS**, it makes nationwide housing trends interactive and accessible.
+**Domapus** visualizes U.S. housing market data at the ZIP-code level.  
+Built with **React**, **TypeScript**, and **MapLibre GL JS**, it makes nationwide housing trends interactive and accessible.
 
 ![Preview](https://jasperc2024.github.io/Domapus/preview.png)
+
+---
 
 ## ✨ Features
 
@@ -60,6 +75,8 @@
 npm run build && npm run preview
 ```
 
+---
+
 ## 🏗️ Project Structure
 
 ```
@@ -92,56 +109,20 @@ src/
 
 ---
 
-## 🎨 Technology Stack
+## 🧠 Tech Stack
+**Frontend:** React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui
 
-### Frontend
+**Visualization:** MapLibre GL JS, D3-Scale
 
-- **React 18** 
-- **TypeScript** 
-- **Vite** 
-- **Tailwind CSS** 
-- **shadcn/ui**
+**Data:** Redfin (market), U.S. Census (ZCTA)
 
-### Mapping & Visualization
+**Data Processing:** Github Action, Python
 
-- **MapLibre GL JS** - Open-source vector map rendering with hardware acceleration
-- **D3-Scale** - Data-driven color scaling and interpolation
-- **Canvas Rendering** - High-performance GPU-accelerated rendering
+**Export Tools:** html2canvas, jsPDF
 
-### Data Processing
+**Optimization:** Pako, Web Workers
 
-- **Pako** - Fast zlib implementation for data decompression
-- **Web Workers** - Background processing for better performance
-- **CSV Parsing** - Efficient client-side data processing
-
-### Export & Analytics
-
-- **html2canvas** - High-quality screenshot generation
-- **jsPDF** - Client-side PDF generation
-- **Custom Export Engine** - Professional map export system
-
-## 📈 Performance Features
-
-### Core Web Vitals Optimization
-
-- **LCP (Largest Contentful Paint)** - Optimized with resource preloading
-- **FID (First Input Delay)** - Web workers prevent main thread blocking
-- **CLS (Cumulative Layout Shift)** - Fixed dimensions and skeleton loading
-- **INP (Interaction to Next Paint)** - Hardware acceleration and efficient event handling
-
-### Loading Optimizations
-
-- Resource preconnection to CDN domains
-- Critical asset prefetching
-- Lazy loading for non-critical components
-- Efficient data compression (gzip)
-
-### Runtime Performance
-
-- Hardware-accelerated map rendering with MapLibre GL JS
-- Web worker data processing
-- Efficient event handling with throttling
-- Optimized memory management
+---
 
 ## 🔧 Configuration
 
@@ -164,23 +145,23 @@ The project uses Vite with custom configuration for:
 - TypeScript compilation with strict mode
 - Tailwind CSS with custom design system
 
-## 📱 Responsive Design
-
-* Mobile-first, adaptive layouts
-* Touch-optimized map controls
-* Responsive panels and legends
+---
 
 ## 🌐 Data Sources
 
-- * Redfin real estate market data
-- * U.S. Census ZIP Code Tabulation Areas (ZCTA)
-- * Custom aggregated geographic data for city/County Mapping
-- * Data refreshed monthly from Redfin sources
+-  Redfin real estate market data
+-  U.S. Census ZIP Code Tabulation Areas (ZCTA)
+-  Custom aggregated geographic data for city/County Mapping
+-  Data refreshed monthly from Redfin sources
+
+---
 
 ## 🔒 Privacy & Security
 
 * 100% client-side processing
 * All assets served securely over HTTPS
+
+---
 
 ## 🤝 Contributing
 
@@ -204,9 +185,13 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 - Prettier code formatting
 - Component-based architecture with clear separation of concerns
 
+---
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
 
 ## 🙋 Support
 
@@ -215,11 +200,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Discussions**: Join the conversation in [GitHub Discussions](https://github.com/Jasperc2024/Domapus/discussions)
 - **Email**: Contact the maintainer at [jasperc.wk@gmail.com](mailto:jasperc.wk@gmail.com)
 
+---
+
 ## ☕ Support the Project
 
 If you find Domapus useful, consider supporting its development:
 
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/JasperC)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=flat&logo=buy-me-a-coffee)](https://buymeacoffee.com/JasperC)
+
+---
 
 ## 🏆 Acknowledgments
 
