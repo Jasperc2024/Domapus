@@ -6,51 +6,31 @@
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 
-Domapus is an interactive dashboard for visualizing U.S. housing market data at the ZIP code level. Built with React, TypeScript, and MapLibre GL JS, it visualizes real estate trends across 24,000+ ZIP codes using data sourced from Redfin.
+> **Domapus** visualizes U.S. housing market data at the ZIP-code level.  
+> Built with **React**, **TypeScript**, and **MapLibre GL JS**, it makes nationwide housing trends interactive and accessible.
 
-![Domapus Preview](https://jasperc2024.github.io/Domapus/preview.png)
+![Preview](https://jasperc2024.github.io/Domapus/preview.png)
 
 ## ✨ Features
 
-### 🗺️ Interactive Map Visualization
+### 🗺️ Map & Data Visualization
+- Interactive **ZIP-level map** updated monthly  
+- Metrics: *median price, inventory, DOM, listings, sales, and more*  
+- **Hover tooltips**, **ZIP search**, and **region filters**  
 
-- **Real-time ZIP code data** for 24,000+ locations across the United States
-- **Multiple housing metrics** including median sale price, inventory, days on market, and more
-- **Smooth zoom and pan** with hardware-accelerated MapLibre GL JS rendering
-- **Hover tooltips** displaying detailed information for each ZIP code
-- **Search functionality** to quickly locate specific ZIP codes
+### 📊 Analytics & Export
+- Dynamic color scaling with **D3-Scale**  
+- Quintile-based legend for data distribution  
+- **Export maps** to PNG or PDF with title and legend options  
 
-### 📊 Advanced Analytics
+### ⚡ Performance
+- **Web Workers** for data offloading  
+- **GPU-accelerated rendering** via MapLibre GL  
+- Lazy-loaded components and gzip compression
 
-- **Dynamic color scaling** based on data distribution
-- **Quintile-based legend** showing actual data ranges
-- **Regional filtering** by state and metropolitan area
-- **Real-time metric switching** without data reloading
-
-### 📸 Professional Export System
-
-- **High-quality map exports** in PNG and PDF formats
-- **Dynamic legend scaling** based on selected data
-- **Customizable export options** including title, legend, and attribution
-- **Professional branding** with Domapus logo integration
-
-### ⚡ Performance Optimizations
-
-- **Web Workers** for data processing to improve responsiveness
-- **Hardware-accelerated rendering** with MapLibre GL JS
-- **Optimized INP (Interaction to Next Paint)** for better user experience
-- **Resource preconnection** and prefetching for faster loading
-- **Debounced interactions** to reduce main thread blocking
-- **Efficient memory management** with proper cleanup
+---
 
 ## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js 18+
-- npm or yarn package manager
-
-### Installation
 
 1. **Clone the repository**
 
@@ -77,8 +57,7 @@ Domapus is an interactive dashboard for visualizing U.S. housing market data at 
 ### Build for Production
 
 ```bash
-npm run build
-npm run preview
+npm run build && npm run preview
 ```
 
 ## 🏗️ Project Structure
@@ -86,41 +65,42 @@ npm run preview
 ```
 src/
 ├── components/
-│   ├── dashboard/           # Main dashboard components
-│   │   ├── map/            # Map-related utilities and hooks
-│   │   ├── MapLibreMap.tsx       # Main MapLibre GL JS component
-│   │   ├── ExportRenderer.tsx    # Export functionality
-│   │   ├── ExportLegend.tsx      # Dynamic legend component
-│   │   └── ...
-│   ├── ui/                 # Reusable UI components (shadcn/ui)
-│   └── ...
-├── hooks/                  # Custom React hooks
-├── workers/                # Web workers for performance
-├── utils/                  # Utility functions
-└── pages/                  # Page components
+│   ├── dashboard/        # Map and analytics components
+│   ├── ui/               # Reusable UI (shadcn/ui)
+├── hooks/                # Custom React hooks
+├── utils/                # Helper functions
+├── workers/              # Web workers
+└── pages/                # Page components
+
 ```
 
-## 📊 Available Metrics
+---
 
-- **Median Sale Price** - Middle price point of recently sold homes
-- **Median List Price** - Middle asking price of homes for sale
-- **Median Days on Market** - Average time homes spend listed before sale
-- **Inventory** - Number of homes currently available for sale
-- **New Listings** - Recently added properties to the market
-- **Homes Sold** - Number of completed transactions
-- **Sale to List Ratio** - Percentage of asking price achieved in sales
-- **Homes Sold Above List** - Properties selling above asking price
-- **Off Market in 2 Weeks** - Quick-selling properties
+## 📈 Metrics Overview
+
+| Metric                    | Description                 |
+| ------------------------- | --------------------------- |
+| **Median Sale Price**     | Typical price of sold homes |
+| **Median List Price**     | Typical asking price        |
+| **Days on Market**        | Average listing duration    |
+| **Inventory**             | Homes available for sale    |
+| **New Listings**          | Homes newly added           |
+| **Homes Sold**            | Closed transactions         |
+| **Sale-to-List Ratio**    | Sale price ÷ asking price   |
+| **Homes Sold Above List** | % of homes sold above ask   |
+| **Off Market in 2 Weeks** | % of homes selling rapidly  |
+
+---
 
 ## 🎨 Technology Stack
 
 ### Frontend
 
-- **React 18** - Modern React with hooks and concurrent features
-- **TypeScript** - Type-safe development with enhanced IDE support
-- **Vite** - Fast build tool with hot module replacement
-- **Tailwind CSS** - Utility-first CSS framework
-- **shadcn/ui** - High-quality, accessible component library
+- **React 18** 
+- **TypeScript** 
+- **Vite** 
+- **Tailwind CSS** 
+- **shadcn/ui**
 
 ### Mapping & Visualization
 
@@ -186,24 +166,21 @@ The project uses Vite with custom configuration for:
 
 ## 📱 Responsive Design
 
-- **Mobile-first approach** with adaptive layouts
-- **Touch-optimized interactions** for mobile devices
-- **Responsive map controls** that adapt to screen size
-- **Mobile-specific UI patterns** for better usability
+* Mobile-first, adaptive layouts
+* Touch-optimized map controls
+* Responsive panels and legends
 
 ## 🌐 Data Sources
 
-- **Primary Data**: Redfin real estate market data
-- **Geographic Data**: U.S. Census ZIP Code Tabulation Areas (ZCTA)
-- **City/County Mapping**: Custom aggregated geographic data
-- **Update Frequency**: Data refreshed monthly from Redfin sources
+- * Redfin real estate market data
+- * U.S. Census ZIP Code Tabulation Areas (ZCTA)
+- * Custom aggregated geographic data for city/County Mapping
+- * Data refreshed monthly from Redfin sources
 
 ## 🔒 Privacy & Security
 
-- **No user tracking** - All analytics are aggregated and anonymous
-- **Client-side processing** - No personal data sent to servers
-- **Secure data sources** - All external resources served over HTTPS
-- **Content Security Policy** - Strict CSP headers for security
+* 100% client-side processing
+* All assets served securely over HTTPS
 
 ## 🤝 Contributing
 
