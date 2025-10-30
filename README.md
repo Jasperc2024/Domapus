@@ -1,13 +1,6 @@
 <p align="center" style="margin: 0;">
-  <span style="display: inline-block; vertical-align: middle;">
-    <img src="https://jasperc2024.github.io/Domapus//android-chrome-512x512.png" width="90" alt="Logo" style="margin-right: 10px;">
-  </span>
-  <span style="display: inline-block; vertical-align: middle; text-align: left;">
-    <h2 style="font-size: 20px; line-height: 1;">Domapus</h2><br>
-    <span style="font-size: 16px; font-weight: normal; line-height: 1;">Interactive U.S. Housing Market Dashboard</span>
-  </span>
+    <img src="https://github.com/Jasperc2024/Domapus/blob/main/public/Banner.svg" width=400>
 </p>
-<br>
 
 [![Live Website](https://img.shields.io/badge/Live-Website-2596BE)](https://jasperc2024.github.io/Domapus/)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white&style=flat)
