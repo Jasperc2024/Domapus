@@ -91,13 +91,13 @@
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
     "jsdom": "^26.1.0",
-    "lovable-tagger": "^1.1.8",
+    "lovable-tagger": "^1.1.11",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
     "tsd": "^0.32.0",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.21",
+    "vite": "^7.1.12",
     "vitest": "^3.2.4"
   }
 }
