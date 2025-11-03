@@ -34,8 +34,12 @@ export function HousingDashboard() {
 
   useEffect(() => {
     let isMounted = true;
+    let hasRun = false;
     
     const loadInitialData = async () => {
+      if (hasRun) return;
+      hasRun = true;
+      
       const dataUrl = new URL(`${BASE_PATH}data/zip-data.json.gz`, window.location.origin).href;
       const geoJsonUrl = new URL(`${BASE_PATH}data/us-zip-codes.geojson.gz`, window.location.origin).href;
 
@@ -96,6 +100,7 @@ export function HousingDashboard() {
       isMounted = false;
       clearTimeout(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   const handleZipSelect = (zip: ZipData) => { setSelectedZip(zip); setSidebarOpen(true); };
