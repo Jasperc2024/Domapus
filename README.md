@@ -5,7 +5,7 @@
 [![Live Website](https://img.shields.io/badge/Live-Website-2596BE)](https://jasperc2024.github.io/Domapus/)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white&style=flat)
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/Jasperc2024/Domapus/blob/main/LICENSE.md)
-[![build](https://github.com/Jasperc2024/Domapus/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/Jasperc2024/Domapus/actions/workflows/pages/pages-build-deployment)
+[![Deploy to GitHub Pages](https://github.com/Jasperc2024/Domapus/actions/workflows/deploy.yml/badge.svg)](https://github.com/Jasperc2024/Domapus/actions/workflows/deploy.yml)
 ![GitHub Stars](https://img.shields.io/github/stars/Jasperc2024/Domapus?style=flat)
 ![Contributors](https://img.shields.io/github/contributors/Jasperc2024/Domapus?style=flat)
 [![](https://data.jsdelivr.com/v1/package/gh/Jasperc2024/Domapus/badge)](https://www.jsdelivr.com/package/gh/Jasperc2024/Domapus)
