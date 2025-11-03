@@ -267,6 +267,7 @@ export function MapLibreMap({
         abortControllerRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMapReady, baseGeoJSON, colorScale, zipData, selectedMetric]);
 
   // Navigate to searched ZIP with error handling
