@@ -5,8 +5,13 @@
   "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#4f46e5",
+  "theme_color": "#05264e",
   "icons": [
+    {
+    "src": "Logo.svg",
+    "sizes": "any",
+    "type": "image/svg+xml"
+    },
     {
       "src": "android-chrome-192x192.png",
       "sizes": "192x192",
