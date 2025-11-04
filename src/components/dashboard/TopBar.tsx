@@ -31,7 +31,7 @@ export function TopBar({
           onClick={() => window.location.reload()}
           title="Click to reload page"
         >
-          <img src="/Domapus/apple-touch-icon.png" alt="Domapus Logo" className="h-8 w-8 sm:h-10 sm:w-10" />
+          <img src="/Domapus/Logo.svg" alt="Domapus Logo" className="h-8 w-8 sm:h-10 sm:w-10" />
           
           {/* This div applies the special 'Inter' font only to the logo and subtitle */}
           <div className="flex flex-col font-logo">
