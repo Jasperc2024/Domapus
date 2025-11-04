@@ -359,8 +359,8 @@ export function MapLibreMap({
   };
 
   return (
-    <div className="absolute inset-0 w-full h-full">
-      <div ref={mapContainer} data-testid="map-container" role="application" className="w-full h-full" />
+    <div className="absolute inset-0 w-full h-full min-h-[400px]">
+      <div ref={mapContainer} data-testid="map-container" role="application" className="w-full h-full" style={{ minHeight: '400px' }} />
       {(isLoading || !isMapReady || error) && (
         <div
           role="status"

@@ -46,7 +46,7 @@ export function Legend({ selectedMetric, colorScaleDomain }: LegendProps) {
 
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-lg p-3 shadow-lg w-full max-w-xs">
+    <div className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-lg p-3 shadow-lg w-full max-w-xs min-h-[88px]">
       <h3 className="text-xs font-semibold mb-2 text-gray-800">
         {getMetricDisplayName(selectedMetric)}
       </h3>

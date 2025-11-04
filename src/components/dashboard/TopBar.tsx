@@ -24,14 +24,20 @@ export function TopBar({
   const isMobile = useIsMobile();
 
   return (
-    <div className="flex items-center justify-between p-2 sm:p-4 bg-dashboard-panel border-b border-dashboard-border">
+    <div className="flex items-center justify-between p-2 sm:p-4 bg-dashboard-panel border-b border-dashboard-border min-h-[60px] sm:min-h-[80px]">
       <div className="flex items-center space-x-2 sm:space-x-6">
         <div
           className="flex items-center space-x-2 sm:space-x-3 cursor-pointer hover:opacity-80 transition-opacity"
           onClick={() => window.location.reload()}
           title="Click to reload page"
         >
-          <img src="/Domapus/Logo.svg" alt="Domapus Logo" className="h-8 w-8 sm:h-10 sm:w-10" />
+          <img 
+            src="/Domapus/Logo.svg" 
+            alt="Domapus Logo" 
+            width="40" 
+            height="40"
+            className="h-8 w-8 sm:h-10 sm:w-10" 
+          />
           
           {/* This div applies the special 'Inter' font only to the logo and subtitle */}
           <div className="flex flex-col font-logo">

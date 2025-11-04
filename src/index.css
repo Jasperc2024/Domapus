@@ -1,11 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+/* Font loaded in index.html with display=swap for better CLS */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Map container safety */
+/* Map container safety and CLS prevention */
 [data-testid="map-container"] {
-  min-height: 300px;
+  min-height: 400px;
+  will-change: contents;
 }
 
 @layer base {
@@ -120,6 +121,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  /* Prevent layout shift from font loading */
+  body {
+    font-display: swap;
   }
 }
 
@@ -133,6 +140,7 @@
 /* MapLibre GL JS map improvements */
 .maplibregl-map {
   background: hsl(var(--dashboard-bg)) !important;
+  contain: layout style paint;
 }
 
 .maplibregl-canvas {
@@ -212,4 +220,41 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Performance and CLS optimizations */
+@layer utilities {
+  /* Prevent layout shifts with containment */
+  .contain-layout {
+    contain: layout;
+  }
+  
+  .contain-paint {
+    contain: paint;
+  }
+  
+  .contain-strict {
+    contain: strict;
+  }
+  
+  /* Optimize animations to prevent repaints */
+  .will-change-transform {
+    will-change: transform;
+  }
+  
+  .will-change-opacity {
+    will-change: opacity;
+  }
+  
+  /* Force GPU acceleration */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+}
+
+/* Ensure smooth transitions without layout shifts */
+* {
+  /* Use transform and opacity for animations - they don't cause layout shifts */
+  transition-property: transform, opacity, color, background-color, border-color;
 }
