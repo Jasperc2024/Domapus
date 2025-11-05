@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
 import { useIsMobile } from "@/hooks/use-mobile";
+const DATA_BASE = "https://jasperc2024.github.io/Domapus/";
 
 interface TopBarProps {
   selectedMetric: MetricType;
@@ -22,9 +23,10 @@ export function TopBar({
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
+    const dataUrl = `${DATA_BASE}data/last_updated.json`;
     const fetchLastUpdated = async () => {
       try {
-        const res = await fetch("/data/last_updated.json");
+        const res = await fetch(dataUrl);
         if (!res.ok) throw new Error("Failed to fetch last_updated.json");
         const data = await res.json();
         setLastUpdated(data.last_updated_utc);
@@ -72,7 +74,7 @@ export function TopBar({
                 Domapus
               </h1>
               <p className="text-[9px] sm:text-[10px] text-dashboard-text-secondary leading-tight mt-0.5 hidden sm:block">
-                U.S. Housing Market Analysis
+                U.S. Housing Market
               </p>
             </div>
           </div>
