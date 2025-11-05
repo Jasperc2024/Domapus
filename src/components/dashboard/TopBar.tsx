@@ -25,9 +25,9 @@ export function TopBar({
 
   return (
     <>
-      <div className="flex items-center justify-between px-3 sm:px-6 py-2 bg-dashboard-panel border-b border-dashboard-border h-16 sm:h-[72px]">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-2 bg-dashboard-panel border-b border-dashboard-border h-14 sm:h-16">
         {/* Left Section - Logo and Metric Selector */}
-        <div className="flex items-center gap-3 sm:gap-6 min-w-0 flex-shrink-0">
+        <div className="flex items-center gap-4 sm:gap-6 min-w-0 flex-1">
           <div
             className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
             onClick={() => window.location.reload()}
@@ -38,13 +38,13 @@ export function TopBar({
               alt="Domapus Logo" 
               width="32" 
               height="32"
-              className="w-8 h-8 sm:w-9 sm:h-9" 
+              className="w-7 h-7 sm:w-8 sm:h-8" 
             />
             <div className="flex flex-col font-logo min-w-0">
-              <h1 className="text-base sm:text-lg font-bold text-dashboard-text-primary leading-none">
+              <h1 className="text-sm sm:text-base font-bold text-dashboard-text-primary leading-none">
                 Domapus
               </h1>
-              <p className="text-[10px] sm:text-xs text-dashboard-text-secondary leading-tight mt-0.5 hidden sm:block">
+              <p className="text-[9px] sm:text-[10px] text-dashboard-text-secondary leading-tight mt-0.5 hidden sm:block">
                 U.S. Housing Market
               </p>
             </div>
@@ -59,20 +59,20 @@ export function TopBar({
 
         {/* Right Section - Actions */}
         {!isMobile && (
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <SearchBox onSearch={onSearch} />
             <LastUpdated lastUpdated={lastUpdated} />
             {children}
             
-            <div className="flex items-center gap-2 ml-2 pl-2 border-l border-dashboard-border">
-              <Button variant="outline" size="sm" asChild className="h-8">
+            <div className="flex items-center gap-2 pl-3 border-l border-dashboard-border">
+              <Button variant="outline" size="sm" asChild className="h-8 px-2.5">
                 <a href="https://github.com/Jasperc2024/Domapus" target="_blank" rel="noopener noreferrer">
                   <Github className="h-3.5 w-3.5 sm:mr-1.5" />
                   <span className="hidden lg:inline">GitHub</span>
                 </a>
               </Button>
 
-              <Button variant="default" size="sm" asChild className="h-8 bg-pink-600 hover:bg-pink-700 text-white">
+              <Button variant="default" size="sm" asChild className="h-8 px-2.5 bg-pink-600 hover:bg-pink-700 text-white">
                 <a href="https://buymeacoffee.com/JasperC" target="_blank" rel="noopener noreferrer">
                   <Heart className="h-3.5 w-3.5 sm:mr-1.5" />
                   <span className="hidden lg:inline">Sponsor</span>

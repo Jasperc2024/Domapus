@@ -30,12 +30,12 @@ interface MetricSelectorProps {
 
 export function MetricSelector({ selectedMetric, onMetricChange }: MetricSelectorProps) {
   return (
-    <div className="bg-dashboard-panel border border-dashboard-border rounded-lg p-3 shadow-sm">
-      <label className="block text-sm font-medium text-dashboard-text-secondary mb-2">
-        Visualization Metric
+    <div className="flex items-center gap-2">
+      <label className="text-xs font-medium text-dashboard-text-secondary whitespace-nowrap hidden lg:block">
+        Metric:
       </label>
       <Select value={selectedMetric} onValueChange={onMetricChange}>
-        <SelectTrigger className="w-64" aria-label="Select visualization metric">
+        <SelectTrigger className="w-48 h-8 text-sm" aria-label="Select visualization metric">
           <SelectValue placeholder="Select a metric" />
         </SelectTrigger>
         <SelectContent className="z-[9999]">
