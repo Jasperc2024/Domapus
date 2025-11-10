@@ -45,9 +45,9 @@ export function MapLibreMap({
       minZoom: 3,
       maxZoom: 12,
       maxBounds: [
-      [-180, -85],
-      [180, 85],
-    ],
+        [-180, -85],
+        [180, 85],
+      ],
     });
 
     map.on("error", (e) => {
@@ -55,29 +55,13 @@ export function MapLibreMap({
       setError("Map encountered an internal error. Please refresh the page.");
     });
 
+    // --- FIX: Simplified load handler ---
+    // The broken label-moving logic has been removed.
+    // We will add our layer *under* the labels later.
     map.once("load", () => {
       console.log("[Map] Loaded successfully");
       map.resize();
       setIsMapReady(true);
-
-      // Reposition labels using moveLayer
-      const labelLayers = [
-        "Place labels",
-        "Road labels",
-        "POI labels",
-        "Housenumber labels",
-      ];
-
-      labelLayers.forEach((layerId) => {
-        const layer = map.getLayer(layerId);
-        if (layer) {
-          try {
-            map.moveLayer(layerId);
-          } catch (err) {
-            console.warn(`Could not move layer ${layerId}:`, err);
-          }
-        }
-      });
     });
 
     map.addControl(new maplibregl.NavigationControl(), "top-right");
@@ -85,40 +69,60 @@ export function MapLibreMap({
     return map;
   };
 
-  // Initialize map with enhanced error handling
+  // Initialize map with enhanced error handling and cleanup
   useEffect(() => {
-    if (!mapContainer.current || mapRef.current) return;
-
-    const { clientWidth, clientHeight } = mapContainer.current;
-    
-    if (!clientWidth || !clientHeight) {
-      console.warn("Container has no size yet; delaying init");
-      const id = requestAnimationFrame(() => {
-        if (mapContainer.current && !mapRef.current) {
-          const newMap = createAndInitializeMap(mapContainer.current);
-          mapRef.current = newMap;
-        }
-      });
-      return () => cancelAnimationFrame(id);
+    if (!mapContainer.current) {
+      console.error("Map container ref is not available.");
+      return;
+    }
+    if (mapRef.current) {
+      return; // Map is already initialized
     }
 
-    try {
-      const newMap = createAndInitializeMap(mapContainer.current);
-      mapRef.current = newMap;
+    let map: maplibregl.Map | null = null;
+    let animationFrameId: number;
 
-      return () => {
-        if (newMap) {
-          try {
-            newMap.remove();
-          } catch (error) {
-            console.error("[MapLibreMap] Error during cleanup:", error);
-          }
-        }
-      };
-    } catch (error) {
-      console.error("[MapLibreMap] Failed to initialize map:", error);
-      setError("Failed to initialize map. Please refresh the page.");
-    }
+    const init = () => {
+      if (!mapContainer.current) return; // Container unmounted
+
+      const { clientWidth, clientHeight } = mapContainer.current;
+
+      // If container has no size, try again next frame
+      if (!clientWidth || !clientHeight) {
+        console.warn("Container has no size, delaying init...");
+        animationFrameId = requestAnimationFrame(init);
+        return;
+      }
+
+      // Container has size, create the map
+      try {
+        console.log("[MapLibreMap] Container is sized, initializing map...");
+        map = createAndInitializeMap(mapContainer.current);
+        mapRef.current = map;
+      } catch (error) {
+        console.error("[MapLibreMap] Failed to initialize map:", error);
+        setError("Failed to initialize map. Please refresh the page.");
+      }
+    };
+
+    // Start the initialization attempt
+    animationFrameId = requestAnimationFrame(init);
+
+    // This single cleanup function handles all cases
+    return () => {
+      console.log("[MapLibreMap] Cleanup running...");
+      cancelAnimationFrame(animationFrameId); // Stop any pending init
+      
+      // Use mapRef.current first, as it's the most reliable
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      } else if (map) {
+        // Fallback in case ref hadn't been set yet
+        map.remove();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   /* Color scale */
@@ -130,16 +134,16 @@ export function MapLibreMap({
       .clamp(true);
   }, [colorScaleDomain]);
 
-  // Load base GeoJSON data with enhanced security
+  // Load base GeoJSON data
   useEffect(() => {
-    if (!isMapReady || baseGeoJSON) return;
+    if (!isMapReady || baseGeoJSON) return; // Only load once
 
     async function loadGeoJSON() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         console.warn("[MapLibreMap] GeoJSON load timeout");
         controller.abort();
-      }, 30000); // 30 second timeout for large file
+      }, 30000); // 30 second timeout
 
       try {
         const geoJsonUrl = new URL( `${BASE_PATH}data/us-zip-codes.geojson.gz`, window.location.origin).href;
@@ -158,7 +162,6 @@ export function MapLibreMap({
           throw new Error(`Failed to load GeoJSON: ${response.status} ${response.statusText}`);
         }
 
-        // Check file size
         const contentLength = response.headers.get('content-length');
         if (contentLength && parseInt(contentLength) > 50 * 1024 * 1024) { // 50MB limit
           throw new Error(`GeoJSON file too large: ${contentLength} bytes`);
@@ -172,7 +175,6 @@ export function MapLibreMap({
         console.log("[MapLibreMap] Parsing GeoJSON...");
         const geoJSON = JSON.parse(jsonData);
         
-        // Basic validation
         if (!geoJSON || geoJSON.type !== "FeatureCollection" || !Array.isArray(geoJSON.features)) {
           throw new Error("Invalid GeoJSON structure");
         }
@@ -193,8 +195,73 @@ export function MapLibreMap({
     loadGeoJSON();
   }, [isMapReady, baseGeoJSON]);
 
-  // Process and update map data with enhanced error handling
+  // --- NEW EFFECT: Add the data source and layers ---
+  // This is the critical missing step. It runs once after the map
+  // and the base GeoJSON are both ready.
   useEffect(() => {
+    if (!isMapReady || !baseGeoJSON || !mapRef.current) return;
+
+    const map = mapRef.current;
+
+    // Prevent this from running more than once
+    if (map.getSource("zips")) {
+      console.log("[MapLibreMap] Source and layers already added.");
+      return;
+    }
+
+    console.log("[MapLibreMap] Adding source and layers for the first time...");
+
+    try {
+      // 1. Add the GeoJSON source
+      map.addSource("zips", {
+        type: "geojson",
+        data: baseGeoJSON, // Use the base data
+      });
+
+      // 2. Find the ID of the first label layer in the basemap style
+      // This is the correct way to put your data *under* the labels
+      const styleLayers = map.getStyle().layers;
+      const firstLabelLayer = styleLayers.find(
+        (layer) => layer.type === "symbol"
+      );
+      const beforeId = firstLabelLayer ? firstLabelLayer.id : undefined;
+
+      if (!beforeId) {
+        console.warn("[MapLibreMap] Could not find a label layer. Adding layer on top.");
+      } else {
+        console.log(`[MapLibreMap] Inserting layer before: ${beforeId}`);
+      }
+      
+      // 3. Add the fill layer for your choropleth
+      map.addLayer({
+        id: "zips-fill", // This ID is used in your setupMapInteractions
+        type: "fill",
+        source: "zips",
+        paint: {
+          // Use a data-driven expression. The update effect will
+          // add the 'metricColor' property.
+          "fill-color": [
+            "case",
+            ["has", "metricColor"], ["get", "metricColor"],
+            "transparent" // Default to transparent
+          ],
+          "fill-opacity": 0.75,
+          "fill-outline-color": "rgba(0, 0, 0, 0.1)",
+        },
+      }, beforeId); // This inserts your layer *under* the labels
+
+      console.log("[MapLibreMap] Source and layers added successfully.");
+
+    } catch (err) {
+      console.error("[MapLibreMap] Error adding source/layers:", err);
+      setError("Failed to add map data layers.");
+    }
+
+  }, [isMapReady, baseGeoJSON]); // This effect runs when the map AND data are ready
+
+  // Process and update map data
+  useEffect(() => {
+    // This effect now runs *after* the one above has created the source
     if (!isMapReady || !baseGeoJSON || !colorScale || Object.keys(zipData).length === 0) return;
     if (processingRef.current) return;
 
@@ -231,13 +298,16 @@ export function MapLibreMap({
           return feature;
         });
 
+        // --- This will now succeed ---
         const source = mapRef.current.getSource("zips") as maplibregl.GeoJSONSource;
         if (source) {
+          console.log("[MapLibreMap] Updating source data...");
           source.setData({ 
             type: "FeatureCollection", 
             features: enhancedFeatures 
           });
         } else {
+          // This should no longer happen
           console.error("[MapLibreMap] ZIP source not found");
           setError("Map data source not available");
           return;
@@ -270,7 +340,7 @@ export function MapLibreMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMapReady, baseGeoJSON, colorScale, zipData, selectedMetric]);
 
-  // Navigate to searched ZIP with error handling
+  // Navigate to searched ZIP
   useEffect(() => {
     if (!isMapReady || !mapRef.current || !searchZip || !zipData[searchZip]) return;
     
@@ -291,11 +361,11 @@ export function MapLibreMap({
     }
   }, [isMapReady, searchZip, zipData]);
 
-  // Setup map interactions with comprehensive error handling
+  // Setup map interactions
   const setupMapInteractions = (mapInstance: maplibregl.Map) => {
     console.log("[MapLibreMap] Setting up map interactions...");
     let popup: maplibregl.Popup | null = null;
-    const layers = ["zips-fill"];
+    const layers = ["zips-fill"]; // This layer ID now matches the one we created
 
     try {
       mapInstance.on("mousemove", layers, (e) => {
@@ -343,7 +413,7 @@ export function MapLibreMap({
         try {
           const props = e.features?.[0]?.properties;
           if (props?.zipCode && zipData[props.zipCode]) {
-            console.log(`[MapLibreMap] ZIP selected: ${props.zipCode}`);
+            console.log(`[MapLibGbreMap] ZIP selected: ${props.zipCode}`);
             onZipSelect(zipData[props.zipCode]);
           }
         } catch (error) {
