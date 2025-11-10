@@ -88,7 +88,7 @@ export function MapLibreMap({
       const { clientWidth, clientHeight } = mapContainer.current;
 
       // If container has no size, try again next frame
-      if (!clientWidth || !clientHeight) {
+      if (clientWidth === 0 || clientHeight === 0) {
         console.warn("Container has no size, delaying init...");
         animationFrameId = requestAnimationFrame(init);
         return;
