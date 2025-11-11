@@ -25,7 +25,6 @@ export function HousingDashboard() {
   const [zipData, setZipData] = useState<Record<string, ZipData>>({});
   const [dataBounds, setDataBounds] = useState<{ min: number; max: number } | null>(null);
   const [fullGeoJSON, setFullGeoJSON] = useState<GeoJSON.FeatureCollection | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showSponsorBanner, setShowSponsorBanner] = useState(false);
@@ -54,7 +53,6 @@ export function HousingDashboard() {
         if (result) {
           setZipData(result.zip_codes);
           setDataBounds(result.bounds);
-          setLastUpdated(result.last_updated_utc);
         }
 
         const geoResponse = await fetch(geoJsonUrl);
@@ -109,7 +107,7 @@ export function HousingDashboard() {
   return (
     <div className="w-full h-screen bg-dashboard-bg overflow-hidden flex flex-col">
       {showSponsorBanner && <SponsorBanner onClose={() => setShowSponsorBanner(false)} />}
-      <TopBar selectedMetric={selectedMetric} onMetricChange={setSelectedMetric} onSearch={setSearchZip} lastUpdated={lastUpdated}>
+      <TopBar selectedMetric={selectedMetric} onMetricChange={setSelectedMetric} onSearch={setSearchZip}>
         <MapExport allZipData={zipData} fullGeoJSON={fullGeoJSON} selectedMetric={selectedMetric} />
       </TopBar>
       <div className="flex flex-1 relative min-h-0">
