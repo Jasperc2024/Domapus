@@ -55,7 +55,6 @@ export function TopBar({
   const isMobile = useIsMobile();
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
-  /* Fetch last_updated.json */
   useEffect(() => {
     const fetchLastUpdated = async () => {
       try {
@@ -91,10 +90,8 @@ export function TopBar({
   useEffect(() => {
     const measure = () => {
       if (!rightRef.current) return;
-
       const container = rightRef.current;
       const available = container.offsetWidth;
-
       const nodes = Array.from(
         container.querySelectorAll(".right-item")
       ) as HTMLElement[];
@@ -102,12 +99,9 @@ export function TopBar({
       let total = 0;
       const hidden: React.ReactNode[] = [];
 
+      nodes.forEach((node) => (node.style.display = ""));
       nodes.forEach((node) => {
-        node.style.display = ""; // reset
-      });
-
-      nodes.forEach((node) => {
-        total += node.offsetWidth + 12; // gap=12px
+        total += node.offsetWidth + 12;
         if (total > available - 50) {
           hidden.push(node.cloneNode(true) as any);
           node.style.display = "none";
@@ -120,7 +114,6 @@ export function TopBar({
     measure();
     const handler = () => measure();
     window.addEventListener("resize", handler);
-
     return () => window.removeEventListener("resize", handler);
   }, []);
 
@@ -130,7 +123,7 @@ export function TopBar({
     <>
       <header className="w-full bg-dashboard-panel border-b border-dashboard-border">
         <div className="px-4 sm:px-6">
-          <div className="flex items-center gap-6 h-16">
+          <div className="flex items-center justify-between gap-4 sm:gap-6 h-16 flex-wrap">
 
             {/* LEFT: Logo + Title */}
             <div
@@ -152,8 +145,8 @@ export function TopBar({
               </div>
             </div>
 
-            {/* CENTER: Metric + Search (adaptive) */}
-            <div className="flex items-center gap-4 flex-1 min-w-0">
+            {/* CENTER: Metric + Search */}
+            <div className="flex items-center gap-4 flex-1 min-w-0 overflow-hidden">
               <div className="flex-shrink-0">
                 <MetricSelector
                   selectedMetric={selectedMetric}
@@ -161,23 +154,26 @@ export function TopBar({
                 />
               </div>
 
-              <div className="flex-1 min-w-[180px]">
+              <div className="flex-1 min-w-[180px] max-w-full">
                 <SearchBox onSearch={onSearch} />
               </div>
             </div>
 
-            {/* RIGHT SECTION (overflow-aware) */}
+            {/* RIGHT SECTION */}
             <div
               ref={rightRef}
               className="flex items-center gap-3 flex-shrink-0 overflow-hidden"
             >
-              {/* ---------- TRACKED ITEMS ---------- */}
-
               {/* Last Updated */}
-              <div className="right-item flex items-center gap-2 text-dashboard-text-secondary whitespace-nowrap">
-                <Calendar className="h-4 w-4 opacity-80" />
-                <span className="text-xs font-medium">
-                  Last Updated: {formatDate(lastUpdated)}
+              <div className="right-item flex flex-col items-start text-dashboard-text-secondary whitespace-nowrap">
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4 opacity-80" />
+                  <span className="text-[11px] uppercase tracking-wide font-semibold">
+                    Last Updated
+                  </span>
+                </div>
+                <span className="text-xs font-medium mt-0.5">
+                  {formatDate(lastUpdated)}
                 </span>
               </div>
 
@@ -206,10 +202,7 @@ export function TopBar({
                   asChild
                   className="h-8 px-2.5 bg-pink-600 hover:bg-pink-700 text-white"
                 >
-                  <a
-                    href="https://buymeacoffee.com/JasperC"
-                    target="_blank"
-                  >
+                  <a href="https://buymeacoffee.com/JasperC" target="_blank">
                     <Heart className="h-4 w-4 mr-1" />
                     <span className="hidden lg:inline text-xs font-medium">
                       Sponsor
@@ -235,9 +228,14 @@ export function TopBar({
               onMetricChange={onMetricChange}
             />
 
-            <div className="flex items-center gap-2 text-xs text-dashboard-text-secondary">
-              <Calendar className="h-4 w-4" />
-              <span>Last Updated: {formatDate(lastUpdated)}</span>
+            <div className="flex flex-col text-xs text-dashboard-text-secondary">
+              <div className="flex items-center gap-1">
+                <Calendar className="h-4 w-4" />
+                <span className="uppercase font-semibold text-[11px] tracking-wide">
+                  Last Updated
+                </span>
+              </div>
+              <span className="mt-0.5">{formatDate(lastUpdated)}</span>
             </div>
           </div>
         </div>
