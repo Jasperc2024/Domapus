@@ -11,7 +11,7 @@ interface TopBarProps {
   selectedMetric: MetricType;
   onMetricChange: (metric: MetricType) => void;
   onSearch: (zipCode: string) => void;
-  children?: React.ReactNode;
+  children?: React.ReactNode; // optional export / tools button(s)
 }
 
 export function TopBar({
@@ -54,107 +54,142 @@ export function TopBar({
 
   return (
     <>
-      {/* === Desktop / Main Header === */}
-      <header className="flex items-center justify-between px-5 sm:px-8 py-2 bg-dashboard-panel border-b border-dashboard-border h-16 sm:h-18">
-        {/* Left Section - Logo + Metric Selector */}
-        <div className="flex items-center gap-5 sm:gap-8 flex-1 min-w-0">
-          <div
-            className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-            onClick={() => window.location.reload()}
-            title="Click to reload page"
-          >
-            <img
-              src="/Domapus/Logo.svg"
-              alt="Domapus Logo"
-              width="40"
-              height="40"
-              className="w-9 h-9 sm:w-10 sm:h-10"
-            />
-            <div className="flex flex-col font-logo">
-              <h1 className="text-base sm:text-lg font-extrabold text-dashboard-text-primary leading-none">
-                Domapus
-              </h1>
-              <p className="text-[10px] sm:text-xs text-dashboard-text-secondary leading-tight mt-0.5 hidden sm:block">
-                U.S. Housing Market Analysis
-              </p>
+      <header className="w-full bg-dashboard-panel border-b border-dashboard-border">
+        <div className="max-w-full mx-auto px-4 sm:px-6">
+          {/* main row */}
+          <div className="flex items-center gap-6 h-16">
+            {/* LEFT: brand */}
+            <div
+              className="flex items-center gap-3 flex-shrink-0 cursor-pointer"
+              onClick={() => window.location.reload()}
+              title="Reload page"
+            >
+              <img
+                src="/Domapus/Logo.svg"
+                alt="Domapus"
+                className="w-10 h-10 sm:w-11 sm:h-11"
+                width={40}
+                height={40}
+              />
+              <div className="min-w-0">
+                <div className="text-base sm:text-lg font-extrabold text-dashboard-text-primary leading-tight truncate">
+                  Domapus
+                </div>
+                <div className="text-[10px] sm:text-xs text-dashboard-text-secondary mt-0.5 hidden sm:block truncate">
+                  U.S. Housing Market Analysis
+                </div>
+              </div>
+            </div>
+
+            {/* CENTER: controls (metric + search). prevents overlap with min-w-0 */}
+            <div className="flex items-center gap-4 min-w-0 flex-1">
+              {/* Metric: fixed natural width, will not shrink into search */}
+              <div className="flex-shrink-0">
+                <MetricSelector
+                  selectedMetric={selectedMetric}
+                  onMetricChange={onMetricChange}
+                />
+              </div>
+
+              {/* Search: fluid but constrained; min-w-0 ensures it truncates internally instead of overflowing */}
+              <div className="flex-1 min-w-0">
+                {/* Wrap SearchBox so we can guarantee a full-width container for it */}
+                <div className="w-full max-w-full">
+                  <SearchBox onSearch={onSearch} />
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT: last-updated, optional children (export), and links */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {/* Last updated block */}
+              <div
+                className="flex items-center gap-2 text-dashboard-text-secondary whitespace-nowrap"
+                aria-live="polite"
+              >
+                <Calendar className="h-4 w-4 opacity-85" />
+                <div className="text-xs">
+                  <span className="opacity-80 mr-1">Last Updated:</span>
+                  <span className="font-medium">{formatDate(lastUpdated)}</span>
+                </div>
+              </div>
+
+              {/* Optional tools (export etc.) */}
+              {children && <div className="flex items-center">{children}</div>}
+
+              {/* GitHub + Sponsor (no dividing line) */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  asChild
+                  className="h-8 px-2.5"
+                >
+                  <a
+                    href="https://github.com/Jasperc2024/Domapus"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Open project on GitHub"
+                  >
+                    <Github className="h-4 w-4" />
+                    <span className="hidden lg:inline ml-2 text-xs font-medium">
+                      GitHub
+                    </span>
+                  </a>
+                </Button>
+
+                <Button
+                  variant="default"
+                  size="sm"
+                  asChild
+                  className="h-8 px-2.5 bg-pink-600 hover:bg-pink-700 text-white"
+                >
+                  <a
+                    href="https://buymeacoffee.com/JasperC"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Sponsor"
+                  >
+                    <Heart className="h-4 w-4" />
+                    <span className="hidden lg:inline ml-2 text-xs font-medium">
+                      Sponsor
+                    </span>
+                  </a>
+                </Button>
+              </div>
             </div>
           </div>
-
-          {!isMobile && (
-            <MetricSelector
-              selectedMetric={selectedMetric}
-              onMetricChange={onMetricChange}
-            />
-          )}
         </div>
-
-        {/* Right Section - Actions */}
-        {!isMobile && (
-          <div className="flex items-center gap-4 flex-shrink-0">
-            <SearchBox onSearch={onSearch} />
-
-            {/* Last Updated */}
-            <div className="flex items-center gap-2 text-dashboard-text-secondary">
-              <Calendar className="h-4 w-4 opacity-80" />
-              <span className="text-xs font-medium whitespace-nowrap">
-                <span className="opacity-80 mr-1">Last Updated:</span>
-                {formatDate(lastUpdated)}
-              </span>
-            </div>
-
-            {children && <div className="flex items-center">{children}</div>}
-
-            {/* External Links - No Divider */}
-            <div className="flex items-center gap-2 ml-2">
-              <Button
-                variant="outline"
-                size="sm"
-                asChild
-                className="h-8 px-2.5 hover:border-dashboard-text-secondary"
-              >
-                <a
-                  href="https://github.com/Jasperc2024/Domapus"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Github className="h-4 w-4 sm:mr-1" />
-                  <span className="hidden lg:inline text-xs font-medium">
-                    GitHub
-                  </span>
-                </a>
-              </Button>
-
-              <Button
-                variant="default"
-                size="sm"
-                asChild
-                className="h-8 px-2.5 bg-pink-600 hover:bg-pink-700 text-white"
-              >
-                <a
-                  href="https://buymeacoffee.com/JasperC"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Heart className="h-4 w-4 sm:mr-1" />
-                  <span className="hidden lg:inline text-xs font-medium">
-                    Sponsor
-                  </span>
-                </a>
-              </Button>
-            </div>
-          </div>
-        )}
       </header>
 
-      {/* === Mobile Bottom Bar === */}
+      {/* MOBILE: compact bottom panel with controls and last-updated beneath */}
       {isMobile && (
         <div className="fixed bottom-4 left-4 right-4 z-[1001] bg-dashboard-panel border border-dashboard-border rounded-lg p-3 shadow-lg">
-          <div className="space-y-2.5">
-            <MetricSelector
-              selectedMetric={selectedMetric}
-              onMetricChange={onMetricChange}
-            />
-            <SearchBox onSearch={onSearch} />
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <SearchBox onSearch={onSearch} />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <MetricSelector
+                  selectedMetric={selectedMetric}
+                  onMetricChange={onMetricChange}
+                />
+              </div>
+
+              <div className="text-xs text-dashboard-text-secondary">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <div>
+                    <div className="opacity-80">Last Updated</div>
+                    <div className="font-medium">{formatDate(lastUpdated)}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
