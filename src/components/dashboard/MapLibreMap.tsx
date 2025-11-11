@@ -429,36 +429,13 @@ export function MapLibreMap({
   };
 
   return (
-    <div className="absolute inset-0 w-full h-full min-h-[400px]">
-      <div ref={mapContainer} data-testid="map-container" role="application" className="w-full h-full" style={{ minHeight: '400px' }} />
-      {(isLoading || !isMapReady || error) && (
-        <div
-          role="status"
-          aria-label="Loading..."
-          className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-10"
-        >
-          {error ? (
-            <div className="text-center space-y-4">
-              <div className="text-red-500 font-bold">{error}</div>
-              <button 
-                onClick={() => window.location.reload()} 
-                className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
-              >
-                Refresh Page
-              </button>
-            </div>
-          ) : (
-            <div className="text-center space-y-4">
-              <div
-                role="progressbar"
-                aria-label="Loading map data"
-                className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"
-              />
-              <p className="text-sm font-medium text-gray-700">{progress.phase || "Loading"}...</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+  <div className="absolute inset-0 w-full h-full min-h-[400px]">
+    <div
+      ref={mapContainer}
+      data-testid="map-container"
+      role="application"
+      className="w-full h-full"
+      style={{ minHeight: "400px" }}
+    />
+  </div>
+);
