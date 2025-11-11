@@ -110,7 +110,7 @@ export function HousingDashboard() {
       <TopBar selectedMetric={selectedMetric} onMetricChange={setSelectedMetric} onSearch={setSearchZip}>
         <MapExport allZipData={zipData} fullGeoJSON={fullGeoJSON} selectedMetric={selectedMetric} />
       </TopBar>
-      <div className="flex flex-1 relative min-h-0">
+      <div className="flex flex-1 relative min-h-[400px]">
         {sidebarOpen && <Sidebar isOpen={sidebarOpen} isCollapsed={sidebarCollapsed} zipData={selectedZip} allZipData={zipData} onClose={() => setSidebarOpen(false)} onToggleCollapse={toggleSidebarCollapse} />}
         <div className="flex-1 relative">
           <div className="absolute inset-0 min-h-[400px]">
