@@ -6,10 +6,6 @@ html, body {
   overflow: hidden; 
 }
 
-[data-testid="map-container"] {
-  min-height: 400px !important;
-}
-
 /* Font loaded in index.html with display=swap for better CLS */
 @tailwind base;
 @tailwind components;
