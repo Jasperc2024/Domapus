@@ -55,12 +55,8 @@ export function MapLibreMap({
       setError("Map encountered an internal error. Please refresh the page.");
     });
 
-    // --- FIX: Simplified load handler ---
-    // The broken label-moving logic has been removed.
-    // We will add our layer *under* the labels later.
     map.once("load", () => {
       console.log("[Map] Loaded successfully");
-      map.resize();
       setIsMapReady(true);
     });
 
