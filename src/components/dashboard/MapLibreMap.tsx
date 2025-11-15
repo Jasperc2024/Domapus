@@ -5,6 +5,7 @@ import { scaleLinear } from "d3-scale";
 import { getMetricDisplay } from "./map/utils";
 import { ZipData } from "./map/types";
 const BASE_PATH = import.meta.env.BASE_URL;
+(window as any).maplibregl = maplibregl;
 
 interface MapProps {
   selectedMetric: string;
