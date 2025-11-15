@@ -40,7 +40,7 @@ export function MapLibreMap({
     const map = new maplibregl.Map({
       container,
       style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-      center: [-98.5795, 39.8283],
+      center: [-98.57, 39.82],
       zoom: 3.5,
       minZoom: 3,
       maxZoom: 12,
