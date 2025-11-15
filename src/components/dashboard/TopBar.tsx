@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Github, Heart, Calendar, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MetricSelector, MetricType } from "./MetricSelector";
@@ -106,13 +106,6 @@ export function TopBar({
    ***********************/
 
   // Prepare the render nodes (these are the actual UI nodes used when showing visible items).
-  // Ensure Export (children) is included — do NOT filter it out.
-  const exportNode = (
-    <div className="flex items-center">
-      {/* children can be anything (export control). We don't filter it out. */}
-      {children}
-    </div>
-  );
 
   const lastUpdatedNode = (
     <div
