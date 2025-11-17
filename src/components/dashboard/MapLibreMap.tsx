@@ -52,9 +52,11 @@ export function MapLibreMap({
       setError("Map encountered an internal error. Please refresh the page.");
     });
 
-    map.once("load", () => {
-      console.log("[Map] Loaded successfully");
-      setIsMapReady(true);
+    map.on("styledata", () => {
+      if (map.isStyleLoaded()) {
+        console.log("[Map] Style fully loaded");
+        setIsMapReady(true);
+      }
     });
 
     map.addControl(new maplibregl.NavigationControl(), "top-right");
@@ -255,7 +257,14 @@ export function MapLibreMap({
   // Process and update map data
   useEffect(() => {
     // This effect now runs *after* the one above has created the source
-    if (!isMapReady || !baseGeoJSON || !colorScale || Object.keys(zipData).length === 0) return;
+  if (
+    !isMapReady ||
+    !mapRef.current?.isStyleLoaded() ||   // ← ADD THIS
+    !baseGeoJSON ||
+    !colorScale ||
+    Object.keys(zipData).length === 0
+  ) return;
+
     if (processingRef.current) return;
 
     processingRef.current = true;
@@ -274,11 +283,6 @@ export function MapLibreMap({
         
         if (abortControllerRef.current?.signal.aborted) {
           console.log("[MapLibreMap] Processing aborted");
-          return;
-        }
-
-        if (!mapRef.current?.isStyleLoaded()) {
-          console.warn("[MapLibreMap] Map style not loaded");
           return;
         }
 
