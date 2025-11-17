@@ -49,6 +49,7 @@ export function MapLibreMap({
       zoom: 3.5,
       minZoom: 3,
       maxZoom: 12,
+      maxBounds: [-180, -90, 180, 90],
     });
 
     // catch map internal errors
