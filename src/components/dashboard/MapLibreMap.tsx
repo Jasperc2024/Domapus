@@ -40,9 +40,6 @@ export function MapLibreMap({
   const mousemoveRafRef = useRef<number | null>(null);
   const lastMouseEventRef = useRef<any>(null);
 
-  const SW = new maplibregl.LngLat(-180, -90);
-  const NE = new maplibregl.LngLat(180, 90);
-  const fullEarthBounds = new maplibregl.LngLatBounds(SW, NE);
   // create map factory
   const createAndInitializeMap = useCallback((container: HTMLDivElement) => {
     const map = new maplibregl.Map({
@@ -52,7 +49,6 @@ export function MapLibreMap({
       zoom: 3.5,
       minZoom: 3,
       maxZoom: 12,
-      maxBounds: fullEarthBounds,
     });
 
     // catch map internal errors
