@@ -1,231 +1,159 @@
-卷 Windows 的文件夹 PATH 列表
-卷序列号为 A60B-5B12
-C:.
-│  .gitattributes
-│  .gitignore
-│  .nojekyll
-│  bun.lockb
-│  components.json
-│  CONTRIBUTING.md
-│  data_pipeline.log
-│  eslint.config.js
-│  index.html
-│  LICENSE.md
-│  package-lock.json
-│  package.json
-│  postcss.config.js
-│  README.md
-│  requirements.txt
-│  tailwind.config.ts
-│  tree.txt
-│  tsconfig.app.json
-│  tsconfig.json
-│  tsconfig.node.json
-│  vercel.json
-│  vite.config.ts
-│  vitest.config.ts
-│  
-├─.github
-│  │  FUNDING.yml
-│  │  
-│  └─workflows
-│          deploy.yml
-│          update_data.yml
-│          
-├─.vscode
-│      launch.json
-│      settings.json
-│      
-├─dist
-│  │  android-chrome-192x192.png
-│  │  android-chrome-512x512.png
-│  │  apple-touch-icon.png
-│  │  Banner.svg
-│  │  favicon-16x16.png
-│  │  favicon-32x32.png
-│  │  favicon.ico
-│  │  index.html
-│  │  Logo.svg
-│  │  placeholder.svg
-│  │  robots.txt
-│  │  site.webmanifest
-│  │  sitemap.xml
-│  │  _headers
-│  │  
-│  ├─assets
-│  │      data-processor-DJgtgGkX.js
-│  │      index-D48w_GnX.css
-│  │      index-PYG9sKNN.js
-│  │      index.es-DPE9tyPq.js
-│  │      purify.es-CQJ0hv7W.js
-│  │      
-│  └─data
-│          .gitkeep
-│          last_updated.json
-│          us-state.geojson.gz
-│          us-zip-codes.geojson.gz
-│          zip-city-mapping.csv.gz
-│          zip-data.json.gz
-│          
-├─node_modules
-│  ├─@esbuild
-│  │  └─win32-x64
-│  │          esbuild.exe
-│  │          
-│  ├─@rollup
-│  │  └─rollup-win32-x64-msvc
-│  │          rollup.win32-x64-msvc.node
-│  │          
-│  └─@swc
-│      └─core-win32-x64-msvc
-│              swc.win32-x64-msvc.node
-│              
-├─public
-│  │  android-chrome-192x192.png
-│  │  android-chrome-512x512.png
-│  │  apple-touch-icon.png
-│  │  Banner.svg
-│  │  favicon-16x16.png
-│  │  favicon-32x32.png
-│  │  favicon.ico
-│  │  Logo.svg
-│  │  placeholder.svg
-│  │  robots.txt
-│  │  site.webmanifest
-│  │  sitemap.xml
-│  │  _headers
-│  │  
-│  └─data
-│          .gitkeep
-│          last_updated.json
-│          us-state.geojson.gz
-│          us-zip-codes.geojson.gz
-│          zip-city-mapping.csv.gz
-│          zip-data.json.gz
-│          
-├─scripts
-│      compress-assets.js
-│      parse_redfin_zip_data.py
-│      
-└─src
-    │  App.css
-    │  App.tsx
-    │  index.css
-    │  main.tsx
-    │  vite-env.d.ts
-    │  
-    ├─components
-    │  │  ErrorBoundary.tsx
-    │  │  MapExport.tsx
-    │  │  
-    │  ├─dashboard
-    │  │  │  ExportLegend.tsx
-    │  │  │  ExportMap.tsx
-    │  │  │  ExportPreviewMap.tsx
-    │  │  │  ExportRenderer.tsx
-    │  │  │  ExportSidebar.tsx
-    │  │  │  HousingDashboard.tsx
-    │  │  │  Legend.tsx
-    │  │  │  MapLibreMap.tsx
-    │  │  │  MetricSelector.tsx
-    │  │  │  SearchBox.tsx
-    │  │  │  Sidebar.tsx
-    │  │  │  SponsorBanner.tsx
-    │  │  │  TopBar.tsx
-    │  │  │  ZipComparison.tsx
-    │  │  │  
-    │  │  └─map
-    │  │          types.ts
-    │  │          utils.ts
-    │  │          
-    │  └─ui
-    │          accordion.tsx
-    │          alert-dialog.tsx
-    │          alert.tsx
-    │          aspect-ratio.tsx
-    │          avatar.tsx
-    │          badge.tsx
-    │          breadcrumb.tsx
-    │          button.tsx
-    │          calendar.tsx
-    │          card.tsx
-    │          carousel.tsx
-    │          chart.tsx
-    │          checkbox.tsx
-    │          collapsible.tsx
-    │          command.tsx
-    │          context-menu.tsx
-    │          dialog.tsx
-    │          domapus-logo.tsx
-    │          drawer.tsx
-    │          dropdown-menu.tsx
-    │          form.tsx
-    │          hover-card.tsx
-    │          input-otp.tsx
-    │          input.tsx
-    │          label.tsx
-    │          menubar.tsx
-    │          navigation-menu.tsx
-    │          pagination.tsx
-    │          popover.tsx
-    │          progress.tsx
-    │          radio-group.tsx
-    │          resizable.tsx
-    │          scroll-area.tsx
-    │          select.tsx
-    │          separator.tsx
-    │          sheet.tsx
-    │          sidebar.tsx
-    │          skeleton.tsx
-    │          slider.tsx
-    │          sonner.tsx
-    │          switch.tsx
-    │          table.tsx
-    │          tabs.tsx
-    │          textarea.tsx
-    │          toast.tsx
-    │          toaster.tsx
-    │          toggle-group.tsx
-    │          toggle.tsx
-    │          tooltip.tsx
-    │          use-toast.ts
-    │          
-    ├─hooks
-    │      use-mobile.tsx
-    │      use-toast.ts
-    │      useDataWorker.test.ts
-    │      useDataWorker.ts
-    │      useFilteredData.ts
-    │      
-    ├─lib
-    │      utils.ts
-    │      
-    ├─pages
-    │      Index.tsx
-    │      NotFound.tsx
-    │      
-    ├─tests
-    │  │  setup.ts
-    │  │  
-    │  ├─components
-    │  │      MapContainer.test.tsx
-    │  │      Sidebar.test.tsx
-    │  │      TopBar.test.tsx
-    │  │      
-    │  ├─utils
-    │  │      dataValidation.test.ts
-    │  │      formatters.test.ts
-    │  │      
-    │  ├─workers
-    │  │      data-processor.test.ts
-    │  │      
-    │  └─__mocks__
-    │          mock-data.ts
-    │          
-    ├─utils
-    │      dataValidation.ts
-    │      
-    └─workers
-            data-processor.ts
-            worker-types.ts
-            
+.
+|-- LICENSE.md
+|-- README.md
+|-- bun.lockb
+|-- components.json
+|-- dist
+|   |-- Banner.svg
+|   |-- Logo.svg
+|   |-- _headers
+|   |-- android-chrome-192x192.png
+|   |-- android-chrome-512x512.png
+|   |-- apple-touch-icon.png
+|   |-- assets
+|   |   |-- data-processor-DJgtgGkX.js
+|   |   |-- index-BaGqdC3i.js
+|   |   |-- index-D3A7iZy2.css
+|   |   |-- index.es-C_RlpW7W.js
+|   |   `-- purify.es-C65SP4u9.js
+|   |-- data
+|   |   |-- last_updated.json
+|   |   |-- us-state.geojson.gz
+|   |   |-- us-zip-codes.geojson.gz
+|   |   |-- zip-city-mapping.csv.gz
+|   |   `-- zip-data.json.gz
+|   |-- favicon-16x16.png
+|   |-- favicon-32x32.png
+|   |-- favicon.ico
+|   |-- index.html
+|   |-- robots.txt
+|   |-- site.webmanifest
+|   `-- sitemap.xml
+|-- eslint.config.js
+|-- index.html
+|-- package-lock.json
+|-- package.json
+|-- postcss.config.js
+|-- public
+|   |-- Banner.svg
+|   |-- Logo.svg
+|   |-- _headers
+|   |-- android-chrome-192x192.png
+|   |-- android-chrome-512x512.png
+|   |-- apple-touch-icon.png
+|   |-- data
+|   |   |-- last_updated.json
+|   |   |-- us-state.geojson.gz
+|   |   |-- us-zip-codes.geojson.gz
+|   |   |-- zip-city-mapping.csv.gz
+|   |   `-- zip-data.json.gz
+|   |-- favicon-16x16.png
+|   |-- favicon-32x32.png
+|   |-- favicon.ico
+|   |-- robots.txt
+|   |-- site.webmanifest
+|   `-- sitemap.xml
+|-- requirements.txt
+|-- scripts
+|   |-- compress-assets.js
+|   `-- parse_redfin_zip_data.py
+|-- src
+|   |-- App.tsx
+|   |-- components
+|   |   |-- ErrorBoundary.tsx
+|   |   |-- MapExport.tsx
+|   |   |-- dashboard
+|   |   |   |-- ExportLegend.tsx
+|   |   |   |-- ExportMap.tsx
+|   |   |   |-- ExportPreviewMap.tsx
+|   |   |   |-- ExportRenderer.tsx
+|   |   |   |-- ExportSidebar.tsx
+|   |   |   |-- HousingDashboard.tsx
+|   |   |   |-- Legend.tsx
+|   |   |   |-- MapLibreMap.tsx
+|   |   |   |-- MetricSelector.tsx
+|   |   |   |-- SearchBox.tsx
+|   |   |   |-- Sidebar.tsx
+|   |   |   |-- SponsorBanner.tsx
+|   |   |   |-- TopBar.tsx
+|   |   |   |-- ZipComparison.tsx
+|   |   |   `-- map
+|   |   |       |-- types.ts
+|   |   |       `-- utils.ts
+|   |   `-- ui
+|   |       |-- accordion.tsx
+|   |       |-- alert-dialog.tsx
+|   |       |-- alert.tsx
+|   |       |-- aspect-ratio.tsx
+|   |       |-- avatar.tsx
+|   |       |-- badge.tsx
+|   |       |-- breadcrumb.tsx
+|   |       |-- button.tsx
+|   |       |-- calendar.tsx
+|   |       |-- card.tsx
+|   |       |-- carousel.tsx
+|   |       |-- chart.tsx
+|   |       |-- checkbox.tsx
+|   |       |-- collapsible.tsx
+|   |       |-- command.tsx
+|   |       |-- context-menu.tsx
+|   |       |-- dialog.tsx
+|   |       |-- domapus-logo.tsx
+|   |       |-- drawer.tsx
+|   |       |-- dropdown-menu.tsx
+|   |       |-- form.tsx
+|   |       |-- hover-card.tsx
+|   |       |-- input-otp.tsx
+|   |       |-- input.tsx
+|   |       |-- label.tsx
+|   |       |-- menubar.tsx
+|   |       |-- navigation-menu.tsx
+|   |       |-- pagination.tsx
+|   |       |-- popover.tsx
+|   |       |-- progress.tsx
+|   |       |-- radio-group.tsx
+|   |       |-- resizable.tsx
+|   |       |-- scroll-area.tsx
+|   |       |-- select.tsx
+|   |       |-- separator.tsx
+|   |       |-- sheet.tsx
+|   |       |-- sidebar.tsx
+|   |       |-- skeleton.tsx
+|   |       |-- slider.tsx
+|   |       |-- sonner.tsx
+|   |       |-- switch.tsx
+|   |       |-- table.tsx
+|   |       |-- tabs.tsx
+|   |       |-- textarea.tsx
+|   |       |-- toast.tsx
+|   |       |-- toaster.tsx
+|   |       |-- toggle-group.tsx
+|   |       |-- toggle.tsx
+|   |       |-- tooltip.tsx
+|   |       `-- use-toast.ts
+|   |-- hooks
+|   |   |-- use-mobile.tsx
+|   |   |-- use-toast.ts
+|   |   `-- useDataWorker.ts
+|   |-- index.css
+|   |-- lib
+|   |   `-- utils.ts
+|   |-- main.tsx
+|   |-- pages
+|   |   |-- Index.tsx
+|   |   `-- NotFound.tsx
+|   |-- utils
+|   |   `-- dataValidation.ts
+|   |-- vite-env.d.ts
+|   `-- workers
+|       |-- data-processor.ts
+|       `-- worker-types.ts
+|-- tailwind.config.ts
+|-- tree.txt
+|-- tsconfig.app.json
+|-- tsconfig.json
+|-- tsconfig.node.json
+|-- vercel.json
+`-- vite.config.ts
+
+16 directories, 140 files

@@ -1,155 +1,169 @@
 import { ZipData } from "../components/dashboard/map/types";
 import { WorkerMessage, LoadDataRequest, ProcessGeoJSONRequest } from "./worker-types";
-import { inflate } from 'pako';
+import { inflate } from "pako";
+import RBush from "rbush"; // R-Tree library
 
+let currentAbortController: AbortController | null = null;
+
+// --- Helper ---
 export function getMetricValue(data: ZipData, metric: string): number {
   if (!data) return 0;
   const value = data[metric as keyof ZipData];
   return typeof value === "number" && isFinite(value) ? value : 0;
 }
 
+// --- Worker state ---
+let zipRTree: RBush<any> | null = null;
+let geoJSONIndex: Record<string, GeoJSON.Feature> = {};
+
+// --- Bucketed expression ---
+function getMetricBuckets(values: number[], numBuckets = 7) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const step = Math.ceil(sorted.length / numBuckets);
+  const thresholds: number[] = [];
+  for (let i = 1; i < numBuckets; i++) {
+    thresholds.push(sorted[i * step] ?? sorted[sorted.length - 1]);
+  }
+  return thresholds;
+}
+
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const { id, type, data } = e.data;
-  
+
+  // Cancel previous operation
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+  currentAbortController = new AbortController();
+  const signal = currentAbortController.signal;
+
   try {
     switch (type) {
       case "LOAD_AND_PROCESS_DATA": {
         const { url, selectedMetric } = data as LoadDataRequest;
-        
-        self.postMessage({
-          type: "PROGRESS",
-          data: { phase: "Fetching market data..." },
-        });
+        self.postMessage({ type: "PROGRESS", data: { phase: "Fetching market data..." } });
 
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Fetch failed: ${response.status}`);
-        }
-
-        const contentEncoding = response.headers.get("content-encoding") || "";
+        const response = await fetch(url, { signal });
+        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
         const buffer = await response.arrayBuffer();
+
         let fullPayload;
+        const contentEncoding = response.headers.get("content-encoding") || "";
 
         try {
           if (contentEncoding.includes("gzip")) {
+            // Browser already ungzips automatically unless `fetch` is done with special headers.
+            // Try direct JSON first.
             try {
               fullPayload = JSON.parse(new TextDecoder().decode(buffer));
             } catch {
-              const jsonData = inflate(new Uint8Array(buffer), { to: "string" });
-              fullPayload = JSON.parse(jsonData);
+              // If server sends raw gzip bytes (rare), inflate manually
+              const inflated = inflate(new Uint8Array(buffer), { to: "string" });
+              fullPayload = JSON.parse(inflated);
             }
           } else {
-            try {
-              const jsonData = inflate(new Uint8Array(buffer), { to: "string" });
-              fullPayload = JSON.parse(jsonData);
-            } catch {
-              fullPayload = JSON.parse(new TextDecoder().decode(buffer));
-            }
+            // NOT gzip → decode directly
+            fullPayload = JSON.parse(new TextDecoder().decode(buffer));
           }
-        } catch (parseError) {
-          throw new Error(`Failed to parse data: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+        } catch (err) {
+          throw new Error("Failed to parse JSON: " + (err as Error).message);
         }
 
         const { last_updated_utc, zip_codes: rawZipData } = fullPayload;
         if (!rawZipData) throw new Error("Missing zip_codes data");
 
-        self.postMessage({
-          type: "PROGRESS",
-          data: { phase: "Processing ZIP codes..." },
-        });
+        self.postMessage({ type: "PROGRESS", data: { phase: "Indexing ZIP codes..." } });
 
         const zipData: Record<string, ZipData> = {};
+        const metricValues: number[] = [];
         const entries = Object.entries(rawZipData);
-        const total = entries.length;
 
-        for (let i = 0; i < total; i++) {
+        for (let i = 0; i < entries.length; i++) {
+          if (signal.aborted) return;
           const [zipCode, rawValue] = entries[i];
           (rawValue as ZipData).zipCode = zipCode;
           zipData[zipCode] = rawValue as ZipData;
-          
-          if (i % 2000 === 0 && i > 0) {
+          const metric = getMetricValue(rawValue as ZipData, selectedMetric);
+          if (metric > 0) metricValues.push(metric);
+
+          if (i % 2000 === 0) {
             self.postMessage({
               type: "PROGRESS",
-              data: { phase: "Processing ZIP codes...", processed: i, total },
+              data: { phase: "Indexing ZIP codes...", processed: i, total: entries.length },
             });
           }
         }
 
-        self.postMessage({
-          type: "PROGRESS",
-          data: { phase: "Calculating bounds..." },
-        });
+        const bounds = { min: Math.min(...metricValues), max: Math.max(...metricValues) };
 
-        const metricValues = Object.values(zipData)
-          .map(z => getMetricValue(z, selectedMetric))
-          .filter(v => v > 0)
-          .sort((a, b) => a - b);
-        
-        const bounds = {
-          min: metricValues[0] || 0,
-          max: metricValues[metricValues.length - 1] || 0,
-        };
-
-        self.postMessage({
-          type: "DATA_PROCESSED",
-          id,
-          data: { zip_codes: zipData, last_updated_utc, bounds },
-        });
+        self.postMessage({ type: "DATA_PROCESSED", id, data: { zip_codes: zipData, last_updated_utc, bounds } });
         break;
       }
 
       case "PROCESS_GEOJSON": {
-        const { geojson, zipData, selectedMetric } = data as ProcessGeoJSONRequest;
+        const { geojson, zipData, selectedMetric, viewport } = data as ProcessGeoJSONRequest;
+        if (!geojson?.features) throw new Error("Invalid GeoJSON");
 
-        if (!geojson?.features || !Array.isArray(geojson.features)) {
-          throw new Error("Invalid GeoJSON data");
-        }
+        self.postMessage({ type: "PROGRESS", data: { phase: "Building spatial index..." } });
 
-        self.postMessage({
-          type: "PROGRESS",
-          data: { phase: "Processing shapes..." },
-        });
+        // Build R-Tree
+        const tree = new RBush();
+        const indexedFeatures: any[] = [];
 
-        const features: GeoJSON.Feature[] = [];
-        const total = geojson.features.length;
-
-        for (let i = 0; i < total; i++) {
-          const feature = geojson.features[i];
-          if (!feature.geometry) continue;
-
-          const zipCode = feature.properties?.ZCTA5CE20;
+        for (let f of geojson.features) {
+          if (signal.aborted) return;
+          const zipCode = f.properties?.ZCTA5CE20;
           if (!zipCode || !zipData[zipCode]) continue;
-
-          const metricValue = getMetricValue(zipData[zipCode], selectedMetric);
-          feature.properties!.zipCode = zipCode;
-          feature.properties!.metricValue = metricValue;
-          features.push(feature);
-          
-          if (i % 5000 === 0 && i > 0) {
-            self.postMessage({
-              type: "PROGRESS",
-              data: { phase: "Processing shapes...", processed: i, total },
-            });
-          }
+          const [minX, minY, maxX, maxY] = bbox(f);
+          tree.insert({ minX, minY, maxX, maxY, feature: f });
+          geoJSONIndex[zipCode] = f;
+          indexedFeatures.push(f);
         }
+        zipRTree = tree;
 
-        self.postMessage({
-          type: "GEOJSON_PROCESSED",
-          id,
-          data: { type: "FeatureCollection", features },
-        });
+        self.postMessage({ type: "PROGRESS", data: { phase: "Filtering viewport..." } });
+
+        // Lazy load features in viewport
+        const visibleFeatures = viewport ? tree.search(viewport).map((d) => d.feature) : indexedFeatures;
+
+        // Bucket coloring
+        const values = visibleFeatures.map(f => getMetricValue(zipData[f.properties!.ZCTA5CE20], selectedMetric));
+        const buckets = getMetricBuckets(values);
+        const expression: any[] = ["step", ["get", "metricValue"], "#FFF9B0", ...buckets.flatMap((v, i) => [v, bucketColor(i)])];
+
+        self.postMessage({ type: "GEOJSON_PROCESSED", id, data: { type: "FeatureCollection", features: visibleFeatures, bucketExpression: expression } });
         break;
       }
 
       default:
         throw new Error(`Unknown type: ${type}`);
     }
-  } catch (error) {
-    console.error("[Worker] Error:", error);
-    self.postMessage({
-      type: "ERROR",
-      id,
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+  } catch (err) {
+    if (!signal.aborted) {
+      console.error("[Worker] Error:", err);
+      self.postMessage({ type: "ERROR", id, error: err instanceof Error ? err.message : "Unknown error" });
+    }
   }
 };
+
+// --- Helper: bounding box of a feature ---
+function bbox(f: GeoJSON.Feature): [number, number, number, number] {
+  if (f.geometry.type === "Polygon") {
+    const coords = f.geometry.coordinates.flat(2);
+    const xs = coords.filter((_, i) => i % 2 === 0);
+    const ys = coords.filter((_, i) => i % 2 === 0 ? undefined : coords[i]);
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  } else if (f.geometry.type === "MultiPolygon") {
+    const coords = f.geometry.coordinates.flat(3);
+    const xs = coords.filter((_, i) => i % 2 === 0);
+    const ys = coords.filter((_, i) => i % 2 === 0 ? undefined : coords[i]);
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  }
+  return [0, 0, 0, 0];
+}
+
+// --- Helper: bucket colors ---
+function bucketColor(i: number) {
+  const palette = ["#FFF9B0", "#FFE066", "#FFB347", "#FF7F50", "#E84C61", "#AD1457", "#2E0B59"];
+  return palette[i] || palette[palette.length - 1];
+}

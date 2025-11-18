@@ -151,9 +151,17 @@ export function MapLibreMap({
 
     (async () => {
       try {
-        const geoJsonUrl = new URL(`${BASE_PATH}data/us-zip-codes.geojson.gz`, window.location.origin).href;
+        const geoJsonUrl = new URL(
+          `${BASE_PATH}data/us-zip-codes.geojson.gz`,
+          window.location.origin
+        ).href;
+
         console.log("[MapLibreMap] fetching base geojson...", geoJsonUrl);
-        const resp = await fetch(geoJsonUrl, { signal: controller.signal, headers: { Accept: "application/octet-stream" } });
+
+        const resp = await fetch(geoJsonUrl, {
+          signal: controller.signal,
+          headers: { Accept: "application/octet-stream" }
+        });
 
         clearTimeout(timeoutId);
 
@@ -161,15 +169,19 @@ export function MapLibreMap({
           throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
         }
 
-        const contentLength = resp.headers.get("content-length");
-        if (contentLength && parseInt(contentLength) > 50 * 1024 * 1024) {
-          throw new Error("GeoJSON over 50MB; aborting.");
-        }
-
         const buf = await resp.arrayBuffer();
-        const { inflate } = await import("pako");
-        const jsonStr = inflate(buf, { to: "string" });
-        const parsed = JSON.parse(jsonStr);
+        let parsed;
+
+        // Try direct JSON first (browser likely auto-decompressed)
+        try {
+          const text = new TextDecoder().decode(buf);
+          parsed = JSON.parse(text);
+        } catch {
+          // If that fails, THEN try pako inflate
+          const { inflate } = await import("pako");
+          const inflated = inflate(new Uint8Array(buf), { to: "string" });
+          parsed = JSON.parse(inflated);
+        }
 
         if (!parsed || parsed.type !== "FeatureCollection" || !Array.isArray(parsed.features)) {
           throw new Error("Invalid GeoJSON structure");
@@ -322,78 +334,62 @@ export function MapLibreMap({
 
   // Re-run process/update when data changes (ensures source exists)
   useEffect(() => {
-    if (
-      !isMapReady ||
-      !mapRef.current?.isStyleLoaded() ||
-      !baseGeoJSON ||
-      !colorScale ||
-      Object.keys(zipData).length === 0
-    )
-      return;
+  if (!isMapReady || !mapRef.current || !baseGeoJSON || Object.keys(zipData).length === 0) return;
+  if (processingRef.current) return;
+  processingRef.current = true;
 
-    if (processingRef.current) return;
-    processingRef.current = true;
-    abortControllerRef.current = new AbortController();
+  // cancel previous worker task
+  if (abortControllerRef.current) abortControllerRef.current.abort();
+  abortControllerRef.current = new AbortController();
+  const signal = abortControllerRef.current.signal;
 
-    (async () => {
-      try {
-        setError(null);
+  (async () => {
+    try {
+      const map = mapRef.current;
+      if (!map) return;
+      // get current viewport bbox
+      const bounds = map.getBounds();
+      const viewport = {
+        minX: bounds.getWest(),
+        minY: bounds.getSouth(),
+        maxX: bounds.getEast(),
+        maxY: bounds.getNorth(),
+      };
 
-        // processData is external — pass a copy of what we can
-        // If processData supports cancellation, consider accepting a signal.
-        const processed = await processData({
-          type: "PROCESS_GEOJSON",
-          data: { geojson: baseGeoJSON, zipData, selectedMetric },
-        });
+      // send geojson + viewport to worker
+      const processed = await processData({
+        type: "PROCESS_GEOJSON",
+        data: { geojson: baseGeoJSON, zipData, selectedMetric, viewport },
+      });
 
-        if (abortControllerRef.current?.signal.aborted) {
-          console.log("[MapLibreMap] process aborted early");
-          return;
-        }
+      if (signal.aborted) return;
 
-        const enhancedFeatures = (processed?.features ?? []).map((feature: any) => {
-          const props = feature.properties ?? {};
-          const value = typeof props.metricValue === "number" ? props.metricValue : undefined;
-          if (typeof value === "number" && value > 0) {
-            // attach color
-            props.metricColor = colorScale(value);
-            feature.properties = props;
-          }
-          return feature;
-        });
+      const source = map.getSource("zips") as maplibregl.GeoJSONSource;
+      if (!source) throw new Error("Map source 'zips' missing");
 
-        const source = mapRef.current!.getSource("zips") as any;
-        if (!source) {
-          console.error("[MapLibreMap] source 'zips' missing");
-          setError("Map data source missing");
-          return;
-        }
+      // set filtered features
+      source.setData({
+        type: "FeatureCollection",
+        features: processed.features ?? [],
+      });
 
-        // setData - put a FeatureCollection
-        source.setData({ type: "FeatureCollection", features: enhancedFeatures });
-
-        // only setup interactions once
-        if (!interactionsSetup.current && mapRef.current) {
-          setupMapInteractions(mapRef.current);
-        }
-      } catch (err) {
-        if (!abortControllerRef.current?.signal.aborted) {
-          console.error("[MapLibreMap] update failed", err);
-          setError("Failed to update map visualization.");
-        }
-      } finally {
-        processingRef.current = false;
+      // apply bucketed Mapbox expression for fill-color
+      if (processed.bucketExpression) {
+        map.setPaintProperty("zips-fill", "fill-color", processed.bucketExpression);
       }
-    })();
 
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMapReady, baseGeoJSON, colorScale, zipData, selectedMetric, processData]);
+      if (!interactionsSetup.current) setupMapInteractions(map);
+    } catch (err) {
+      if (!signal.aborted) console.error("[MapLibreMap] update failed", err);
+    } finally {
+      processingRef.current = false;
+    }
+  })();
+
+  return () => {
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+  };
+}, [isMapReady, baseGeoJSON, zipData, selectedMetric, processData, setupMapInteractions]);
 
   // When searchZip arrives, fly to it if valid coords
   useEffect(() => {
