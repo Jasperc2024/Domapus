@@ -18,10 +18,18 @@ export interface LoadDataRequest {
   selectedMetric: string;
 }
 
+export interface Viewport {
+  minX: number; // west
+  minY: number; // south
+  maxX: number; // east
+  maxY: number; // north
+}
+
 export interface ProcessGeoJSONRequest {
   geojson: GeoJSON.FeatureCollection;
   zipData: Record<string, ZipData>;
   selectedMetric: string;
+  viewport: Viewport | null;
 }
 
 export interface DataProcessedResponse {
