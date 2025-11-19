@@ -13,7 +13,6 @@ export function getMetricValue(data: ZipData, metric: string): number {
 }
 
 // --- Worker state ---
-let zipRTree: RBush<any> | null = null;
 let geoJSONIndex: Record<string, GeoJSON.Feature> = {};
 
 // --- Bucketed expression ---
@@ -29,10 +28,12 @@ function getMetricBuckets(values: number[], numBuckets = 7) {
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const { id, type, data } = e.data;
+  console.log(`[Worker] Received message: ${type}`, { id, data });
 
   // Cancel previous operation
   if (currentAbortController) {
     currentAbortController.abort();
+    console.log('[Worker] Aborted previous operation');
   }
   currentAbortController = new AbortController();
   const signal = currentAbortController.signal;
@@ -41,11 +42,15 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     switch (type) {
       case "LOAD_AND_PROCESS_DATA": {
         const { url, selectedMetric } = data as LoadDataRequest;
+        console.log(`[Worker] Loading data from: ${url}, metric: ${selectedMetric}`);
         self.postMessage({ type: "PROGRESS", data: { phase: "Fetching market data..." } });
 
         const response = await fetch(url, { signal });
         if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+        console.log(`[Worker] Fetch successful, status: ${response.status}`);
+        
         const buffer = await response.arrayBuffer();
+        console.log(`[Worker] Received buffer size: ${buffer.byteLength} bytes`);
 
         let fullPayload;
 
@@ -55,13 +60,16 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         try {
           const jsonText = new TextDecoder().decode(buffer);
           fullPayload = JSON.parse(jsonText);
+          console.log('[Worker] JSON parsed successfully');
         } catch (err) {
+          console.error('[Worker] JSON parse failed:', err);
           throw new Error("Failed to parse JSON: " + (err as Error).message);
         }
         // --- END MODIFICATION ---
 
         const { last_updated_utc, zip_codes: rawZipData } = fullPayload;
         if (!rawZipData) throw new Error("Missing zip_codes data");
+        console.log(`[Worker] Found ${Object.keys(rawZipData).length} ZIP codes, last updated: ${last_updated_utc}`);
 
         self.postMessage({ type: "PROGRESS", data: { phase: "Indexing ZIP codes..." } });
 
@@ -86,6 +94,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         }
 
         const bounds = { min: Math.min(...metricValues), max: Math.max(...metricValues) };
+        console.log(`[Worker] Data processed: ${Object.keys(zipData).length} ZIPs, bounds:`, bounds);
 
         self.postMessage({ type: "DATA_PROCESSED", id, data: { zip_codes: zipData, last_updated_utc, bounds } });
         break;
@@ -94,6 +103,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       case "PROCESS_GEOJSON": {
         const { geojson, zipData, selectedMetric, viewport } = data as ProcessGeoJSONRequest;
         if (!geojson?.features) throw new Error("Invalid GeoJSON");
+        console.log(`[Worker] Processing GeoJSON: ${geojson.features.length} features, metric: ${selectedMetric}`);
 
         self.postMessage({ type: "PROGRESS", data: { phase: "Building spatial index..." } });
 
@@ -110,17 +120,17 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           geoJSONIndex[zipCode] = f;
           indexedFeatures.push(f);
         }
-        zipRTree = tree;
 
         self.postMessage({ type: "PROGRESS", data: { phase: "Filtering viewport..." } });
 
         // Lazy load features in viewport
-        const visibleFeatures = viewport ? tree.search(viewport).map((d) => d.feature) : indexedFeatures;
+        const visibleFeatures = viewport ? tree.search(viewport).map((d: any) => d.feature) : indexedFeatures;
 
         // Bucket coloring
-        const values = visibleFeatures.map(f => getMetricValue(zipData[f.properties!.ZCTA5CE20], selectedMetric));
+        const values = visibleFeatures.map((f: GeoJSON.Feature) => getMetricValue(zipData[f.properties!.ZCTA5CE20], selectedMetric));
         const buckets = getMetricBuckets(values);
         const expression: any[] = ["step", ["get", "metricValue"], "#FFF9B0", ...buckets.flatMap((v, i) => [v, bucketColor(i)])];
+        console.log(`[Worker] GeoJSON processed: ${visibleFeatures.length} visible features, ${buckets.length} buckets`);
 
         self.postMessage({ type: "GEOJSON_PROCESSED", id, data: { type: "FeatureCollection", features: visibleFeatures, bucketExpression: expression } });
         break;
