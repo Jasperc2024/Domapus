@@ -26,29 +26,37 @@ export function ExportRenderer({
 
   const handleRenderComplete = useCallback(async () => {
     if (!containerRef.current) {
-      console.error("Export failed: Render container not found.");
+      console.error("[ExportRenderer] Export failed: Render container not found.");
       onExportComplete();
       return;
     }
+    console.log('[ExportRenderer] Starting export render process');
     try {
+      console.log('[ExportRenderer] Capturing canvas with html2canvas');
       const canvas = await html2canvas(containerRef.current, {
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
       });
+      console.log(`[ExportRenderer] Canvas captured: ${canvas.width}x${canvas.height}`);
+      
       if (exportOptions.fileFormat === "png") {
+        console.log('[ExportRenderer] Exporting as PNG');
         const link = document.createElement("a");
         link.download = `domapus-map-${selectedMetric}.png`;
         link.href = canvas.toDataURL("image/png");
         link.click();
+        console.log('[ExportRenderer] PNG export complete');
       } else {
+        console.log('[ExportRenderer] Exporting as PDF');
         const imgData = canvas.toDataURL("image/png");
         const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [canvas.width, canvas.height] });
         pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
         pdf.save(`domapus-map-${selectedMetric}.pdf`);
+        console.log('[ExportRenderer] PDF export complete');
       }
     } catch (error) {
-      console.error("Export failed during screenshot process:", error);
+      console.error("[ExportRenderer] Export failed during screenshot process:", error);
     } finally {
       onExportComplete();
     }
