@@ -314,8 +314,14 @@ export function MapLibreMap({
 
   // Re-run process/update when data changes (ensures source exists)
   useEffect(() => {
-  if (!isMapReady || !mapRef.current || !baseGeoJSON || Object.keys(zipData).length === 0) return;
-  if (processingRef.current) return;
+  if (!isMapReady || !mapRef.current || !baseGeoJSON || Object.keys(zipData).length === 0) {
+    console.log('[MapLibreMap] Skipping process - not ready', { isMapReady, hasMap: !!mapRef.current, hasGeoJSON: !!baseGeoJSON, zipDataCount: Object.keys(zipData).length });
+    return;
+  }
+  if (processingRef.current) {
+    console.log('[MapLibreMap] Skipping process - already processing');
+    return;
+  }
   
   console.log('[MapLibreMap] Processing data update for metric:', selectedMetric);
   processingRef.current = true;
@@ -367,9 +373,10 @@ export function MapLibreMap({
         map.setPaintProperty("zips-fill", "fill-color", processed.bucketExpression);
       }
 
-      if (!interactionsSetup.current) {
+      // Setup interactions using current zipData/metric without triggering re-render
+      if (!interactionsSetup.current && mapRef.current) {
         console.log('[MapLibreMap] Setting up map interactions');
-        setupMapInteractions(map);
+        setupMapInteractions(mapRef.current);
       }
       console.log('[MapLibreMap] Map update complete');
     } catch (err) {
@@ -380,9 +387,11 @@ export function MapLibreMap({
   })();
 
   return () => {
+    console.log('[MapLibreMap] Cleanup - aborting processing');
     if (abortControllerRef.current) abortControllerRef.current.abort();
   };
-}, [isMapReady, baseGeoJSON, zipData, selectedMetric, processData, setupMapInteractions]);
+  // Remove setupMapInteractions from deps to prevent infinite loop
+}, [isMapReady, baseGeoJSON, zipData, selectedMetric, processData]);
 
   // When searchZip arrives, fly to it if valid coords
   useEffect(() => {
