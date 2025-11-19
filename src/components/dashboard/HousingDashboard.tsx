@@ -39,8 +39,8 @@ export function HousingDashboard() {
       if (hasRun) return;
       hasRun = true;
       
-      const dataUrl = new URL(`${BASE_PATH}data/zip-data.json.gz`, window.location.origin).href;
-      const geoJsonUrl = new URL(`${BASE_PATH}data/us-zip-codes.geojson.gz`, window.location.origin).href;
+      const dataUrl = new URL(`${BASE_PATH}data/zip-data.json`, window.location.origin).href;
+      const geoJsonUrl = new URL(`${BASE_PATH}data/us-zip-codes.geojson`, window.location.origin).href;
 
       try {
         const result = await processData({
@@ -60,37 +60,13 @@ export function HousingDashboard() {
 
         if (!isMounted) return;
 
-        const contentEncoding = geoResponse.headers.get("content-encoding") || "";
-        const isGzipped = contentEncoding.includes("gzip") || geoJsonUrl.endsWith(".gz");
-        const buffer = await geoResponse.arrayBuffer();
-
-        let geoData;
-        
-        if (isGzipped) {
-          try {
-            geoData = JSON.parse(new TextDecoder().decode(buffer));
-          } catch {
-            const { inflate } = await import("pako");
-            const jsonString = inflate(new Uint8Array(buffer), { to: "string" });
-            geoData = JSON.parse(jsonString);
-          }
-        } else {
-          try {
-            const { inflate } = await import("pako");
-            const jsonString = inflate(new Uint8Array(buffer), { to: "string" });
-            geoData = JSON.parse(jsonString);
-          } catch {
-            geoData = JSON.parse(new TextDecoder().decode(buffer));
-          }
-        }
-        
+        const geoData = await geoResponse.json();
         if (!isMounted) return;
         setFullGeoJSON(geoData);
-      } catch (error) {
+            } catch (error) {
         console.error("[HousingDashboard] Failed to load initial data:", error);
-      }
-    };
-    
+            }
+          };
     loadInitialData();
     const timer = setTimeout(() => setShowSponsorBanner(true), 30000);
     

@@ -9,13 +9,14 @@ from pathlib import Path
 import logging
 from io import BytesIO
 
+# Configure logging
 logging.basicConfig(filename='data_pipeline.log', filemode='w', level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
-def load_zip_mapping_data(file_path='public/data/zip-city-mapping.csv.gz'):
-    """Loads the pre-cleaned ZIP to city, county, and coordinate mapping file."""
+def load_zip_mapping_data(file_path='public/data/zip-city-mapping.csv'):
+    """Loads the pre-cleaned ZIP to city, county, and coordinate mapping file (plain CSV)."""
     try:
         logging.info(f"Loading ZIP mapping data from {file_path}...")
-        df = pd.read_csv(file_path, compression='gzip', dtype={'ZipCode': str})
+        df = pd.read_csv(file_path, dtype={'ZipCode': str})
         df.set_index('ZipCode', inplace=True)
         logging.info(f"Successfully loaded {len(df)} unique mapping entries.")
         return df.to_dict('index')
@@ -30,6 +31,7 @@ def download_redfin_data(url, timeout=300, retries=3):
             logging.info(f"Attempt {attempt}: Downloading data from {url}...")
             response = requests.get(url, timeout=timeout, stream=True)
             response.raise_for_status()
+            logging.info(f"Successfully downloaded data (attempt {attempt}).")
             return response.content
         except requests.exceptions.RequestException as e:
             logging.error(f"Download failed (attempt {attempt}): {e}")
@@ -64,11 +66,18 @@ def get_full_column_mapping():
 
 def process_chunk(chunk_df, column_mapping):
     """Processes a single chunk of Redfin data."""
+    # Find which columns from the mapping are actually in this chunk
     available_cols = {k: v for k, v in column_mapping.items() if k in chunk_df.columns}
     chunk_df.rename(columns=available_cols, inplace=True)
+    
+    # Extract ZIP code
     chunk_df['zip_code'] = chunk_df['REGION'].apply(extract_zip_code)
     chunk_df = chunk_df.dropna(subset=['zip_code'])
+    
+    # Convert date
     chunk_df['period_end'] = pd.to_datetime(chunk_df['period_end'])
+    
+    # Filter to only the columns we care about
     final_cols = list(column_mapping.values()) + ['zip_code']
     existing_cols = [col for col in final_cols if col in chunk_df.columns]
     return chunk_df[existing_cols]
@@ -76,6 +85,7 @@ def process_chunk(chunk_df, column_mapping):
 def format_final_json(df, zip_mapping):
     """Formats the data for JSON output with a specific, logical key order."""
     result = {}
+    # Define the desired order of keys in the final JSON object
     key_order = [
         'city', 'county', 'state', 'parent_metro', 'latitude', 'longitude', 'period_end',
         'median_sale_price', 'median_sale_price_mom_pct', 'median_sale_price_yoy_pct',
@@ -90,9 +100,12 @@ def format_final_json(df, zip_mapping):
         'sold_above_list', 'sold_above_list_mom_pct', 'sold_above_list_yoy_pct',
         'off_market_in_two_weeks', 'off_market_in_two_weeks_mom_pct', 'off_market_in_two_weeks_yoy_pct'
     ]
+    
     for _, row in df.iterrows():
         zip_code = row['zip_code']
         raw_data = row.to_dict()
+        
+        # Add data from the ZIP code mapping
         if zip_mapping and zip_code in zip_mapping:
             raw_data['city'] = zip_mapping[zip_code].get('City')
             raw_data['county'] = zip_mapping[zip_code].get('CountyName')
@@ -103,31 +116,51 @@ def format_final_json(df, zip_mapping):
         for key in key_order:
             if key in raw_data:
                 value = raw_data[key]
-                if pd.isna(value): ordered_data[key] = None
-                elif isinstance(value, pd.Timestamp): ordered_data[key] = value.strftime('%Y-%m-%d')
-                elif key in ['latitude', 'longitude']: ordered_data[key] = round(float(value), 5) if not pd.isna(value) else None
-                elif 'pct' in key: ordered_data[key] = round(float(value) * 100, 1) if not pd.isna(value) else None
-                elif any(c in key for c in ['price', 'homes_sold', 'inventory', 'dom']): ordered_data[key] = int(float(value)) if not pd.isna(value) else None
-                elif isinstance(value, float): ordered_data[key] = round(value, 2) if not pd.isna(value) else None
-                else: ordered_data[key] = value
+                # Standardize data types and formats
+                if pd.isna(value): 
+                    ordered_data[key] = None
+                elif isinstance(value, pd.Timestamp): 
+                    ordered_data[key] = value.strftime('%Y-%m-%d')
+                elif key in ['latitude', 'longitude']: 
+                    ordered_data[key] = round(float(value), 5) if not pd.isna(value) else None
+                elif 'pct' in key: 
+                    # Convert ratios (0.05) to percentages (5.0)
+                    ordered_data[key] = round(float(value) * 100, 1) if not pd.isna(value) else None
+                elif any(c in key for c in ['price', 'homes_sold', 'inventory', 'dom', 'ppsf', 'listings', 'pending']): 
+                    ordered_data[key] = int(float(value)) if not pd.isna(value) else None
+                elif isinstance(value, float): 
+                    ordered_data[key] = round(value, 2) if not pd.isna(value) else None
+                else: 
+                    ordered_data[key] = value
+                    
         result[zip_code] = ordered_data
     return result
 
 def main():
+    logging.info("--- Starting Data Pipeline Run ---")
     zip_mapping = load_zip_mapping_data()
-    if zip_mapping is None: exit(1)
+    if zip_mapping is None: 
+        logging.critical("Failed to load ZIP mapping. Exiting.")
+        exit(1)
 
     url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/zip_code_market_tracker.tsv000.gz"
     data = download_redfin_data(url)
-    if data is None: exit(1)
+    if data is None: 
+        logging.critical("Failed to download Redfin data. Exiting.")
+        exit(1)
     
     try:
+        logging.info("Processing downloaded data...")
         column_mapping = get_full_column_mapping()
         buffer = BytesIO(data)
         chunk_iterator = pd.read_csv(gzip.GzipFile(fileobj=buffer), sep='\t', chunksize=100000)
+        
         processed_chunks = [process_chunk(chunk, column_mapping) for chunk in chunk_iterator]
         df_full = pd.concat(processed_chunks, ignore_index=True)
+        
+        # Get only the latest entry for each ZIP code
         df_latest = df_full.sort_values('period_end').groupby('zip_code').tail(1)
+        logging.info(f"Processed data. Found {len(df_latest)} unique ZIP codes with latest data.")
         
         output_data_content = format_final_json(df_latest, zip_mapping)
 
@@ -138,15 +171,18 @@ def main():
         output_dir = Path("public/data")
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Load previous data to compare changes
+        # --- MODIFICATION 1: Load previous data from plain JSON ---
         previous_data = None
-        zip_data_path = output_dir / "zip-data.json.gz"
+        zip_data_path = output_dir / "zip-data.json"
         try:
             if zip_data_path.exists():
-                with gzip.open(zip_data_path, 'rt') as f:
+                logging.info(f"Loading previous data from {zip_data_path} for comparison...")
+                with open(zip_data_path, 'r', encoding='utf-8') as f: # Use standard open
                     previous_data = json.load(f).get('zip_codes', {})
+                logging.info("Successfully loaded previous data.")
         except Exception as e:
             logging.warning(f"Could not load previous data for comparison: {e}")
+        # --- END MODIFICATION 1 ---
 
         # Calculate changes
         zip_codes_changed = 0
@@ -165,17 +201,25 @@ def main():
                 old_data = previous_data[zip_code]
                 
                 for key in new_data:
+                    # Check if key exists in old data and if values are different
                     if key in old_data and new_data[key] != old_data[key]:
                         data_points_changed += 1
+                    # Count if key is new for this zip_code
+                    elif key not in old_data:
+                        data_points_changed += 1
+            logging.info(f"Comparison complete: {zip_codes_changed} ZIPs added/removed, {data_points_changed} data points changed.")
+        else:
+            logging.info("No previous data found. Skipping comparison.")
 
+        # --- MODIFICATION 2: Write output to plain JSON ---
+        logging.info(f"Writing {len(output_data_content)} ZIP codes to {zip_data_path}...")
+        # Use separators for compact JSON
         json_string = json.dumps(final_output, sort_keys=True, separators=(",", ":"))
-        json_bytes = json_string.encode('utf-8')
         
-        # Write with explicit flush to avoid broken pipe
-        with open(zip_data_path, 'wb') as f:
-            with gzip.GzipFile(fileobj=f, mode='wb', mtime=0) as gz:
-                gz.write(json_bytes)
+        with open(zip_data_path, 'w', encoding='utf-8') as f:
+            f.write(json_string)
             f.flush()
+        # --- END MODIFICATION 2 ---
 
         # Write last_updated.json with change statistics
         update_info = {
@@ -185,21 +229,24 @@ def main():
             "data_points_changed": data_points_changed
         }
         
-        with open(output_dir / "last_updated.json", 'w') as f:
+        last_updated_path = output_dir / "last_updated.json"
+        with open(last_updated_path, 'w') as f:
             json.dump(update_info, f, indent=2)
             f.flush()
+        logging.info(f"Successfully wrote update stats to {last_updated_path}")
 
-        logging.info(f"Successfully wrote {len(output_data_content)} ZIP codes to zip-data.json.gz")
-        logging.info(f"Changes: {zip_codes_changed} ZIP codes, {data_points_changed} data points")
-
+        # Log a random sample for verification
         if output_data_content:
             sample_zip = random.choice(list(output_data_content.keys()))
             pretty_sample = json.dumps({sample_zip: output_data_content[sample_zip]}, indent=2)
             print("\n--- Verification Sample ---"); print(pretty_sample); print("-------------------------")
             logging.info(f"Verification sample for ZIP {sample_zip}:\n{pretty_sample}")
+        
+        logging.info("--- Data Pipeline Run Finished Successfully ---")
             
     except Exception as e:
-        logging.error(f"An error occurred: {e}")
+        logging.error(f"An error occurred during the main processing block: {e}")
+        logging.error("--- Data Pipeline Run FAILED ---")
         raise
 
 
