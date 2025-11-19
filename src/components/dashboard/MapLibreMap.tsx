@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl, { LngLatLike } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { scaleLinear } from "d3-scale";
 import { getMetricDisplay } from "./map/utils";
 import { ZipData } from "./map/types";
 const BASE_PATH = import.meta.env.BASE_URL;
@@ -23,11 +22,11 @@ export function MapLibreMap({
   onZipSelect,
   searchZip,
   zipData,
-  colorScaleDomain,
   isLoading,
   progress,
   processData,
 }: MapProps) {
+  console.log('[MapLibreMap] Component render, selectedMetric:', selectedMetric);
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
@@ -134,14 +133,6 @@ export function MapLibreMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createAndInitializeMap]);
 
-  /* Color scale - defensive: ensure domain sorted */
-  const colorScale = useMemo(() => {
-    if (!colorScaleDomain) return null;
-    const [a, b] = colorScaleDomain;
-    const domain = a <= b ? [a, b] : [b, a];
-    return scaleLinear<string>().domain(domain).range(["#FFF9B0", "#E84C61", "#2E0B59"]).clamp(true);
-  }, [colorScaleDomain]);
-
   // Load base GeoJSON (safe fetch + decompress with pako)
   useEffect(() => {
     if (!isMapReady || baseGeoJSON) return;
@@ -151,6 +142,7 @@ export function MapLibreMap({
 
     (async () => {
       try {
+      console.log("[MapLibreMap] Starting GeoJSON fetch");
       const geoJsonUrl = new URL(
         `${BASE_PATH}data/us-zip-codes.geojson`,
         window.location.origin
@@ -324,6 +316,8 @@ export function MapLibreMap({
   useEffect(() => {
   if (!isMapReady || !mapRef.current || !baseGeoJSON || Object.keys(zipData).length === 0) return;
   if (processingRef.current) return;
+  
+  console.log('[MapLibreMap] Processing data update for metric:', selectedMetric);
   processingRef.current = true;
 
   // cancel previous worker task
@@ -343,18 +337,24 @@ export function MapLibreMap({
         maxX: bounds.getEast(),
         maxY: bounds.getNorth(),
       };
+      console.log('[MapLibreMap] Current viewport:', viewport);
 
       // send geojson + viewport to worker
+      console.log('[MapLibreMap] Sending data to worker for processing');
       const processed = await processData({
         type: "PROCESS_GEOJSON",
         data: { geojson: baseGeoJSON, zipData, selectedMetric, viewport },
       });
 
-      if (signal.aborted) return;
+      if (signal.aborted) {
+        console.log('[MapLibreMap] Processing aborted');
+        return;
+      }
 
       const source = map.getSource("zips") as maplibregl.GeoJSONSource;
       if (!source) throw new Error("Map source 'zips' missing");
 
+      console.log(`[MapLibreMap] Updating map with ${processed.features?.length || 0} features`);
       // set filtered features
       source.setData({
         type: "FeatureCollection",
@@ -363,10 +363,15 @@ export function MapLibreMap({
 
       // apply bucketed Mapbox expression for fill-color
       if (processed.bucketExpression) {
+        console.log('[MapLibreMap] Applying color expression to map');
         map.setPaintProperty("zips-fill", "fill-color", processed.bucketExpression);
       }
 
-      if (!interactionsSetup.current) setupMapInteractions(map);
+      if (!interactionsSetup.current) {
+        console.log('[MapLibreMap] Setting up map interactions');
+        setupMapInteractions(map);
+      }
+      console.log('[MapLibreMap] Map update complete');
     } catch (err) {
       if (!signal.aborted) console.error("[MapLibreMap] update failed", err);
     } finally {

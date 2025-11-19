@@ -19,22 +19,28 @@ export function useDataWorker() {
   const requestsRef = useRef<Map<string, PendingRequest>>(new Map());
   const isInitializedRef = useRef(false);
 
+  console.log('[useDataWorker] Hook initialized');
+
   useEffect(() => {
     if (isInitializedRef.current) return;
     
+    console.log('[useDataWorker] Creating worker instance');
     const worker = new DataProcessorWorker();
     workerRef.current = worker;
     isInitializedRef.current = true;
 
     worker.onmessage = (event: MessageEvent) => {
       const { id, type, data, error } = event.data;
+      console.log('[useDataWorker] Received message from worker:', type, { id });
 
       switch (type) {
         case 'PROGRESS':
+          console.log('[useDataWorker] Progress update:', data.phase);
           setProgress(data);
           break;
 
         case 'ERROR': {
+          console.error('[useDataWorker] Worker error:', error);
           setIsLoading(false);
           const pending = requestsRef.current.get(id);
           if (pending) {
@@ -45,6 +51,7 @@ export function useDataWorker() {
         }
 
         default: {
+          console.log(`[useDataWorker] ${type} completed for request ${id}`);
           setIsLoading(false);
           const pending = requestsRef.current.get(id);
           if (pending) {
@@ -64,6 +71,7 @@ export function useDataWorker() {
     };
 
     return () => {
+      console.log('[useDataWorker] Terminating worker');
       if (workerRef.current) {
         workerRef.current.terminate();
         workerRef.current = null;
@@ -81,6 +89,7 @@ export function useDataWorker() {
 
     return new Promise((resolve, reject) => {
       const id = `${Date.now()}-${Math.random()}`;
+      console.log(`[useDataWorker] Sending message to worker: ${message.type}, request ID: ${id}`);
       
       requestsRef.current.set(id, { resolve, reject });
       setIsLoading(true);
