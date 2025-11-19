@@ -1,6 +1,6 @@
 import { ZipData } from "../components/dashboard/map/types";
 import { WorkerMessage, LoadDataRequest, ProcessGeoJSONRequest } from "./worker-types";
-import { inflate } from "pako";
+// import { inflate } from "pako"; // No longer needed
 import RBush from "rbush"; // R-Tree library
 
 let currentAbortController: AbortController | null = null;
@@ -48,26 +48,17 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         const buffer = await response.arrayBuffer();
 
         let fullPayload;
-        const contentEncoding = response.headers.get("content-encoding") || "";
 
+        // --- MODIFICATION ---
+        // Since we know the data is plain JSON, we can decode and parse directly.
+        // Removed the old logic that checked for content-encoding and used pako.
         try {
-          if (contentEncoding.includes("gzip")) {
-            // Browser already ungzips automatically unless `fetch` is done with special headers.
-            // Try direct JSON first.
-            try {
-              fullPayload = JSON.parse(new TextDecoder().decode(buffer));
-            } catch {
-              // If server sends raw gzip bytes (rare), inflate manually
-              const inflated = inflate(new Uint8Array(buffer), { to: "string" });
-              fullPayload = JSON.parse(inflated);
-            }
-          } else {
-            // NOT gzip → decode directly
-            fullPayload = JSON.parse(new TextDecoder().decode(buffer));
-          }
+          const jsonText = new TextDecoder().decode(buffer);
+          fullPayload = JSON.parse(jsonText);
         } catch (err) {
           throw new Error("Failed to parse JSON: " + (err as Error).message);
         }
+        // --- END MODIFICATION ---
 
         const { last_updated_utc, zip_codes: rawZipData } = fullPayload;
         if (!rawZipData) throw new Error("Missing zip_codes data");
@@ -151,12 +142,12 @@ function bbox(f: GeoJSON.Feature): [number, number, number, number] {
   if (f.geometry.type === "Polygon") {
     const coords = f.geometry.coordinates.flat(2);
     const xs = coords.filter((_, i) => i % 2 === 0);
-    const ys = coords.filter((_, i) => i % 2 === 0 ? undefined : coords[i]);
+    const ys = coords.filter((_, i) => i % 2 !== 0); // Corrected this line
     return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
   } else if (f.geometry.type === "MultiPolygon") {
     const coords = f.geometry.coordinates.flat(3);
     const xs = coords.filter((_, i) => i % 2 === 0);
-    const ys = coords.filter((_, i) => i % 2 === 0 ? undefined : coords[i]);
+    const ys = coords.filter((_, i) => i % 2 !== 0); // Corrected this line
     return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
   }
   return [0, 0, 0, 0];

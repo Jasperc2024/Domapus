@@ -6,8 +6,8 @@ permissions:
 
 on:
   schedule:
-    - cron: '0 5 1 * *' 
-  workflow_dispatch:
+    - cron: '0 5 1 * *' # Runs at 05:00 UTC on the 1st of every month
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
   update-data:
@@ -27,12 +27,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install pandas requests
 
-    - name: Run Redfin ZIP Data Parser
+    - name: Run Redfin Data Pipeline
       run: |
         python -u scripts/parse_redfin_zip_data.py
 
     - name: Display Logs
-      if: always() 
+      if: always() # Always run this step to see logs, even if the script fails
       run: |
         echo "--- Displaying contents of data_pipeline.log ---"
         cat data_pipeline.log
@@ -41,38 +41,34 @@ jobs:
     - name: Check for changes in ZIP data file
       id: check_changes
       run: |
-        if [ ! -f public/data/zip-data.json.gz ]; then
+        if [ ! -f public/data/zip-data.json ]; then
+          echo "File not found, changes=true"
           echo "changes=true" >> $GITHUB_OUTPUT
-        elif git diff --quiet HEAD -- public/data/zip-data.json.gz; then
+        elif git diff --quiet HEAD -- public/data/zip-data.json; then
+          echo "No changes detected in zip-data.json"
           echo "changes=false" >> $GITHUB_OUTPUT
         else
+          echo "Changes detected in zip-data.json"
           echo "changes=true" >> $GITHUB_OUTPUT
         fi
 
-    - name: Commit and push if changed or missing
+    - name: Commit and push if changed
+      # Only run if the check_changes step output 'changes=true'
       if: steps.check_changes.outputs.changes == 'true'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-
-        if git show HEAD:public/data/zip-data.json.gz >/dev/null 2>&1; then
-          git show HEAD:public/data/zip-data.json.gz > /tmp/old-data.json.gz
-          if gzip -cd /tmp/old-data.json.gz > /tmp/old-data.json && \
-             gzip -cd public/data/zip-data.json.gz > /tmp/new-data.json && \
-             cmp -s /tmp/old-data.json /tmp/new-data.json; then
-            echo "No data changes, skipping commit."
-            exit 0
-          fi
-        fi
-
-        git add public/data/zip-data.json.gz public/data/last_updated.json
+        
+        echo "Adding and committing changes..."
+        # Add the uncompressed json file
+        git add public/data/zip-data.json public/data/last_updated.json
         git commit -m "Update Redfin ZIP data - $(date +'%Y-%m-%d %H:%M:%S' --utc)"
         git push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Create issue if failed
-      if: failure()
+      if: failure() # Only run if any previous step failed
       uses: actions/github-script@v6
       with:
         script: |

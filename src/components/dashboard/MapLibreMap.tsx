@@ -151,55 +151,43 @@ export function MapLibreMap({
 
     (async () => {
       try {
-        const geoJsonUrl = new URL(
-          `${BASE_PATH}data/us-zip-codes.geojson.gz`,
-          window.location.origin
-        ).href;
+      const geoJsonUrl = new URL(
+        `${BASE_PATH}data/us-zip-codes.geojson`,
+        window.location.origin
+      ).href;
 
-        console.log("[MapLibreMap] fetching base geojson...", geoJsonUrl);
+      console.log("[MapLibreMap] fetching base geojson...", geoJsonUrl);
 
-        const resp = await fetch(geoJsonUrl, {
-          signal: controller.signal,
-          headers: { Accept: "application/octet-stream" }
-        });
+      const resp = await fetch(geoJsonUrl, {
+        signal: controller.signal,
+        headers: { Accept: "application/json" }
+      });
 
-        clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-        if (!resp.ok) {
-          throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
-        }
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+      }
 
-        const buf = await resp.arrayBuffer();
-        let parsed;
+      const parsed = await resp.json();
 
-        // Try direct JSON first (browser likely auto-decompressed)
-        try {
-          const text = new TextDecoder().decode(buf);
-          parsed = JSON.parse(text);
-        } catch {
-          // If that fails, THEN try pako inflate
-          const { inflate } = await import("pako");
-          const inflated = inflate(new Uint8Array(buf), { to: "string" });
-          parsed = JSON.parse(inflated);
-        }
+      if (!parsed || parsed.type !== "FeatureCollection" || !Array.isArray(parsed.features)) {
+        throw new Error("Invalid GeoJSON structure");
+      }
 
-        if (!parsed || parsed.type !== "FeatureCollection" || !Array.isArray(parsed.features)) {
-          throw new Error("Invalid GeoJSON structure");
-        }
-
-        if (!cancelled) {
-          console.log(`[MapLibreMap] GeoJSON loaded: ${parsed.features.length} features`);
-          setBaseGeoJSON(parsed);
-        }
+      if (!cancelled) {
+        console.log(`[MapLibreMap] GeoJSON loaded: ${parsed.features.length} features`);
+        setBaseGeoJSON(parsed);
+      }
       } catch (err: any) {
-        clearTimeout(timeoutId);
-        if (err.name === "AbortError") {
-          console.warn("[MapLibreMap] geojson fetch aborted/timed out");
-          setError("Map data load timed out. Try refreshing.");
-        } else {
-          console.error("[MapLibreMap] geojson load failed", err);
-          setError("Failed to load map data.");
-        }
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        console.warn("[MapLibreMap] geojson fetch aborted/timed out");
+        setError("Map data load timed out. Try refreshing.");
+      } else {
+        console.error("[MapLibreMap] geojson load failed", err);
+        setError("Failed to load map data.");
+      }
       }
     })();
 
