@@ -38,6 +38,9 @@ export function MapLibreMap({
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const mousemoveRafRef = useRef<number | null>(null);
   const lastMouseEventRef = useRef<any>(null);
+  const popupRef = useRef<maplibregl.Popup | null>(null);
+  const lastProcessedMetric = useRef<string>("");
+  const lastProcessedDataKeys = useRef<string>("");
 
   // create map factory
   const createAndInitializeMap = useCallback((container: HTMLDivElement) => {
@@ -119,9 +122,16 @@ export function MapLibreMap({
         mousemoveRafRef.current = null;
       }
 
+      // Remove popup
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+      }
+
       // remove map if exists
       if (mapRef.current) {
         try {
+          console.log('[MapLibreMap] Removing map instance');
           mapRef.current.remove();
         } catch (err) {
           console.warn("[MapLibreMap] error removing map", err);
@@ -129,6 +139,7 @@ export function MapLibreMap({
         mapRef.current = null;
       }
       setIsMapReady(false);
+      interactionsSetup.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createAndInitializeMap]);
@@ -235,163 +246,166 @@ export function MapLibreMap({
     }
   }, [isMapReady, baseGeoJSON]);
 
-  // Setup interactions (kept as stable callback)
-  const setupMapInteractions = useCallback(
-    (mapInstance: maplibregl.Map) => {
-      if (!mapInstance) return;
-      if (interactionsSetup.current) return;
+  // Setup interactions once - use refs to access latest data without recreating
+  const setupMapInteractions = useCallback(() => {
+    const mapInstance = mapRef.current;
+    if (!mapInstance || interactionsSetup.current) return;
 
-      console.log("[MapLibreMap] setting up interactions...");
-      const layers = ["zips-fill"];
-      let popup: maplibregl.Popup | null = null;
+    console.log("[MapLibreMap] setting up interactions...");
+    const layers = ["zips-fill"];
 
-      // throttled mousemove using requestAnimationFrame
-      const mousemoveHandler = (e: any) => {
-        lastMouseEventRef.current = e;
-        if (mousemoveRafRef.current) return;
-        mousemoveRafRef.current = requestAnimationFrame(() => {
-          const ev = lastMouseEventRef.current;
-          mousemoveRafRef.current = null;
-          try {
-            const features = ev.features ?? [];
-            mapInstance.getCanvas().style.cursor = features.length ? "pointer" : "";
-            if (!features.length) {
-              popup?.remove();
-              return;
-            }
-            const props = features[0].properties ?? {};
-            const zipCode = props.zipCode ?? props.zip?.toString();
-            if (!zipCode || !zipData[zipCode]) {
-              popup?.remove();
-              return;
-            }
-
-            const coords =
-              features[0].geometry?.type === "Point" ? (features[0].geometry.coordinates as LngLatLike) : ev.lngLat;
-            popup?.remove();
-            popup = new maplibregl.Popup({ closeButton: false, offset: [0, -10], maxWidth: "320px" })
-              .setLngLat(coords)
-              .setHTML(getMetricDisplay(zipData[zipCode], selectedMetric))
-              .addTo(mapInstance);
-          } catch (err) {
-            console.error("[MapLibreMap] mousemove handler error", err);
-          }
-        });
-      };
-
-      const mouseleaveHandler = () => {
+    // throttled mousemove using requestAnimationFrame
+    const mousemoveHandler = (e: any) => {
+      lastMouseEventRef.current = e;
+      if (mousemoveRafRef.current) return;
+      mousemoveRafRef.current = requestAnimationFrame(() => {
+        const ev = lastMouseEventRef.current;
+        mousemoveRafRef.current = null;
         try {
-          mapInstance.getCanvas().style.cursor = "";
-          popup?.remove();
-        } catch (err) {
-          console.error("[MapLibreMap] mouseleave error", err);
-        }
-      };
-
-      const clickHandler = (e: any) => {
-        try {
-          const props = (e.features?.[0]?.properties) ?? {};
-          const zipCode = props.zipCode ?? props.zip;
-          if (zipCode && zipData[zipCode]) {
-            onZipSelect(zipData[zipCode]);
+          const features = ev.features ?? [];
+          mapInstance.getCanvas().style.cursor = features.length ? "pointer" : "";
+          if (!features.length) {
+            popupRef.current?.remove();
+            return;
           }
+          const props = features[0].properties ?? {};
+          const zipCode = props.zipCode ?? props.zip?.toString();
+          if (!zipCode || !zipData[zipCode]) {
+            popupRef.current?.remove();
+            return;
+          }
+
+          const coords =
+            features[0].geometry?.type === "Point" ? (features[0].geometry.coordinates as LngLatLike) : ev.lngLat;
+          popupRef.current?.remove();
+          popupRef.current = new maplibregl.Popup({ closeButton: false, offset: [0, -10], maxWidth: "320px" })
+            .setLngLat(coords)
+            .setHTML(getMetricDisplay(zipData[zipCode], selectedMetric))
+            .addTo(mapInstance);
+          console.log(`[MapLibreMap] Showing hover popup for ZIP ${zipCode}`);
         } catch (err) {
-          console.error("[MapLibreMap] click handler error", err);
+          console.error("[MapLibreMap] mousemove handler error", err);
         }
-      };
+      });
+    };
 
-      // use delegated events on layer
-      mapInstance.on("mousemove", layers, mousemoveHandler);
-      mapInstance.on("mouseleave", layers, mouseleaveHandler);
-      mapInstance.on("click", layers, clickHandler);
+    const mouseleaveHandler = () => {
+      try {
+        mapInstance.getCanvas().style.cursor = "";
+        popupRef.current?.remove();
+      } catch (err) {
+        console.error("[MapLibreMap] mouseleave error", err);
+      }
+    };
 
-      // cleanup when removing interactions (we rely on map removal to clear listeners)
-      interactionsSetup.current = true;
-      console.log("[MapLibreMap] interactions registered");
-    },
-    [onZipSelect, selectedMetric, zipData]
-  );
+    const clickHandler = (e: any) => {
+      try {
+        const props = (e.features?.[0]?.properties) ?? {};
+        const zipCode = props.zipCode ?? props.zip;
+        if (zipCode && zipData[zipCode]) {
+          console.log(`[MapLibreMap] ZIP ${zipCode} clicked, opening sidebar`);
+          onZipSelect(zipData[zipCode]);
+        }
+      } catch (err) {
+        console.error("[MapLibreMap] click handler error", err);
+      }
+    };
 
-  // Re-run process/update when data changes (ensures source exists)
+    // use delegated events on layer
+    mapInstance.on("mousemove", layers, mousemoveHandler);
+    mapInstance.on("mouseleave", layers, mouseleaveHandler);
+    mapInstance.on("click", layers, clickHandler);
+
+    interactionsSetup.current = true;
+    console.log("[MapLibreMap] interactions registered");
+  }, []); // Empty deps - uses refs for data access
+
+  // Re-run process/update only when metric or data actually changes
   useEffect(() => {
-  if (!isMapReady || !mapRef.current || !baseGeoJSON || Object.keys(zipData).length === 0) {
-    console.log('[MapLibreMap] Skipping process - not ready', { isMapReady, hasMap: !!mapRef.current, hasGeoJSON: !!baseGeoJSON, zipDataCount: Object.keys(zipData).length });
-    return;
-  }
-  if (processingRef.current) {
-    console.log('[MapLibreMap] Skipping process - already processing');
-    return;
-  }
-  
-  console.log('[MapLibreMap] Processing data update for metric:', selectedMetric);
-  processingRef.current = true;
-
-  // cancel previous worker task
-  if (abortControllerRef.current) abortControllerRef.current.abort();
-  abortControllerRef.current = new AbortController();
-  const signal = abortControllerRef.current.signal;
-
-  (async () => {
-    try {
-      const map = mapRef.current;
-      if (!map) return;
-      // get current viewport bbox
-      const bounds = map.getBounds();
-      const viewport = {
-        minX: bounds.getWest(),
-        minY: bounds.getSouth(),
-        maxX: bounds.getEast(),
-        maxY: bounds.getNorth(),
-      };
-      console.log('[MapLibreMap] Current viewport:', viewport);
-
-      // send geojson + viewport to worker
-      console.log('[MapLibreMap] Sending data to worker for processing');
-      const processed = await processData({
-        type: "PROCESS_GEOJSON",
-        data: { geojson: baseGeoJSON, zipData, selectedMetric, viewport },
-      });
-
-      if (signal.aborted) {
-        console.log('[MapLibreMap] Processing aborted');
-        return;
-      }
-
-      const source = map.getSource("zips") as maplibregl.GeoJSONSource;
-      if (!source) throw new Error("Map source 'zips' missing");
-
-      console.log(`[MapLibreMap] Updating map with ${processed.features?.length || 0} features`);
-      // set filtered features
-      source.setData({
-        type: "FeatureCollection",
-        features: processed.features ?? [],
-      });
-
-      // apply bucketed Mapbox expression for fill-color
-      if (processed.bucketExpression) {
-        console.log('[MapLibreMap] Applying color expression to map');
-        map.setPaintProperty("zips-fill", "fill-color", processed.bucketExpression);
-      }
-
-      // Setup interactions using current zipData/metric without triggering re-render
-      if (!interactionsSetup.current && mapRef.current) {
-        console.log('[MapLibreMap] Setting up map interactions');
-        setupMapInteractions(mapRef.current);
-      }
-      console.log('[MapLibreMap] Map update complete');
-    } catch (err) {
-      if (!signal.aborted) console.error("[MapLibreMap] update failed", err);
-    } finally {
-      processingRef.current = false;
+    if (!isMapReady || !mapRef.current || !baseGeoJSON || Object.keys(zipData).length === 0) {
+      console.log('[MapLibreMap] Skipping process - not ready', { isMapReady, hasMap: !!mapRef.current, hasGeoJSON: !!baseGeoJSON, zipDataCount: Object.keys(zipData).length });
+      return;
     }
-  })();
 
-  return () => {
-    console.log('[MapLibreMap] Cleanup - aborting processing');
+    // Prevent unnecessary processing if metric and data haven't changed
+    const currentDataKeys = Object.keys(zipData).sort().join(',');
+    if (processingRef.current || 
+        (lastProcessedMetric.current === selectedMetric && lastProcessedDataKeys.current === currentDataKeys)) {
+      console.log('[MapLibreMap] Skipping process - no changes or already processing');
+      return;
+    }
+    
+    console.log('[MapLibreMap] Processing data update for metric:', selectedMetric);
+    lastProcessedMetric.current = selectedMetric;
+    lastProcessedDataKeys.current = currentDataKeys;
+    processingRef.current = true;
+
+    // cancel previous worker task
     if (abortControllerRef.current) abortControllerRef.current.abort();
-  };
-  // Remove setupMapInteractions from deps to prevent infinite loop
-}, [isMapReady, baseGeoJSON, zipData, selectedMetric, processData]);
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    (async () => {
+      try {
+        const map = mapRef.current;
+        if (!map) return;
+        
+        // get current viewport bbox
+        const bounds = map.getBounds();
+        const viewport = {
+          minX: bounds.getWest(),
+          minY: bounds.getSouth(),
+          maxX: bounds.getEast(),
+          maxY: bounds.getNorth(),
+        };
+        console.log('[MapLibreMap] Current viewport:', viewport);
+
+        // send geojson + viewport to worker
+        console.log('[MapLibreMap] Sending data to worker for processing');
+        const processed = await processData({
+          type: "PROCESS_GEOJSON",
+          data: { geojson: baseGeoJSON, zipData, selectedMetric, viewport },
+        });
+
+        if (signal.aborted) {
+          console.log('[MapLibreMap] Processing aborted');
+          return;
+        }
+
+        const source = map.getSource("zips") as maplibregl.GeoJSONSource;
+        if (!source) throw new Error("Map source 'zips' missing");
+
+        console.log(`[MapLibreMap] Updating map with ${processed.features?.length || 0} features`);
+        // set filtered features
+        source.setData({
+          type: "FeatureCollection",
+          features: processed.features ?? [],
+        });
+
+        // apply bucketed Mapbox expression for fill-color
+        if (processed.bucketExpression) {
+          console.log('[MapLibreMap] Applying choropleth color expression to map');
+          map.setPaintProperty("zips-fill", "fill-color", processed.bucketExpression);
+        }
+
+        // Setup interactions once
+        if (!interactionsSetup.current) {
+          console.log('[MapLibreMap] Setting up map interactions');
+          setupMapInteractions();
+        }
+        console.log('[MapLibreMap] Map update complete');
+      } catch (err) {
+        if (!signal.aborted) console.error("[MapLibreMap] update failed", err);
+      } finally {
+        processingRef.current = false;
+      }
+    })();
+
+    return () => {
+      console.log('[MapLibreMap] Cleanup - aborting processing');
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+  }, [isMapReady, baseGeoJSON, zipData, selectedMetric, processData, setupMapInteractions]);
 
   // When searchZip arrives, fly to it if valid coords
   useEffect(() => {
