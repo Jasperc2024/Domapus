@@ -15,14 +15,17 @@ export function getMetricValue(data: ZipData, metric: string): number {
 // --- Worker state ---
 let geoJSONIndex: Record<string, GeoJSON.Feature> = {};
 
-// --- Bucketed expression ---
-function getMetricBuckets(values: number[], numBuckets = 7) {
-  const sorted = [...values].sort((a, b) => a - b);
+// --- Bucketed expression for choropleth coloring ---
+function getMetricBuckets(values: number[], numBuckets = 8) {
+  const sorted = [...values].filter(v => v > 0).sort((a, b) => a - b);
+  if (sorted.length === 0) return [];
+  
   const step = Math.ceil(sorted.length / numBuckets);
   const thresholds: number[] = [];
   for (let i = 1; i < numBuckets; i++) {
     thresholds.push(sorted[i * step] ?? sorted[sorted.length - 1]);
   }
+  console.log('[Worker] Computed thresholds:', thresholds);
   return thresholds;
 }
 
@@ -126,13 +129,23 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         // Lazy load features in viewport
         const visibleFeatures = viewport ? tree.search(viewport).map((d: any) => d.feature) : indexedFeatures;
 
-        // Bucket coloring
+        // Bucket coloring with more granular steps for smoother choropleth
         const values = visibleFeatures.map((f: GeoJSON.Feature) => getMetricValue(zipData[f.properties!.ZCTA5CE20], selectedMetric));
-        const buckets = getMetricBuckets(values);
-        const expression: any[] = ["step", ["get", "metricValue"], "#FFF9B0", ...buckets.flatMap((v, i) => [v, bucketColor(i)])];
-        console.log(`[Worker] GeoJSON processed: ${visibleFeatures.length} visible features, ${buckets.length} buckets`);
+        const buckets = getMetricBuckets(values, 8); // 8 buckets for smoother gradient
+        
+        // Attach metric value to each feature for color expression
+        const enrichedFeatures = visibleFeatures.map((f: GeoJSON.Feature) => ({
+          ...f,
+          properties: {
+            ...f.properties,
+            metricValue: getMetricValue(zipData[f.properties!.ZCTA5CE20], selectedMetric)
+          }
+        }));
+        
+        const expression: any[] = ["step", ["get", "metricValue"], bucketColor(0), ...buckets.flatMap((v, i) => [v, bucketColor(i + 1)])];
+        console.log(`[Worker] GeoJSON processed: ${enrichedFeatures.length} visible features, ${buckets.length} buckets, color steps applied`);
 
-        self.postMessage({ type: "GEOJSON_PROCESSED", id, data: { type: "FeatureCollection", features: visibleFeatures, bucketExpression: expression } });
+        self.postMessage({ type: "GEOJSON_PROCESSED", id, data: { type: "FeatureCollection", features: enrichedFeatures, bucketExpression: expression } });
         break;
       }
 
@@ -163,8 +176,8 @@ function bbox(f: GeoJSON.Feature): [number, number, number, number] {
   return [0, 0, 0, 0];
 }
 
-// --- Helper: bucket colors ---
+// --- Helper: choropleth color palette (light yellow to deep purple) ---
 function bucketColor(i: number) {
-  const palette = ["#FFF9B0", "#FFE066", "#FFB347", "#FF7F50", "#E84C61", "#AD1457", "#2E0B59"];
-  return palette[i] || palette[palette.length - 1];
+  const palette = ["#FFF9B0", "#FFEB84", "#FFD166", "#FF9A56", "#E84C61", "#C13584", "#7B2E8D", "#2E0B59"];
+  return palette[Math.min(i, palette.length - 1)];
 }
