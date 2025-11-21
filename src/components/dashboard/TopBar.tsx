@@ -92,6 +92,9 @@ export function TopBar({
           <div className="flex items-center gap-4 flex-shrink-0">
             <SearchBox onSearch={onSearch} />
 
+            {/* Actions */}
+            <div className="flex items-center gap-2 pl-4 ml-2">
+            
             {/* Last Updated */}
             <div className="flex items-center text-dashboard-text-secondary gap-2">
               <Calendar className="h-4 w-4 opacity-80" />
@@ -102,11 +105,9 @@ export function TopBar({
                 </span>
               </div>
             </div>
-
-
-            {/* Actions */}
-            <div className="flex items-center gap-2 pl-4 ml-2">
+              
               {children}
+              
               <Button
                 variant="outline"
                 size="sm"
