@@ -38,7 +38,7 @@ export function TopBar({
   }, []);
 
   const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return "July 1, 2025";
+    if (!dateStr) return "N/A";
     try {
       const date = new Date(dateStr);
       return date.toLocaleDateString("en-US", {
@@ -47,7 +47,7 @@ export function TopBar({
         day: "numeric",
       });
     } catch {
-      return "July 1, 2025";
+      return "N/A";
     }
   };
 
@@ -65,16 +65,16 @@ export function TopBar({
             <img
               src="/Domapus/Logo.svg"
               alt="Domapus Logo"
-              width="32"
-              height="32"
-              className="w-7 h-7 sm:w-8 sm:h-8"
+              width="40"
+              height="40"
+              className="w-9 h-9 sm:w-10 sm:h-10"
             />
             <div className="flex flex-col font-logo">
-              <h1 className="text-sm sm:text-base font-bold text-dashboard-text-primary leading-none">
+              <h1 className="text-base sm:text-lg font-bold text-dashboard-text-primary leading-tight">
                 Domapus
               </h1>
-              <p className="text-[9px] sm:text-[10px] text-dashboard-text-secondary leading-tight mt-0.5 hidden sm:block">
-                U.S. Housing Market
+              <p className="text-xs sm:text-sm text-dashboard-text-secondary leading-tight mt-0.25 hidden sm:block">
+                Housing Market Analysis
               </p>
             </div>
           </div>
@@ -93,50 +93,50 @@ export function TopBar({
             <SearchBox onSearch={onSearch} />
 
             {/* Last Updated */}
-            <div className="flex items-center gap-1.5 text-dashboard-text-secondary">
-              <Calendar className="h-3.5 w-3.5 opacity-80" />
-              <span className="text-xs font-medium whitespace-nowrap">
-                {formatDate(lastUpdated)}
-              </span>
+            <div className="flex items-center text-dashboard-text-secondary gap-2">
+              <Calendar className="h-4 w-4 opacity-80" />
+              <div className="flex flex-col">
+                <span className="text-xs font-medium">Data Updated:</span>
+                <span className="text-xs font-medium whitespace-nowrap">
+                  {formatDate(lastUpdated)}
+                </span>
+              </div>
             </div>
 
+
+            {/* Actions */}
+            
+            {/*Export*/}
             {children && <div className="flex items-center">{children}</div>}
 
-            {/* Divider + External Links */}
-            <div className="flex items-center gap-2 pl-4 border-l border-dashboard-border ml-2">
+            <div className="flex items-center gap-2 pl-4 ml-2">
               <Button
                 variant="outline"
                 size="sm"
-                asChild
-                className="h-8 px-2.5 hover:border-dashboard-text-secondary"
               >
                 <a
                   href="https://github.com/Jasperc2024/Domapus"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Github className="h-4 w-4 sm:mr-1" />
-                  <span className="hidden lg:inline text-xs font-medium">
+                  <Github className="h-4 w-4 mr-2" />
                     GitHub
-                  </span>
                 </a>
               </Button>
 
               <Button
-                variant="default"
+                variant="outline"
                 size="sm"
                 asChild
-                className="h-8 px-2.5 bg-pink-600 hover:bg-pink-700 text-white"
+                className="bg-pink-600 hover:bg-pink-700 text-white"
               >
                 <a
                   href="https://buymeacoffee.com/JasperC"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Heart className="h-4 w-4 sm:mr-1" />
-                  <span className="hidden lg:inline text-xs font-medium">
+                  <Heart className="h-4 w-4 mr-2" />
                     Sponsor
-                  </span>
                 </a>
               </Button>
             </div>
