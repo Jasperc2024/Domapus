@@ -228,7 +228,12 @@ export function MapLibreMap({
 
       // insert before first label symbol layer if possible
       const style = map.getStyle ? map.getStyle() : null;
-      const firstLabel = style?.layers?.find((l: any) => l.type === "symbol");
+      const firstLabel = style?.layers?.find(
+        (l: any) =>
+          l.type === "symbol" &&
+          typeof l.id === "string" &&
+          !l.id.toLowerCase().includes("roadname")
+      );
       const beforeId = firstLabel ? firstLabel.id : undefined;
 
       map.addLayer(
