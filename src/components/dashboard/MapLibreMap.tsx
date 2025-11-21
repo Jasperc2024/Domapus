@@ -51,8 +51,14 @@ export function MapLibreMap({
       zoom: 3.5,
       minZoom: 3,
       maxZoom: 12,
+      attributionControl: false
     });
 
+    const compactAttribution = new maplibregl.AttributionControl({
+            compact: true
+        });
+    map.addControl(compactAttribution, 'bottom-left');
+    
     // catch map internal errors
     map.on("error", (e) => {
       console.error("[Map] Internal error:", (e as any)?.error ?? e);
