@@ -105,11 +105,8 @@ export function TopBar({
 
 
             {/* Actions */}
-            
-            {/*Export*/}
-            {children && <div className="flex items-center">{children}</div>}
-
             <div className="flex items-center gap-2 pl-4 ml-2">
+              {children}
               <Button
                 variant="outline"
                 size="sm"
