@@ -1,3 +1,29 @@
+import { useState, useEffect } from "react";
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
+const useDebounce = (value: string, delay: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]); 
+
+  return debouncedValue;
+};
+
+interface SearchBoxProps {
+  onSearch: (zipCode: string) => void;
+}
+
 export function SearchBox({ onSearch }: SearchBoxProps) {
   const [searchValue, setSearchValue] = useState("");
 
