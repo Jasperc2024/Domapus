@@ -113,6 +113,7 @@ export function TopBar({
               <Button
                 variant="outline"
                 size="sm"
+                asChild
               >
                 <a
                   href="https://github.com/Jasperc2024/Domapus"
