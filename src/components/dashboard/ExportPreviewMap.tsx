@@ -117,6 +117,7 @@ export function ExportPreviewMap({
         },
         center,
         zoom,
+        preserveDrawingBuffer: true,
         interactive: false,
         attributionControl: false
       });
@@ -180,7 +181,9 @@ export function ExportPreviewMap({
           }
         }
         
-        if (onMapReady) onMapReady(mapInstance);
+        mapInstance.once("idle", () => {
+          if (onMapReady) onMapReady(mapInstance);
+        });
       });
     });
     
