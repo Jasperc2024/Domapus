@@ -186,6 +186,9 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
             filteredGeoJSON={filteredGeoJSON}
             selectedMetric={selectedMetric}
             isLoading={false}
+            regionScope={regionScope}
+            includeTitle={includeTitle}
+            includeLegend={includeLegend}
           />
         </div>
       </div>
