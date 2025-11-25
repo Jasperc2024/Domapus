@@ -64,8 +64,9 @@ export function ExportMap({ filteredData, geoJSON, selectedMetric, regionScope, 
         { key: 'hawaii', ref: hawaiiMapRef, center: [-157, 21] as [number, number], zoom: 5, data: hawaii as GeoJSON.FeatureCollection },
       ] : [])
     ];
-    
-    let mapsToLoad = mapConfigs.length;
+
+    const activeMaps = mapConfigs.filter(c => c.data).length;
+    let mapsToLoad = activeMaps;
     let loadedMaps = 0;
 
     const onMapIdle = () => {
@@ -77,10 +78,10 @@ export function ExportMap({ filteredData, geoJSON, selectedMetric, regionScope, 
     
     mapConfigs.forEach(({ key, ref, center, zoom, data }) => {
       if (!ref.current || maps[key]) return;
-      const map = new maplibregl.Map({ container: ref.current, style: { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#ffffff' } }] }, center, zoom, interactive: false, attributionControl: false });
+      const map = new maplibregl.Map({ container: ref.current, style: { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#ffffff' } }] }, center, zoom, interactive: false, attributionControl: false, preserveDrawingBuffer: true, });
       maps[key] = map;
       map.on('load', () => {
-        if (!data || !colorScale || data.features.length === 0) { onMapIdle(); return; }
+        if (!data || !colorScale || data.features.length === 0) { map.once("idle", onMapIdle); return; }
         const dataWithMetrics = {
             ...data,
             features: data.features.map(f => {
@@ -102,7 +103,7 @@ export function ExportMap({ filteredData, geoJSON, selectedMetric, regionScope, 
         map.once('idle', onMapIdle);
       });
     });
-    return () => { Object.values(maps).forEach(map => map?.remove()); };
+    return () => {};
   }, [continental, alaska, hawaii, colorScale, onRenderComplete, regionScope, selectedMetric, filteredData]);
 
   return (
