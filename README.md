@@ -7,7 +7,6 @@
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/Jasperc2024/Domapus/blob/main/LICENSE.md)
 [![Deploy to GitHub Pages](https://github.com/Jasperc2024/Domapus/actions/workflows/deploy.yml/badge.svg)](https://github.com/Jasperc2024/Domapus/actions/workflows/deploy.yml)
 ![GitHub Stars](https://img.shields.io/github/stars/Jasperc2024/Domapus?style=flat)
-![Contributors](https://img.shields.io/github/contributors/Jasperc2024/Domapus?style=flat)
 [![](https://data.jsdelivr.com/v1/package/gh/Jasperc2024/Domapus/badge)](https://www.jsdelivr.com/package/gh/Jasperc2024/Domapus)
 
 
