@@ -1,7 +1,5 @@
 import { ZipData } from "../components/dashboard/map/types";
 import { WorkerMessage, LoadDataRequest, ProcessGeoJSONRequest } from "./worker-types";
-// import { inflate } from "pako"; // No longer needed
-import RBush from "rbush"; // R-Tree library
 
 let currentAbortController: AbortController | null = null;
 
@@ -19,12 +17,32 @@ let geoJSONIndex: Record<string, GeoJSON.Feature> = {};
 function getMetricBuckets(values: number[], numBuckets = 8) {
   const sorted = [...values].filter(v => v > 0).sort((a, b) => a - b);
   if (sorted.length === 0) return [];
-  
-  const step = Math.ceil(sorted.length / numBuckets);
+
+  const minVal = sorted[0];
+  const maxVal = sorted[sorted.length - 1];
+
+  // If all values are the same, return a single threshold
+  if (minVal === maxVal) return [minVal];
+
   const thresholds: number[] = [];
+  const epsilon = (maxVal - minVal) * 1e-6 || 1e-6; // small step relative to range
+
+  const q = (p: number) => {
+    const idx = Math.floor(p * (sorted.length - 1));
+    return sorted[idx];
+  };
+
   for (let i = 1; i < numBuckets; i++) {
-    thresholds.push(sorted[i * step] ?? sorted[sorted.length - 1]);
+    let val = q(i / numBuckets);
+
+    // enforce strictly increasing
+    if (thresholds.length && val <= thresholds[thresholds.length - 1]) {
+      val = thresholds[thresholds.length - 1] + epsilon;
+    }
+
+    thresholds.push(val);
   }
+
   console.log('[Worker] Computed thresholds:', thresholds);
   return thresholds;
 }
@@ -96,7 +114,22 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           }
         }
 
-        const bounds = { min: Math.min(...metricValues), max: Math.max(...metricValues) };
+        function computeQuantileBounds(values: number[]) {
+          const sorted = [...values].filter(v => v > 0).sort((a, b) => a - b);
+          if (sorted.length === 0) return { min: 0, max: 1 };
+
+          const q = (p: number) => {
+            const idx = Math.floor(p * (sorted.length - 1));
+            return sorted[idx];
+          };
+
+          return {
+            min: q(0.05), 
+            max: q(0.95)  
+          };
+        }
+
+        const bounds = computeQuantileBounds(metricValues);
         console.log(`[Worker] Data processed: ${Object.keys(zipData).length} ZIPs, bounds:`, bounds);
 
         self.postMessage({ type: "DATA_PROCESSED", id, data: { zip_codes: zipData, last_updated_utc, bounds } });
@@ -104,34 +137,27 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       }
 
       case "PROCESS_GEOJSON": {
-        const { geojson, zipData, selectedMetric, viewport } = data as ProcessGeoJSONRequest;
+        const { geojson, zipData, selectedMetric } = data as ProcessGeoJSONRequest;
         if (!geojson?.features) throw new Error("Invalid GeoJSON");
         console.log(`[Worker] Processing GeoJSON: ${geojson.features.length} features, metric: ${selectedMetric}`);
 
-        self.postMessage({ type: "PROGRESS", data: { phase: "Building spatial index..." } });
+        self.postMessage({ type: "PROGRESS", data: { phase: "Processing features..." } });
 
-        // Build R-Tree
-        const tree = new RBush();
-        const indexedFeatures: any[] = [];
+        const indexedFeatures: GeoJSON.Feature[] = [];
 
         for (let f of geojson.features) {
           if (signal.aborted) return;
           const zipCode = f.properties?.ZCTA5CE20;
           if (!zipCode || !zipData[zipCode]) continue;
-          const [minX, minY, maxX, maxY] = bbox(f);
-          tree.insert({ minX, minY, maxX, maxY, feature: f });
           geoJSONIndex[zipCode] = f;
           indexedFeatures.push(f);
         }
-
-        self.postMessage({ type: "PROGRESS", data: { phase: "Filtering viewport..." } });
-
-        // Lazy load features in viewport
-        const visibleFeatures = viewport ? tree.search(viewport).map((d: any) => d.feature) : indexedFeatures;
+        
+        const visibleFeatures = indexedFeatures;
 
         // Bucket coloring with more granular steps for smoother choropleth
-        const values = visibleFeatures.map((f: GeoJSON.Feature) => getMetricValue(zipData[f.properties!.ZCTA5CE20], selectedMetric));
-        const buckets = getMetricBuckets(values, 8); // 8 buckets for smoother gradient
+        const values = Object.values(zipData).map(d => getMetricValue(d, selectedMetric));
+        const buckets = getMetricBuckets(values);
         
         // Attach metric value to each feature for color expression
         const enrichedFeatures = visibleFeatures.map((f: GeoJSON.Feature) => ({
@@ -143,7 +169,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         }));
         
         const expression: any[] = ["step", ["get", "metricValue"], bucketColor(0), ...buckets.flatMap((v, i) => [v, bucketColor(i + 1)])];
-        console.log(`[Worker] GeoJSON processed: ${enrichedFeatures.length} visible features, ${buckets.length} buckets, color steps applied`);
+        console.log(`[Worker] GeoJSON processed: ${enrichedFeatures.length} features, ${buckets.length} buckets, color steps applied`);
 
         self.postMessage({ type: "GEOJSON_PROCESSED", id, data: { type: "FeatureCollection", features: enrichedFeatures, bucketExpression: expression } });
         break;
@@ -159,22 +185,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
   }
 };
-
-// --- Helper: bounding box of a feature ---
-function bbox(f: GeoJSON.Feature): [number, number, number, number] {
-  if (f.geometry.type === "Polygon") {
-    const coords = f.geometry.coordinates.flat(2);
-    const xs = coords.filter((_, i) => i % 2 === 0);
-    const ys = coords.filter((_, i) => i % 2 !== 0); // Corrected this line
-    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
-  } else if (f.geometry.type === "MultiPolygon") {
-    const coords = f.geometry.coordinates.flat(3);
-    const xs = coords.filter((_, i) => i % 2 === 0);
-    const ys = coords.filter((_, i) => i % 2 !== 0); // Corrected this line
-    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
-  }
-  return [0, 0, 0, 0];
-}
 
 // --- Helper: choropleth color palette (light yellow to deep purple) ---
 function bucketColor(i: number) {

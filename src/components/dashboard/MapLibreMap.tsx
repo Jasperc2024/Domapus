@@ -360,22 +360,12 @@ export function MapLibreMap({
       try {
         const map = mapRef.current;
         if (!map) return;
-        
-        // get current viewport bbox
-        const bounds = map.getBounds();
-        const viewport = {
-          minX: bounds.getWest(),
-          minY: bounds.getSouth(),
-          maxX: bounds.getEast(),
-          maxY: bounds.getNorth(),
-        };
-        console.log('[MapLibreMap] Current viewport:', viewport);
 
-        // send geojson + viewport to worker
+        // send geojson to worker
         console.log('[MapLibreMap] Sending data to worker for processing');
         const processed = await processData({
           type: "PROCESS_GEOJSON",
-          data: { geojson: baseGeoJSON, zipData, selectedMetric, viewport },
+          data: { geojson: baseGeoJSON, zipData, selectedMetric, },
         });
 
         if (signal.aborted) {

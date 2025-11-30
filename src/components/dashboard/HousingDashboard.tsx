@@ -122,7 +122,12 @@ export function HousingDashboard() {
             />
           </div>
           <div className="absolute bottom-4 right-4 w-64 z-[1000] pointer-events-auto">
-            <Legend selectedMetric={selectedMetric} colorScaleDomain={dataBounds ? [dataBounds.min, dataBounds.max] : null} />
+            <Legend
+              selectedMetric={selectedMetric}
+              metricValues={Object.values(zipData)
+                .map(d => d[selectedMetric] ?? 0)
+                .filter(v => v > 0)}
+            />
           </div>
         </div>
       </div>
