@@ -81,9 +81,9 @@ export function Legend({ selectedMetric, metricValues }: LegendProps) {
         </div>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-gray-200">
+      <div className="mt-1 pt-1 border-gray-200">
         <p className="text-[10px] text-gray-500 text-center">
-          Click zip code to view full info
+          Click ZIP code to view more info
         </p>
       </div>
     </div>

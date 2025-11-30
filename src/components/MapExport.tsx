@@ -5,6 +5,7 @@ import { ExportSidebar, ExportOptions } from "./dashboard/ExportSidebar";
 import { ExportRenderer } from "./dashboard/ExportRenderer";
 import { ZipData } from "./dashboard/map/types";
 import { toast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MapExportProps {
   allZipData: Record<string, ZipData>;
@@ -17,6 +18,7 @@ export function MapExport({ allZipData, fullGeoJSON, selectedMetric }: MapExport
   const [exportOptions, setExportOptions] = useState<ExportOptions | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportTimeoutId, setExportTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const isMobile = useIsMobile();
 
   const { filteredData, filteredGeoJSON } = useMemo(() => {
     if (!exportOptions || Object.keys(allZipData).length === 0 || !fullGeoJSON) {
@@ -128,11 +130,11 @@ export function MapExport({ allZipData, fullGeoJSON, selectedMetric }: MapExport
     );
   }
 
-  // This is the initial "Export" button
+  // Export button
   return (
-    <Button variant="outline" size="sm" onClick={() => setIsExportMode(true)}>
-      <Download className="h-4 w-4 mr-2" />
-      Export
-    </Button>
-  );
+  <Button variant="outline" size="sm" onClick={() => setIsExportMode(true)}>
+    <Download className="h-4 w-4 mr-2" />
+    {!isMobile && <span>Export</span>}
+  </Button>
+);
 }

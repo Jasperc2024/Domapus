@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
 import { useIsMobile } from "@/hooks/use-mobile";
-const DATA_BASE = "https://jasperc2024.github.io/Domapus/";
+const BASE_PATH = import.meta.env.BASE_URL;
 
 interface TopBarProps {
   selectedMetric: MetricType;
@@ -23,7 +23,7 @@ export function TopBar({
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
-    const dataUrl = `${DATA_BASE}data/last_updated.json`;
+    const dataUrl = `${BASE_PATH}data/last_updated.json`;
     const fetchLastUpdated = async () => {
       try {
         const res = await fetch(dataUrl);
@@ -73,12 +73,13 @@ export function TopBar({
               <h1 className="text-base sm:text-lg font-bold text-dashboard-text-primary leading-tight">
                 Domapus
               </h1>
-              <p className="text-xs sm:text-sm text-dashboard-text-secondary leading-tight mt-0.25 hidden sm:block">
+              <p className="text-xs sm:text-sm text-dashboard-text-secondary leading-tight hidden sm:block">
                 Housing Market Analysis
               </p>
             </div>
           </div>
 
+          {/* We hide the desktop MetricSelector only when on mobile */}
           {!isMobile && (
             <MetricSelector
               selectedMetric={selectedMetric}
@@ -87,16 +88,16 @@ export function TopBar({
           )}
         </div>
 
-        {/* Right Section - Actions */}
-        {!isMobile && (
-          <div className="flex items-center gap-4 flex-shrink-0">
-            <SearchBox onSearch={onSearch} />
+        {/* Right Section - Actions - THIS CONTAINER IS NOW ALWAYS RENDERED */}
+        <div className="flex items-center gap-4 flex-shrink-0">
+            {/* SearchBox is moved to the bottom bar on mobile, so we wrap it in !isMobile */}
+            {!isMobile && <SearchBox onSearch={onSearch} />}
 
-            {/* Actions */}
-            <div className="flex items-center gap-2 pl-4 ml-2">
+            {/* Actions Container - always rendered now */}
+            <div className="flex items-center gap-2 ml-1">
             
-            {/* Last Updated */}
-            <div className="flex items-center text-dashboard-text-secondary gap-2">
+            {/* Last Updated - always visible */}
+            <div className="flex items-center text-dashboard-text-secondary gap-2 mr-2">
               <Calendar className="h-4 w-4 opacity-80" />
               <div className="flex flex-col">
                 <span className="text-xs font-medium">Data Updated:</span>
@@ -105,9 +106,10 @@ export function TopBar({
                 </span>
               </div>
             </div>
-              
+              {/* Export - always visible */}
               {children}
               
+              {/* GitHub button - always visible, but hide text on mobile */}
               <Button
                 variant="outline"
                 size="sm"
@@ -117,12 +119,14 @@ export function TopBar({
                   href="https://github.com/Jasperc2024/Domapus"
                   target="_blank"
                   rel="noopener noreferrer"
+                  title="GitHub"
                 >
                   <Github className="h-4 w-4 mr-2" />
-                    GitHub
+                  {!isMobile && <span>GitHub</span>} {/* Hide this span on mobile */}
                 </a>
               </Button>
 
+              {/* Sponsor button - always visible, but hide text on mobile */}
               <Button
                 variant="outline"
                 size="sm"
@@ -133,14 +137,14 @@ export function TopBar({
                   href="https://buymeacoffee.com/JasperC"
                   target="_blank"
                   rel="noopener noreferrer"
+                  title="Sponsor"
                 >
                   <Heart className="h-4 w-4 mr-2" />
-                    Sponsor
+                  {!isMobile && <span>Sponsor</span>} {/* Hide this span on mobile */}
                 </a>
               </Button>
             </div>
           </div>
-        )}
       </header>
 
       {/* === Mobile Bottom Bar === */}

@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { ZipData } from "./map/types";
-import { Download, Settings, Map as MapIcon, FileImage, Search } from "lucide-react";
+import { Download, Settings, Map as MapIcon, FileImage, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ExportPreviewMap } from "./ExportPreviewMap";
+import { cn } from "@/lib/utils"; // Assuming you have a cn utility, otherwise use standard template literals
 
-// Defines the shape of the data this component sends back to its parent
 export interface ExportOptions {
   regionScope: "national" | "state" | "metro";
   selectedState?: string;
@@ -32,25 +32,60 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
   const [regionScope, setRegionScope] = useState<"national" | "state" | "metro">("national");
   const [selectedState, setSelectedState] = useState<string>("");
   const [selectedMetro, setSelectedMetro] = useState<string>("");
+  
+  // Metro Search States
   const [metroSearch, setMetroSearch] = useState<string>("");
+  const [debouncedMetroSearch, setDebouncedMetroSearch] = useState<string>("");
+  const [isMetroListOpen, setIsMetroListOpen] = useState(false);
+  const metroContainerRef = useRef<HTMLDivElement>(null);
+
   const [fileFormat, setFileFormat] = useState<"png" | "pdf">("png");
   const [includeLegend, setIncludeLegend] = useState(true);
   const [includeTitle, setIncludeTitle] = useState(true);
 
+  // Handle Debounce for Metro Search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedMetroSearch(metroSearch);
+    }, 150); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [metroSearch]);
+
+  // Handle Click Outside to close suggestion list
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (metroContainerRef.current && !metroContainerRef.current.contains(event.target as Node)) {
+        setIsMetroListOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const { availableStates, filteredMetros } = useMemo(() => {
     if (Object.keys(allZipData).length === 0) return { availableStates: [], filteredMetros: [] };
+    
     const stateSet = new Set<string>();
     const metroSet = new Set<string>();
+    
     for (const zip of Object.values(allZipData)) {
       if (zip.state) stateSet.add(zip.state);
       if (zip.parent_metro) metroSet.add(zip.parent_metro);
     }
+    
     const metros = Array.from(metroSet).sort();
-    const filtered = metroSearch 
-      ? metros.filter(m => m.toLowerCase().includes(metroSearch.toLowerCase()))
+    
+    // Filter based on the DEBOUNCED search term
+    const filtered = debouncedMetroSearch 
+      ? metros.filter(m => m.toLowerCase().includes(debouncedMetroSearch.toLowerCase()))
       : metros;
+      
     return { availableStates: Array.from(stateSet).sort(), filteredMetros: filtered };
-  }, [allZipData, metroSearch]);
+  }, [allZipData, debouncedMetroSearch]);
+
+  // If user selects "Metro" scope but hasn't typed anything, show all (or top) metros initially?
+  // Or keep list closed until they focus. We'll show list if open.
 
   const { filteredData, filteredGeoJSON } = useMemo(() => {
     if (Object.keys(allZipData).length === 0 || !fullGeoJSON) {
@@ -89,9 +124,28 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
     return false;
   };
 
-  // --- FIX: Create type-safe handlers for the RadioGroup components ---
-  const handleScopeChange = (value: string) => setRegionScope(value as "national" | "state" | "metro");
+  const handleScopeChange = (value: string) => {
+    setRegionScope(value as "national" | "state" | "metro");
+    // Reset selections when switching scopes to avoid confusion
+    if (value !== 'metro') {
+      setIsMetroListOpen(false);
+    }
+  };
+
   const handleFormatChange = (value: string) => setFileFormat(value as "png" | "pdf");
+
+  const selectMetro = (metroName: string) => {
+    setSelectedMetro(metroName);
+    setMetroSearch(metroName); // Update input to show full name
+    setIsMetroListOpen(false);
+  };
+
+  const clearMetroSelection = () => {
+    setSelectedMetro("");
+    setMetroSearch("");
+    setDebouncedMetroSearch("");
+    setIsMetroListOpen(true);
+  };
 
   return (
     <div className="fixed inset-0 bg-background z-50 flex">
@@ -113,33 +167,67 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
               <div className="flex items-center space-x-2"><RadioGroupItem value="state" id="r-state" /><Label htmlFor="r-state" className="text-sm">State</Label></div>
               <div className="flex items-center space-x-2"><RadioGroupItem value="metro" id="r-metro" /><Label htmlFor="r-metro" className="text-sm">Metro Area</Label></div>
             </RadioGroup>
+            
             {regionScope === 'state' && (
               <Select value={selectedState} onValueChange={setSelectedState}>
                 <SelectTrigger className="h-9"><SelectValue placeholder="Select a state"/></SelectTrigger>
                 <SelectContent>{availableStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             )}
+
+            {/* Custom Debounced Search for Metro */}
             {regionScope === 'metro' && (
-              <div className="space-y-2">
+              <div className="space-y-2 relative" ref={metroContainerRef}>
                 <div className="relative">
-                  <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search metro areas..."
+                    placeholder="Type to search metros..."
                     value={metroSearch}
-                    onChange={(e) => setMetroSearch(e.target.value)}
-                    className="pl-8 h-9"
+                    onChange={(e) => {
+                      setMetroSearch(e.target.value);
+                      setIsMetroListOpen(true);
+                      if (selectedMetro && e.target.value !== selectedMetro) {
+                        setSelectedMetro(""); // Clear selection if user modifies text
+                      }
+                    }}
+                    onFocus={() => setIsMetroListOpen(true)}
+                    className="pl-8 h-9 pr-8"
                   />
+                  {metroSearch && (
+                    <button 
+                      onClick={clearMetroSelection}
+                      className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
-                <Select value={selectedMetro} onValueChange={setSelectedMetro}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select a metro area"/></SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
+                
+                {/* Suggestions Dropdown */}
+                {isMetroListOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-popover text-popover-foreground border rounded-md shadow-md max-h-[250px] overflow-y-auto">
                     {filteredMetros.length > 0 ? (
-                      filteredMetros.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)
+                      <div className="p-1">
+                        {filteredMetros.map((m) => (
+                          <div
+                            key={m}
+                            onClick={() => selectMetro(m)}
+                            className={cn(
+                              "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                              selectedMetro === m && "bg-accent text-accent-foreground font-medium"
+                            )}
+                          >
+                            {m}
+                          </div>
+                        ))}
+                      </div>
                     ) : (
-                      <div className="px-2 py-1.5 text-sm text-muted-foreground">No results</div>
+                      <div className="py-6 text-center text-sm text-muted-foreground">
+                        No metro areas found.
+                      </div>
                     )}
-                  </SelectContent>
-                </Select>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -232,7 +232,7 @@ export function MapLibreMap({
         (l: any) =>
           l.type === "symbol" &&
           typeof l.id === "string" &&
-          !l.id.toLowerCase().includes("roadname")
+          !l.id.toLowerCase().includes("road")
       );
       const beforeId = firstLabel ? firstLabel.id : undefined;
 
