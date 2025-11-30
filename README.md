@@ -2,12 +2,14 @@
     <img src="https://github.com/Jasperc2024/Domapus/blob/main/public/Banner.svg" width=400>
 </p>
 
+<p align="center">
 [![Live Website](https://img.shields.io/badge/Live-Website-2596BE)](https://jasperc2024.github.io/Domapus/)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white&style=flat)
 [![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/Jasperc2024/Domapus/blob/main/LICENSE.md)
 [![Deploy to GitHub Pages](https://github.com/Jasperc2024/Domapus/actions/workflows/deploy.yml/badge.svg)](https://github.com/Jasperc2024/Domapus/actions/workflows/deploy.yml)
 ![GitHub Stars](https://img.shields.io/github/stars/Jasperc2024/Domapus?style=flat)
 [![](https://data.jsdelivr.com/v1/package/gh/Jasperc2024/Domapus/badge)](https://www.jsdelivr.com/package/gh/Jasperc2024/Domapus)
+</p>
 
 
 **Domapus** visualizes U.S. housing market data at the ZIP-code level.  
@@ -22,17 +24,11 @@ Built with **React**, **TypeScript**, and **MapLibre GL JS**, it makes nationwid
 ### 🗺️ Map & Data Visualization
 - Interactive **ZIP-level map** updated monthly  
 - Metrics: *median price, inventory, DOM, listings, sales, and more*  
-- **Hover tooltips**, **ZIP search**, and **region filters**  
+- **Hover tooltips**, and **ZIP search**
 
 ### 📊 Analytics & Export
-- Dynamic color scaling with **D3-Scale**  
 - Quintile-based legend for data distribution  
 - **Export maps** to PNG or PDF with title and legend options  
-
-### ⚡ Performance
-- **Web Workers** for data offloading  
-- **GPU-accelerated rendering** via MapLibre GL  
-- Lazy-loaded components and gzip compression
 
 ---
 
@@ -103,15 +99,13 @@ src/
 ## 🧠 Tech Stack
 **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui
 
-**Visualization:** MapLibre GL JS, D3-Scale
+**Visualization:** MapLibre GL JS
 
 **Data:** Redfin (market), U.S. Census (ZCTA)
 
 **Data Processing:** Github Action, Python
 
 **Export Tools:** html2canvas, jsPDF
-
-**Optimization:** Pako, Web Workers
 
 ---
 
@@ -140,10 +134,8 @@ The project uses Vite with custom configuration for:
 
 ## 🌐 Data Sources
 
--  Redfin real estate market data
+-  Redfin real estate market data (Update monthly)
 -  U.S. Census ZIP Code Tabulation Areas (ZCTA)
--  Custom aggregated geographic data for city/County Mapping
--  Data refreshed monthly from Redfin sources
 
 ---
 
@@ -155,8 +147,6 @@ The project uses Vite with custom configuration for:
 ---
 
 ## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
 
 ### Development Workflow
 
