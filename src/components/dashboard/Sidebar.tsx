@@ -119,9 +119,8 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
               </div>
             </div>
           )}
-          <div className="px-4 pt-4 pb-0 mt-auto space-y-3 border-t border-dashboard-border bg-dashboard-panel">
+          <div className="px-4 pt-4 pb-0 space-y-3 border-t border-dashboard-border bg-dashboard-panel">
             <Button variant="outline" className="w-full" onClick={() => setShowComparison(!showComparison)}><BarChart3 className="h-4 w-4 mr-2" />{showComparison ? "Back to Details" : "Compare ZIP Codes"}</Button>
-            <p className="text-xs text-muted-foreground text-center">Data sourced from Redfin Data Center.</p>
           </div>
         </div>
       )}
