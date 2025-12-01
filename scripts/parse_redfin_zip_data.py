@@ -21,6 +21,13 @@ def load_zip_mapping_data(file_path=None):
             file_path = DATA_DIR / "zip-city-mapping.csv"
 
         logging.info(f"Loading ZIP mapping data from {file_path}...")
+        # DEBUG: Show raw CSV content
+        try:
+            with open(file_path, "rb") as f:
+                raw = f.read(200)
+            logging.error(f"RAW CSV BYTES (first 200 bytes): {raw}")
+        except Exception as e2:
+            logging.error(f"Failed to read raw CSV for debugging: {e2}")
         df = pd.read_csv(file_path, dtype={'ZipCode': str})
         df.set_index('ZipCode', inplace=True)
         logging.info(f"Successfully loaded {len(df)} unique mapping entries.")
