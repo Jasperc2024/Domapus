@@ -11,15 +11,21 @@ from io import BytesIO
 
 # Configure logging
 logging.basicConfig(filename='data_pipeline.log', filemode='w', level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+ROOT_DIR = Path(__file__).resolve().parent.parent       # /.../Domapus
+DATA_DIR = ROOT_DIR / "public" / "data"
 
-def load_zip_mapping_data(file_path='public/data/zip-city-mapping.csv'):
-    """Loads the pre-cleaned ZIP to city, county, and coordinate mapping file (plain CSV)."""
+def load_zip_mapping_data(file_path=None):
+    """Loads the pre-cleaned ZIP to city, county, and coordinate mapping file."""
     try:
+        if file_path is None:
+            file_path = DATA_DIR / "zip-city-mapping.csv"
+
         logging.info(f"Loading ZIP mapping data from {file_path}...")
         df = pd.read_csv(file_path, dtype={'ZipCode': str})
         df.set_index('ZipCode', inplace=True)
         logging.info(f"Successfully loaded {len(df)} unique mapping entries.")
         return df.to_dict('index')
+
     except Exception as e:
         logging.error(f"CRITICAL ERROR loading {file_path}: {e}")
         return None
