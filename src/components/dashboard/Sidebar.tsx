@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, BarChart3, MapPin, Building } from "lucide-react";
+import { X, TrendingUp, TrendingDown, BarChart3, MapPin, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ZipComparison } from "./ZipComparison";
@@ -10,12 +10,11 @@ interface SidebarProps {
   isOpen: boolean;
   isCollapsed: boolean;
   zipData: ZipData | null;
-  allZipData: Record<string, ZipData>; // The full dataset
+  allZipData: Record<string, ZipData>;
   onClose: () => void;
-  onToggleCollapse: () => void;
 }
 
-export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: SidebarProps) {
   const [showComparison, setShowComparison] = useState(false);
 
   if (!isOpen || !zipData) return null;
@@ -62,7 +61,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose, onT
   .filter(metric => metric.value !== null && metric.value !== undefined);
 
   return (
-    <div className={`fixed left-0 top-0 h-full bg-dashboard-panel border-r border-dashboard-border shadow-lg z-40 transition-all duration-300 ${isCollapsed ? "w-16" : "w-96"}`}>
+    <div className={`fixed left-0 top-[60px] h-[calc(100vh-60px)] bg-dashboard-panel border-r border-dashboard-border shadow-lg z-40 transition-all duration-300 ${isCollapsed ? "w-16" : "w-96"}`}>
       <div 
         className="flex items-center justify-between px-3 py-2 border-b border-dashboard-border"
         role="banner"

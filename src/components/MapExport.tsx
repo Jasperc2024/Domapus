@@ -11,9 +11,10 @@ interface MapExportProps {
   allZipData: Record<string, ZipData>;
   fullGeoJSON: GeoJSON.FeatureCollection | null;
   selectedMetric: string;
+  onExportModeChange: (isExportMode: boolean) => void;
 }
 
-export function MapExport({ allZipData, fullGeoJSON, selectedMetric }: MapExportProps) {
+export function MapExport({ allZipData, fullGeoJSON, selectedMetric, onExportModeChange }: MapExportProps) {
   const [isExportMode, setIsExportMode] = useState(false);
   const [exportOptions, setExportOptions] = useState<ExportOptions | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -87,7 +88,12 @@ export function MapExport({ allZipData, fullGeoJSON, selectedMetric }: MapExport
     setIsExportMode(false);
     setIsExporting(false);
     setExportOptions(null);
+    onExportModeChange(false);
   };
+
+  useEffect(() => {
+    onExportModeChange(isExportMode);
+  }, [isExportMode, onExportModeChange]);
 
   if (isExportMode) {
     return (
