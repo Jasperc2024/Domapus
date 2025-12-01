@@ -88,7 +88,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
       </div>
             
       {!isCollapsed && (
-        <div className="flex flex-col h-[calc(100vh-73px)]">
+        <div className="flex flex-col h-full">
           {showComparison ? (
             <div className="p-4 flex-1 overflow-y-auto">
               <ZipComparison currentZip={zipData} allZipData={allZipData} onClose={() => setShowComparison(false)} />
