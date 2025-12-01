@@ -2,14 +2,16 @@ import { useMemo } from 'react';
 
 interface LegendProps {
   selectedMetric: string;
-  metricValues: number[]; // array of actual metric values for the current metric
+  metricValues: number[];
+  isExport?: boolean; // Optional prop to remove interactive hints for PDF
 }
 
 // Number formatting helper
 function formatLegendValue(value: number, metric: string): string {
-  if (metric.includes('price')) return `$${(value / 1000).toFixed(0)}k`;
-  if (metric.includes('ratio') || metric.includes('above-list')) return `${(value * 100).toFixed(0)}%`;
-  if (metric.includes('dom')) return `${Math.round(value)}`;
+  const m = metric.toLowerCase();
+  if (m.includes('price')) return `$${(value / 1000).toFixed(0)}k`;
+  if (m.includes('ratio') || m.includes('above')) return `${(value * 100).toFixed(0)}%`;
+  if (m.includes('dom')) return `${Math.round(value)}`;
   return value.toLocaleString();
 }
 
@@ -26,13 +28,13 @@ function computeQuantiles(values: number[], percentiles: number[]) {
   });
 }
 
-export function Legend({ selectedMetric, metricValues }: LegendProps) {
+export function Legend({ selectedMetric, metricValues, isExport = false }: LegendProps) {
   const legendDisplay = useMemo(() => {
     if (!metricValues || metricValues.length === 0) {
       return { min: 'N/A', mid: 'N/A', max: 'N/A' };
     }
 
-    // 5th, 50th, 95th percentiles for robust min/mid/max
+    // 5th, 50th, 95th percentiles for robust min/mid/max (ignores extreme outliers)
     const [min, mid, max] = computeQuantiles(metricValues, [0.05, 0.5, 0.95]);
 
     return {
@@ -43,6 +45,9 @@ export function Legend({ selectedMetric, metricValues }: LegendProps) {
   }, [metricValues, selectedMetric]);
 
   const getMetricDisplayName = (metric: string): string => {
+    // Normalize input to snake_case for lookup
+    const normalizedKey = metric.replace(/-/g, '_');
+    
     const metricNames: Record<string, string> = {
       median_sale_price: 'Median Sale Price',
       median_list_price: 'Median List Price',
@@ -50,21 +55,28 @@ export function Legend({ selectedMetric, metricValues }: LegendProps) {
       inventory: 'Current Inventory',
       homes_sold: 'Homes Sold',
       new_listings: 'New Listings',
-      avg_sale_to_list_ratio: 'Sale-to-List Ratio',
+      sale_to_list_ratio: 'Sale-to-List Ratio',
+      avg_sale_to_list_ratio: 'Sale-to-List Ratio', // Handle potential naming variations
       sold_above_list: 'Sold Above List',
+      homes_sold_above_list: 'Sold Above List',
       off_market_in_two_weeks: 'Off Market in 2 Weeks',
+      off_market_2_weeks: 'Off Market in 2 Weeks',
     };
-    return metricNames[metric] || 'Metric';
+    
+    return metricNames[normalizedKey] || normalizedKey.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   };
 
   return (
-    <div className="bg-white/95 backdrop-blur-sm border border-gray-300 rounded-lg p-4 shadow-xl w-full max-w-xs">
+    <div className={`
+      border border-gray-300 rounded-lg p-4 w-full max-w-xs
+      ${isExport ? 'bg-white shadow-none' : 'bg-white/95 backdrop-blur-sm shadow-xl'}
+    `}>
       <h3 className="text-sm font-bold mb-3 text-gray-900">
         {getMetricDisplayName(selectedMetric)}
       </h3>
 
       <div className="space-y-2">
-        {/* color gradient bar */}
+        {/* Color Gradient Bar */}
         <div
           className="h-4 rounded-md border border-gray-200"
           style={{
@@ -73,19 +85,21 @@ export function Legend({ selectedMetric, metricValues }: LegendProps) {
           }}
         />
 
-        {/* 3-value legend */}
-        <div className="flex justify-between text-xs text-gray-700 font-semibold">
+        {/* 3-value Legend Labels */}
+        <div className="flex justify-between text-xs text-gray-700 font-bold">
           <span>{legendDisplay.min}</span>
           <span>{legendDisplay.mid}</span>
           <span>{legendDisplay.max}</span>
         </div>
       </div>
 
-      <div className="mt-1 pt-1 border-gray-200">
-        <p className="text-[10px] text-gray-500 text-center">
-          Click ZIP code to view more info
-        </p>
-      </div>
+      {!isExport && (
+        <div className="mt-1 pt-1 border-gray-200">
+          <p className="text-[10px] text-gray-500 text-center">
+            Click ZIP code to view more info
+          </p>
+        </div>
+      )}
     </div>
   );
 }
