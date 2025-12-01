@@ -47,7 +47,7 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedMetroSearch(metroSearch);
-    }, 150); // 300ms delay
+    }, 150); 
 
     return () => clearTimeout(timer);
   }, [metroSearch]);

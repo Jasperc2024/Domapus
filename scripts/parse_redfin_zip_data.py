@@ -107,10 +107,11 @@ def format_final_json(df, zip_mapping):
         
         # Add data from the ZIP code mapping
         if zip_mapping and zip_code in zip_mapping:
-            raw_data['city'] = zip_mapping[zip_code].get('City')
-            raw_data['county'] = zip_mapping[zip_code].get('CountyName')
-            raw_data['latitude'] = zip_mapping[zip_code].get('latitude')
-            raw_data['longitude'] = zip_mapping[zip_code].get('longitude')
+            zip_info = zip_mapping[zip_code]
+            raw_data['city'] = zip_info.get('City')
+            raw_data['county'] = zip_info.get('CountyName')
+            raw_data['latitude'] = zip_info.get('latitude')
+            raw_data['longitude'] = zip_info.get('longitude')
         
         ordered_data = {}
         for key in key_order:
@@ -123,7 +124,8 @@ def format_final_json(df, zip_mapping):
                     ordered_data[key] = value.strftime('%Y-%m-%d')
                 elif key in ['latitude', 'longitude']: 
                     ordered_data[key] = round(float(value), 5) if not pd.isna(value) else None
-                elif 'pct' in key: 
+                # MODIFICATION HERE: Added specific keys to the percentage logic
+                elif 'pct' in key or key in ['sold_above_list', 'off_market_in_two_weeks']: 
                     # Convert ratios (0.05) to percentages (5.0)
                     ordered_data[key] = round(float(value) * 100, 1) if not pd.isna(value) else None
                 elif any(c in key for c in ['price', 'homes_sold', 'inventory', 'dom', 'ppsf', 'listings', 'pending']): 
@@ -171,18 +173,17 @@ def main():
         output_dir = Path("public/data")
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # --- MODIFICATION 1: Load previous data from plain JSON ---
+        # Load previous data from plain JSON
         previous_data = None
         zip_data_path = output_dir / "zip-data.json"
         try:
             if zip_data_path.exists():
                 logging.info(f"Loading previous data from {zip_data_path} for comparison...")
-                with open(zip_data_path, 'r', encoding='utf-8') as f: # Use standard open
+                with open(zip_data_path, 'r', encoding='utf-8') as f:
                     previous_data = json.load(f).get('zip_codes', {})
                 logging.info("Successfully loaded previous data.")
         except Exception as e:
             logging.warning(f"Could not load previous data for comparison: {e}")
-        # --- END MODIFICATION 1 ---
 
         # Calculate changes
         zip_codes_changed = 0
@@ -211,7 +212,7 @@ def main():
         else:
             logging.info("No previous data found. Skipping comparison.")
 
-        # --- MODIFICATION 2: Write output to plain JSON ---
+        # Write output to plain JSON
         logging.info(f"Writing {len(output_data_content)} ZIP codes to {zip_data_path}...")
         # Use separators for compact JSON
         json_string = json.dumps(final_output, sort_keys=True, separators=(",", ":"))
@@ -219,7 +220,6 @@ def main():
         with open(zip_data_path, 'w', encoding='utf-8') as f:
             f.write(json_string)
             f.flush()
-        # --- END MODIFICATION 2 ---
 
         # Write last_updated.json with change statistics
         update_info = {

@@ -78,7 +78,7 @@ export function ExportMap({ filteredData, geoJSON, selectedMetric, regionScope, 
     
     mapConfigs.forEach(({ key, ref, center, zoom, data }) => {
       if (!ref.current || maps[key]) return;
-      const map = new maplibregl.Map({ container: ref.current, style: { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#ffffff' } }] }, center, zoom, interactive: false, attributionControl: false, preserveDrawingBuffer: true, });
+      const map = new maplibregl.Map({ container: ref.current, style: { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#ffffff' } }] }, center, zoom, interactive: false, attributionControl: false,});
       maps[key] = map;
       map.on('load', () => {
         if (!data || !colorScale || data.features.length === 0) { map.once("idle", onMapIdle); return; }

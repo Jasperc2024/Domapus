@@ -61,13 +61,11 @@ export function getMetricDisplay(data: ZipData, selectedMetric: string): string 
 
   // Returns the final, styled HTML for the map tooltip.
   return `
-    <div class="p-2 bg-white rounded shadow-lg border text-black font-sans">
       <div class="font-bold text-base">${data.zipCode}</div>
       <div class="text-sm text-gray-600">${data.city || "Unknown City"}, ${data.state}</div>
       <div class="text-sm mt-2">
         <span class="font-semibold">${metricInfo?.label || selectedMetric}:</span>
         <span class="font-normal"> ${formattedValue}</span>
       </div>
-    </div>
   `;
 }

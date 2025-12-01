@@ -1,6 +1,6 @@
 import { useRef, useCallback } from "react";
 import { ExportMap } from "./ExportMap";
-import { ExportLegend } from "./ExportLegend";
+import { Legend } from "./Legend";
 import { DomapusLogo } from "@/components/ui/domapus-logo";
 import { ZipData } from "./map/types";
 import { ExportOptions } from "./ExportSidebar";
@@ -66,12 +66,19 @@ export function ExportRenderer({
     const metricNames: Record<string, string> = { "median-sale-price": "Median Sale Price", "median-list-price": "Median List Price", "median-dom": "Median Days on Market", "inventory": "Inventory", "new-listings": "New Listings", "homes-sold": "Homes Sold", "sale-to-list-ratio": "Sale to List Ratio", "homes-sold-above-list": "Homes Sold Above List", "off-market-2-weeks": "Off Market in 2 Weeks" };
     return metricNames[metric] || metric;
   };
+  
   const getRegionDisplayName = (): string => {
     if (exportOptions.regionScope === 'state') return exportOptions.selectedState || "State";
     if (exportOptions.regionScope === 'metro') return exportOptions.selectedMetro || "Metro Area";
     return "United States";
   };
+  
   const getCurrentDate = (): string => new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  // Extract values for the legend
+  const metricValues = filteredData
+    .map((d) => d[selectedMetric as keyof ZipData] as number)
+    .filter((v) => typeof v === 'number');
 
   return (
     <div ref={containerRef} className="fixed top-0 left-0 w-[1200px] h-[900px] bg-white p-8 flex flex-col font-sans" style={{ transform: "translateX(-9999px)" }}>
@@ -94,10 +101,9 @@ export function ExportRenderer({
       </main>
       <footer className="pt-4 flex justify-between items-end">
         {exportOptions.includeLegend && (
-          <ExportLegend
-            filteredZipData={filteredData}
+          <Legend
             selectedMetric={selectedMetric}
-            exportOptions={exportOptions}
+            metricValues={metricValues}
           />
         )}
         <div className="text-right">

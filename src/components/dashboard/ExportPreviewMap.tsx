@@ -117,7 +117,6 @@ export function ExportPreviewMap({
         },
         center,
         zoom,
-        preserveDrawingBuffer: true,
         interactive: false,
         attributionControl: false
       });

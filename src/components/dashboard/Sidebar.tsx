@@ -63,14 +63,31 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose, onT
 
   return (
     <div className={`fixed left-0 top-0 h-full bg-dashboard-panel border-r border-dashboard-border shadow-lg z-40 transition-all duration-300 ${isCollapsed ? "w-16" : "w-96"}`}>
-      <div className="flex items-center justify-between p-4 border-b border-dashboard-border"
-           role="banner">
-        {!isCollapsed && (<div><h2 className="text-lg font-semibold">{zipData.zipCode}</h2><p className="text-sm text-muted-foreground">{zipData.city}</p></div>)}
-        <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="sm" onClick={onToggleCollapse} aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}>{isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</Button>
-          {!isCollapsed && <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close sidebar"><X className="h-4 w-4" /></Button>}
+      <div 
+        className="flex items-center justify-between px-3 py-2 border-b border-dashboard-border"
+        role="banner"
+      >
+        {!isCollapsed && (
+          <div className="flex flex-col justify-center">
+            <h2 className="text-lg font-semibold leading-tight">{zipData.zipCode}</h2>
+            <p className="text-sm text-muted-foreground leading-none">{zipData.city}</p>
+          </div>
+        )}
+        <div className="flex items-center">
+          {!isCollapsed && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8" 
+              onClick={onClose} 
+              aria-label="Close sidebar"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
+            
       {!isCollapsed && (
         <div className="flex flex-col h-[calc(100vh-73px)]">
           {showComparison ? (
@@ -103,9 +120,9 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose, onT
               </div>
             </div>
           )}
-          <div className="p-4 mt-auto space-y-3 border-t border-dashboard-border bg-dashboard-panel">
+          <div className="px-4 pt-4 pb-0 mt-auto space-y-3 border-t border-dashboard-border bg-dashboard-panel">
             <Button variant="outline" className="w-full" onClick={() => setShowComparison(!showComparison)}><BarChart3 className="h-4 w-4 mr-2" />{showComparison ? "Back to Details" : "Compare ZIP Codes"}</Button>
-            <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">Data sourced from Redfin Data Center.</p></CardContent></Card>
+            <p className="text-xs text-muted-foreground text-center">Data sourced from Redfin Data Center.</p>
           </div>
         </div>
       )}
