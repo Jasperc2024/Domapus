@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useMemo } from "react";
 import { ExportMap } from "./ExportMap";
 import { Legend } from "./Legend";
 import { DomapusLogo } from "@/components/ui/domapus-logo";
@@ -90,16 +90,13 @@ export function ExportRenderer({
   
   const getCurrentDate = (): string => new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
-  // Helper: Convert kebab-case (url param) to snake_case (data key)
-  // e.g., 'median-sale-price' -> 'median_sale_price'
-  const getDataKey = (metric: string): keyof ZipData => {
-    return metric.replace(/-/g, '_') as keyof ZipData;
-  };
-
-  // Extract values for the legend using the correct data key
-  const metricValues = filteredData
-    .map((d) => d[getDataKey(selectedMetric)] as number)
-    .filter((v) => typeof v === 'number');
+  // Extract values for the legend
+  const metricValues = useMemo(() => {
+    const dataKey = selectedMetric.replace(/-/g, "_") as keyof ZipData;
+    return filteredData
+      .map((d) => d[dataKey] as number)
+      .filter((v) => typeof v === "number" && v > 0);
+  }, [filteredData, selectedMetric]);
 
   return (
     <div 

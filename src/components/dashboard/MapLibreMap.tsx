@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import maplibregl, { LngLatLike } from "maplibre-gl";
+import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getMetricDisplay } from "./map/utils";
 import { ZipData } from "./map/types";
@@ -14,7 +14,6 @@ interface MapProps {
   zipData: Record<string, ZipData>;
   colorScaleDomain: [number, number] | null;
   isLoading: boolean;
-  progress: { phase: string };
   processData: (message: { type: string; data?: any }) => Promise<any>;
 }
 
@@ -24,7 +23,6 @@ export function MapLibreMap({
   searchZip,
   zipData,
   isLoading,
-  progress,
   processData,
 }: MapProps) {
   console.log('[MapLibreMap] Component render');

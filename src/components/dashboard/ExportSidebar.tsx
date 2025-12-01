@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { ExportPreviewMap } from "./ExportPreviewMap";
-import { cn } from "@/lib/utils"; // Assuming you have a cn utility, otherwise use standard template literals
+import { ExportMap } from "./ExportMap";
+import { Legend } from "./Legend";
+import { cn } from "@/lib/utils";
 
 export interface ExportOptions {
   regionScope: "national" | "state" | "metro";
@@ -261,23 +262,51 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
       </div>
 
       {/* Right Preview Area */}
-      <div className="flex-1 p-6 overflow-hidden flex flex-col">
+      <div className="flex-1 p-6 overflow-hidden flex flex-col bg-gray-50">
         <div className="mb-4">
           <h3 className="text-lg font-semibold">Preview</h3>
           <p className="text-sm text-muted-foreground">
             {filteredData.length.toLocaleString()} ZIP codes • {regionScope === 'national' ? 'United States' : regionScope === 'state' ? selectedState || 'Select a state' : selectedMetro || 'Select a metro area'}
           </p>
         </div>
-        <div className="flex-1 bg-white border rounded-lg overflow-hidden shadow-sm">
-          <ExportPreviewMap
-            filteredZipData={filteredData}
-            filteredGeoJSON={filteredGeoJSON}
-            selectedMetric={selectedMetric}
-            isLoading={false}
-            regionScope={regionScope}
-            includeTitle={includeTitle}
-            includeLegend={includeLegend}
-          />
+        <div className="flex-1 bg-white border rounded-lg overflow-hidden shadow-sm p-8 flex flex-col">
+          {includeTitle && (
+            <header className="text-center mb-4">
+              <h1 className="text-2xl font-bold text-gray-900 mb-1">
+                {selectedMetric.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} by ZIP Code
+              </h1>
+              <p className="text-sm text-gray-600">
+                {regionScope === 'national' ? 'United States' : regionScope === 'state' ? selectedState || 'State' : selectedMetro || 'Metro Area'} • {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+              </p>
+            </header>
+          )}
+          <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 relative">
+            {filteredGeoJSON && filteredData.length > 0 ? (
+              <ExportMap
+                filteredData={filteredData}
+                geoJSON={filteredGeoJSON}
+                selectedMetric={selectedMetric}
+                regionScope={regionScope}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                {regionScope === 'state' && !selectedState && 'Select a state'}
+                {regionScope === 'metro' && !selectedMetro && 'Select a metro area'}
+                {filteredData.length === 0 && 'No data available'}
+              </div>
+            )}
+          </div>
+          {includeLegend && filteredData.length > 0 && (
+            <div className="mt-4 flex justify-start">
+              <Legend
+                selectedMetric={selectedMetric}
+                metricValues={filteredData
+                  .map(d => d[selectedMetric.replace(/-/g, "_") as keyof ZipData] as number)
+                  .filter(v => typeof v === "number" && v > 0)}
+                isExport={true}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

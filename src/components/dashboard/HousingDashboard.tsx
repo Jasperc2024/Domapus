@@ -26,10 +26,10 @@ export function HousingDashboard() {
   const [dataBounds, setDataBounds] = useState<{ min: number; max: number } | null>(null);
   const [fullGeoJSON, setFullGeoJSON] = useState<GeoJSON.FeatureCollection | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed] = useState(false);
   const [showSponsorBanner, setShowSponsorBanner] = useState(false);
   
-  const { processData, isLoading, progress } = useDataWorker();
+  const { processData, isLoading } = useDataWorker();
 
   useEffect(() => {
     let isMounted = true;
@@ -95,19 +95,21 @@ export function HousingDashboard() {
     setSelectedZip(zip); 
     setSidebarOpen(true); 
   };
-  const toggleSidebarCollapse = () => { 
-    console.log('[HousingDashboard] Toggling sidebar collapse');
-    setSidebarCollapsed(!sidebarCollapsed); 
-  };
+  const [isExportMode, setIsExportMode] = useState(false);
   
   return (
     <div className="w-full h-screen bg-dashboard-bg overflow-hidden flex flex-col">
       {showSponsorBanner && <SponsorBanner onClose={() => setShowSponsorBanner(false)} />}
       <TopBar selectedMetric={selectedMetric} onMetricChange={setSelectedMetric} onSearch={setSearchZip}>
-        <MapExport allZipData={zipData} fullGeoJSON={fullGeoJSON} selectedMetric={selectedMetric} />
+        <MapExport 
+          allZipData={zipData} 
+          fullGeoJSON={fullGeoJSON} 
+          selectedMetric={selectedMetric}
+          onExportModeChange={setIsExportMode}
+        />
       </TopBar>
       <div className="flex flex-1 relative min-h-[400px]">
-        {sidebarOpen && <Sidebar isOpen={sidebarOpen} isCollapsed={sidebarCollapsed} zipData={selectedZip} allZipData={zipData} onClose={() => setSidebarOpen(false)} onToggleCollapse={toggleSidebarCollapse} />}
+        {sidebarOpen && <Sidebar isOpen={sidebarOpen} isCollapsed={sidebarCollapsed} zipData={selectedZip} allZipData={zipData} onClose={() => setSidebarOpen(false)} />}
         <div className="flex-1 relative">
           <div className="absolute inset-0 min-h-[400px]">
             <MapLibreMap
@@ -117,18 +119,19 @@ export function HousingDashboard() {
               zipData={zipData}
               colorScaleDomain={dataBounds ? [dataBounds.min, dataBounds.max] : null}
               isLoading={isLoading || !fullGeoJSON}
-              progress={progress}
               processData={processData}
             />
           </div>
-          <div className="absolute bottom-4 right-4 w-64 z-[1000] pointer-events-auto">
-            <Legend
-              selectedMetric={selectedMetric}
-              metricValues={Object.values(zipData)
-                .map(d => d[selectedMetric] ?? 0)
-                .filter(v => v > 0)}
-            />
-          </div>
+          {!isExportMode && (
+            <div className="absolute bottom-4 right-4 w-64 z-[1000] pointer-events-auto">
+              <Legend
+                selectedMetric={selectedMetric}
+                metricValues={Object.values(zipData)
+                  .map(d => d[selectedMetric] ?? 0)
+                  .filter(v => v > 0)}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

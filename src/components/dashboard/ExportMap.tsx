@@ -21,7 +21,7 @@ interface ExportMapProps {
   geoJSON: GeoJSON.FeatureCollection | null;
   selectedMetric: string;
   regionScope: "national" | "state" | "metro";
-  onRenderComplete: () => void;
+  onRenderComplete?: () => void;
 }
 
 // --- RENAMED: The component is now cleaner ---
