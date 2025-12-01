@@ -61,7 +61,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
   .filter(metric => metric.value !== null && metric.value !== undefined);
 
   return (
-    <div className={`fixed left-0 top-[60px] h-[calc(100vh-60px)] bg-dashboard-panel border-r border-dashboard-border shadow-lg z-40 transition-all duration-300 ${isCollapsed ? "w-16" : "w-96"}`}>
+    <div className={`absolute left-0 top-0 h-full bg-dashboard-panel border-r border-dashboard-border shadow-lg z-40 transition-all duration-300 ${isCollapsed ? "w-16" : "w-96"}`}>
       <div 
         className="flex items-center justify-between px-3 py-2 border-b border-dashboard-border"
         role="banner"
