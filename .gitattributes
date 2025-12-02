@@ -1,5 +1,3 @@
-public/data/us-state.geojson filter=lfs diff=lfs merge=lfs -text
 public/data/us-zip-codes.geojson filter=lfs diff=lfs merge=lfs -text
 public/data/zip-data.json filter=lfs diff=lfs merge=lfs -text
-public/data/zip-city-mapping.csv filter=lfs diff=lfs merge=lfs -text
 data/us-zip-codes.geojson filter=lfs diff=lfs merge=lfs -text
