@@ -85,9 +85,9 @@ export function MapExport({ allZipData, fullGeoJSON, selectedMetric, onExportMod
 
   const handleCancelExport = () => {
     if (exportTimeoutId) clearTimeout(exportTimeoutId);
-    setIsExportMode(false);
     setIsExporting(false);
     setExportOptions(null);
+    setIsExportMode(false);
     onExportModeChange(false);
   };
 

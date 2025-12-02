@@ -107,13 +107,20 @@ export function ExportMap({ filteredData, geoJSON, selectedMetric, regionScope, 
   }, [continental, alaska, hawaii, colorScale, onRenderComplete, regionScope, selectedMetric, filteredData]);
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full bg-white">
+      {/* Main map */}
       <div ref={mainMapRef} className="w-full h-full" />
+      
+      {/* Alaska and Hawaii insets for national view */}
       {regionScope === 'national' && (
-        <>
-          <div className="absolute bottom-4 left-4 w-40 h-32 border border-gray-300 rounded bg-white"><div ref={alaskaMapRef} className="w-full h-full" /></div>
-          <div className="absolute bottom-4 left-48 w-32 h-24 border border-gray-300 rounded bg-white"><div ref={hawaiiMapRef} className="w-full h-full" /></div>
-        </>
+        <div className="absolute bottom-6 left-6 flex gap-3">
+          <div className="w-44 h-36 border-2 border-gray-400 rounded shadow-lg bg-white overflow-hidden">
+            <div ref={alaskaMapRef} className="w-full h-full" />
+          </div>
+          <div className="w-36 h-28 border-2 border-gray-400 rounded shadow-lg bg-white overflow-hidden">
+            <div ref={hawaiiMapRef} className="w-full h-full" />
+          </div>
+        </div>
       )}
     </div>
   );
