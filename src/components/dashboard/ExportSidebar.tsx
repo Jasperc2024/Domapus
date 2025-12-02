@@ -282,12 +282,25 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
           )}
           <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 relative">
             {filteredGeoJSON && filteredData.length > 0 ? (
-              <ExportMap
-                filteredData={filteredData}
-                geoJSON={filteredGeoJSON}
-                selectedMetric={selectedMetric}
-                regionScope={regionScope}
-              />
+              <>
+                <ExportMap
+                  filteredData={filteredData}
+                  geoJSON={filteredGeoJSON}
+                  selectedMetric={selectedMetric}
+                  regionScope={regionScope}
+                />
+                {includeLegend && (
+                  <div className="absolute bottom-4 right-4 w-64">
+                    <Legend
+                      selectedMetric={selectedMetric}
+                      metricValues={filteredData
+                        .map(d => d[selectedMetric.replace(/-/g, "_") as keyof ZipData] as number)
+                        .filter(v => typeof v === "number" && v > 0)}
+                      isExport={true}
+                    />
+                  </div>
+                )}
+              </>
             ) : (
               <div className="flex items-center justify-center h-full text-gray-500">
                 {regionScope === 'state' && !selectedState && 'Select a state'}
@@ -296,17 +309,6 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
               </div>
             )}
           </div>
-          {includeLegend && filteredData.length > 0 && (
-            <div className="mt-4 flex justify-start">
-              <Legend
-                selectedMetric={selectedMetric}
-                metricValues={filteredData
-                  .map(d => d[selectedMetric.replace(/-/g, "_") as keyof ZipData] as number)
-                  .filter(v => typeof v === "number" && v > 0)}
-                isExport={true}
-              />
-            </div>
-          )}
         </div>
       </div>
     </div>

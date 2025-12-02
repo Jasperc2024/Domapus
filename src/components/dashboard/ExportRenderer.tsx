@@ -113,13 +113,24 @@ export function ExportRenderer({
 
       <main className="flex-grow border border-gray-200 rounded-xl overflow-hidden bg-gray-50 relative shadow-sm">
         {filteredGeoJSON && filteredData.length > 0 ? (
-          <ExportMap
-            filteredData={filteredData}
-            geoJSON={filteredGeoJSON}
-            selectedMetric={selectedMetric}
-            regionScope={exportOptions.regionScope}
-            onRenderComplete={handleRenderComplete}
-          />
+          <>
+            <ExportMap
+              filteredData={filteredData}
+              geoJSON={filteredGeoJSON}
+              selectedMetric={selectedMetric}
+              regionScope={exportOptions.regionScope}
+              onRenderComplete={handleRenderComplete}
+            />
+            {exportOptions.includeLegend && (
+              <div className="absolute bottom-6 right-6 w-72">
+                <Legend
+                  selectedMetric={selectedMetric}
+                  metricValues={metricValues}
+                  isExport={true}
+                />
+              </div>
+            )}
+          </>
         ) : (
             <div className="flex items-center justify-center h-full text-gray-500 text-xl font-medium">
                 Preparing map data...
@@ -127,16 +138,7 @@ export function ExportRenderer({
         )}
       </main>
 
-      <footer className="pt-6 flex justify-between items-end">
-        {exportOptions.includeLegend && (
-          <div className="min-w-[300px]">
-            <Legend
-              selectedMetric={selectedMetric}
-              metricValues={metricValues}
-              isExport={true} // New prop to signal clean styling
-            />
-          </div>
-        )}
+      <footer className="pt-6 flex justify-end items-end">
         <div className="text-right">
           <DomapusLogo size="lg" className="mb-2 justify-end" />
           <p className="text-sm text-gray-600 font-medium">Market Analytics by Domapus</p>
