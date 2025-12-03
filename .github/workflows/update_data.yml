@@ -17,52 +17,78 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    # --- STEP 1: INSTALL TIPPECANOE (Felt Fork) ---
+    - name: Install Tippecanoe
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libsqlite3-dev zlib1g-dev
+        git clone https://github.com/felt/tippecanoe.git
+        cd tippecanoe
+        make -j2 && sudo make install
+        cd ..
+
+    # --- STEP 2: SETUP PYTHON ---
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
 
-    - name: Install dependencies
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install pandas requests
 
+    # --- STEP 3: FETCH DATA & MERGE (Python) ---
     - name: Run Redfin Data Pipeline
       run: |
-        python -u scripts/parse_redfin_zip_data.py
+        # Reads: public/data/us-zip-codes.geojson.gz
+        # Should handle converting null geometries to points internally
+        python -u scripts/market_data_to_geojson.py
 
-    - name: Display Logs
-      if: always() # Always run this step to see logs, even if the script fails
-      run: |
-        echo "--- Displaying contents of data_pipeline.log ---"
-        cat data_pipeline.log
-        echo "--- End of log ---"
-
-    - name: Check for changes in ZIP data file
-      id: check_changes
-      run: |
-        if [ ! -f public/data/zip-data.json ]; then
-          echo "File not found, changes=true"
-          echo "changes=true" >> $GITHUB_OUTPUT
-        elif git diff --quiet HEAD -- public/data/zip-data.json; then
-          echo "No changes detected in zip-data.json"
-          echo "changes=false" >> $GITHUB_OUTPUT
-        else
-          echo "Changes detected in zip-data.json"
-          echo "changes=true" >> $GITHUB_OUTPUT
+    - name: Verify GeoJSON Output
+      run: | 
+        if [ ! -f "public/data/zip-codes-master.geojson" ]; then
+          echo "Error: public/data/zip-codes-master.geojson was not found."
+          exit 1
         fi
 
-    - name: Commit and push if changed
-      # Only run if the check_changes step output 'changes=true'
-      if: steps.check_changes.outputs.changes == 'true'
+    # --- STEP 4: GENERATE TILES (Tippecanoe) ---
+    - name: Generate PMTiles (Unlimited Size)
+      run: |
+        echo "Generating PMTiles with no data loss..."
+        # -Z 2 -z 13: Zoom range 2 to 13
+        # --no-feature-limit: Never drop features due to tile density
+        # --no-tile-size-limit: Allow tiles > 500KB (allows 5MB+ tiles)
+        # --extend-zooms-if-still-dropping: Safety net if features are somehow still dense
+        # --detect-shared-borders: Keeps polygons clean
+        
+        tippecanoe -o public/data/zip-codes-master.pmtiles \
+          -l zip_codes \
+          -Z 2 \
+          -z 13 \
+          --drop-densest-as-needed \
+          --extend-zooms-if-still-dropping \
+          --detect-shared-borders \
+          --force \
+          public/data/zip-codes-master.geojson
+
+    # --- STEP 5: CLEANUP ---
+    - name: Clean up intermediate GeoJSON
+      run: |
+        # Remove the huge GeoJSON to keep the repo size down
+        rm public/data/zip-codes-master.geojson
+
+    # --- STEP 6: COMMIT ---
+    - name: Commit and push
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         
         echo "Adding and committing changes..."
-        # Add the uncompressed json file
-        git add public/data/zip-data.json public/data/last_updated.json
-        git commit -m "Update Redfin ZIP data - $(date +'%Y-%m-%d %H:%M:%S' --utc)"
+        git add public/data/zip-codes-master.pmtiles public/data/last_updated.json
+        
+        # --allow-empty forces a commit even if the file is identical to the previous run
+        git commit --allow-empty -m "Update Redfin ZIP data - $(date +'%Y-%m-%d %H:%M:%S' --utc)"
         git push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
