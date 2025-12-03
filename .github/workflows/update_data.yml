@@ -63,6 +63,7 @@ jobs:
           -z 12 \
           --drop-densest-as-needed \
           --detect-shared-borders \
+          --simplification 10 \
           --force \
           public/data/zip-codes-master.geojson
 
