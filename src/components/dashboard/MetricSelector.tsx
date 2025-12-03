@@ -2,25 +2,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export type MetricType = 
   | "median_sale_price"
-  | "median_list_price" 
-  | "median_dom"
-  | "inventory"
-  | "new_listings"
-  | "homes_sold"
+  | "median_ppsf"
   | "avg_sale_to_list_ratio"
-  | "sold_above_list"
-  | "off_market_in_two_weeks";
+  | "median_dom";
 
 export const METRICS = {
   "median_sale_price": "Median Sale Price",
-  "median_list_price": "Median List Price", 
+  "median_ppsf": "Median Price per Sq Ft",
+  "avg_sale_to_list_ratio": "Sale-to-List Ratio",
   "median_dom": "Median Days on Market",
-  "inventory": "Inventory",
-  "new_listings": "New Listings",
-  "homes_sold": "Homes Sold",
-  "avg_sale_to_list_ratio": "Sale-to-List Price Ratio",
-  "sold_above_list": "% Homes Sold Above List",
-  "off_market_in_two_weeks": "% Off-Market in 2 Weeks"
 } as const;
 
 interface MetricSelectorProps {
