@@ -53,21 +53,15 @@ jobs:
         fi
 
     # --- STEP 4: GENERATE TILES (Tippecanoe) ---
-    - name: Generate PMTiles (Unlimited Size)
+    - name: Generate PMTiles
       run: |
-        echo "Generating PMTiles with no data loss..."
-        # -Z 2 -z 13: Zoom range 2 to 13
-        # --no-feature-limit: Never drop features due to tile density
-        # --no-tile-size-limit: Allow tiles > 500KB (allows 5MB+ tiles)
-        # --extend-zooms-if-still-dropping: Safety net if features are somehow still dense
-        # --detect-shared-borders: Keeps polygons clean
+        echo "Generating PMTiles..."
         
         tippecanoe -o public/data/zip-codes-master.pmtiles \
           -l zip_codes \
           -Z 2 \
-          -z 13 \
+          -z 12 \
           --drop-densest-as-needed \
-          --extend-zooms-if-still-dropping \
           --detect-shared-borders \
           --force \
           public/data/zip-codes-master.geojson
