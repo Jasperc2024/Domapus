@@ -61,7 +61,9 @@ jobs:
           -l zip_codes \
           -Z 2 \
           -z 12 \
+          --simplify-only-low-zooms \
           --drop-densest-as-needed \
+          --drop-smallest-as-needed \
           --detect-shared-borders \
           --simplification 10 \
           --force \
