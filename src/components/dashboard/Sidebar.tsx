@@ -44,24 +44,25 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
   };
 
   // The list of all metrics to display for a single ZIP code
+  // All metrics in user-specified order
   const allMetrics = [
     { key: "median_sale_price", label: "Median Sale Price", type: "price", momKey: "median_sale_price_mom_pct", yoyKey: "median_sale_price_yoy_pct" },
     { key: "median_list_price", label: "Median List Price", type: "price", momKey: "median_list_price_mom_pct", yoyKey: "median_list_price_yoy_pct" },
-    { key: "median_dom", label: "Median Days on Market", type: "days", momKey: "median_dom_mom_pct", yoyKey: "median_dom_yoy_pct" },
-    { key: "inventory", label: "Inventory", type: "number", momKey: "inventory_mom_pct", yoyKey: "inventory_yoy_pct" },
-    { key: "new_listings", label: "New Listings", type: "number", momKey: "new_listings_mom_pct", yoyKey: "new_listings_yoy_pct" },
+    { key: "median_ppsf", label: "Median Price per Sq Ft", type: "price", momKey: "median_ppsf_mom_pct", yoyKey: "median_ppsf_yoy_pct" },
     { key: "homes_sold", label: "Homes Sold", type: "number", momKey: "homes_sold_mom_pct", yoyKey: "homes_sold_yoy_pct" },
+    { key: "pending_sales", label: "Pending Sales", type: "number", momKey: "pending_sales_mom_pct", yoyKey: "pending_sales_yoy_pct" },
+    { key: "new_listings", label: "New Listings", type: "number", momKey: "new_listings_mom_pct", yoyKey: "new_listings_yoy_pct" },
+    { key: "inventory", label: "Inventory", type: "number", momKey: "inventory_mom_pct", yoyKey: "inventory_yoy_pct" },
+    { key: "median_dom", label: "Median Days on Market", type: "days", momKey: "median_dom_mom_pct", yoyKey: "median_dom_yoy_pct" },
     { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", type: "ratio", momKey: "avg_sale_to_list_ratio_mom_pct", yoyKey: "avg_sale_to_list_ratio_yoy_pct" },
     { key: "sold_above_list", label: "% Sold Above List", type: "percentage", momKey: "sold_above_list_mom_pct", yoyKey: "sold_above_list_yoy_pct" },
     { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", type: "percentage", momKey: "off_market_in_two_weeks_mom_pct", yoyKey: "off_market_in_two_weeks_yoy_pct" },
-    { key: "median_ppsf", label: "Median Price per Sq Ft", type: "price", momKey: "median_ppsf_mom_pct", yoyKey: "median_ppsf_yoy_pct" },
-    { key: "pending_sales", label: "Pending Sales", type: "number", momKey: "pending_sales_mom_pct", yoyKey: "pending_sales_yoy_pct" },
   ]
   .map(metric => ({ ...metric, value: zipData[metric.key as keyof ZipData] }))
   .filter(metric => metric.value !== null && metric.value !== undefined);
 
   return (
-    <div className={`absolute left-0 top-0 h-full bg-dashboard-panel border-r border-dashboard-border shadow-lg z-40 transition-all duration-300 ${isCollapsed ? "w-16" : "w-96"}`}>
+    <div className={`absolute left-0 top-14 bottom-0 bg-dashboard-panel border-r border-dashboard-border shadow-lg z-40 transition-all duration-300 ${isCollapsed ? "w-16" : "w-96"}`}>
       <div 
         className="flex items-center justify-between px-3 py-2 border-b border-dashboard-border"
         role="banner"
@@ -88,7 +89,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
       </div>
             
       {!isCollapsed && (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full overflow-hidden">
           {showComparison ? (
             <div className="p-4 flex-1 overflow-y-auto">
               <ZipComparison currentZip={zipData} allZipData={allZipData} onClose={() => setShowComparison(false)} />
@@ -119,7 +120,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
               </div>
             </div>
           )}
-          <div className="px-4 pt-4 pb-0 space-y-3 border-t border-dashboard-border bg-dashboard-panel">
+          <div className="flex-shrink-0 px-4 py-4 border-t border-dashboard-border bg-dashboard-panel">
             <Button variant="outline" className="w-full" onClick={() => setShowComparison(!showComparison)}><BarChart3 className="h-4 w-4 mr-2" />{showComparison ? "Back to Details" : "Compare ZIP Codes"}</Button>
           </div>
         </div>

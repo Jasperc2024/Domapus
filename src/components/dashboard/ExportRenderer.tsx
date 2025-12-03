@@ -32,10 +32,12 @@ export function ExportRenderer({
     }
     console.log('[ExportRenderer] Starting export render process');
     try {
-      console.log('[ExportRenderer] Capturing canvas with html2canvas');
-      // Added slightly higher scale for better text clarity in PDF
+      // High DPI scale: 4x for crisp output
+      const scale = 4;
+      console.log(`[ExportRenderer] Capturing canvas with html2canvas at ${scale}x scale`);
+      
       const canvas = await html2canvas(containerRef.current, {
-        scale: 3, 
+        scale, 
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
@@ -46,18 +48,25 @@ export function ExportRenderer({
         console.log('[ExportRenderer] Exporting as PNG');
         const link = document.createElement("a");
         link.download = `domapus-map-${selectedMetric}.png`;
-        link.href = canvas.toDataURL("image/png");
+        link.href = canvas.toDataURL("image/png", 1.0);
         link.click();
       } else {
-        console.log('[ExportRenderer] Exporting as PDF');
-        // Calculate PDF dimensions to fit the image exactly
-        const imgData = canvas.toDataURL("image/png");
+        console.log('[ExportRenderer] Exporting as high-DPI PDF');
+        const imgData = canvas.toDataURL("image/png", 1.0);
+        
+        // PDF at 300 DPI: convert pixel dimensions to points (72 DPI)
+        // Scale factor from screen (96 DPI * render scale) to PDF points
+        const pdfWidth = canvas.width / scale * 0.75; // Convert to points (72/96)
+        const pdfHeight = canvas.height / scale * 0.75;
+        
         const pdf = new jsPDF({ 
-            orientation: "landscape", 
-            unit: "px", 
-            format: [canvas.width, canvas.height] 
+          orientation: pdfWidth > pdfHeight ? "landscape" : "portrait", 
+          unit: "pt", 
+          format: [pdfWidth, pdfHeight] 
         });
-        pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+        
+        // Add high-res image scaled to fit PDF page
+        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
         pdf.save(`domapus-map-${selectedMetric}.pdf`);
       }
     } catch (error) {

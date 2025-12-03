@@ -8,8 +8,7 @@ import { MapLibreMap } from "./MapLibreMap";
 import { Legend } from "./Legend";
 import { SponsorBanner } from "./SponsorBanner";
 import { Sidebar } from "./Sidebar";
-
-export type MetricType = "median_sale_price" | "median_list_price" | "median_dom" | "inventory" | "new_listings" | "homes_sold" | "avg_sale_to_list_ratio" | "sold_above_list" | "off_market_in_two_weeks";
+import { MetricType } from "./MetricSelector";
 interface DataPayload { 
   last_updated_utc: string;
   zip_codes: Record<string, ZipData>;
