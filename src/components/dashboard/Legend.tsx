@@ -50,17 +50,10 @@ export function Legend({ selectedMetric, metricValues, isExport = false }: Legen
     
     const metricNames: Record<string, string> = {
       median_sale_price: 'Median Sale Price',
-      median_list_price: 'Median List Price',
-      median_dom: 'Median Days on Market',
-      inventory: 'Current Inventory',
-      homes_sold: 'Homes Sold',
-      new_listings: 'New Listings',
+      median_ppsf: 'Median Price per Sq Ft',
       sale_to_list_ratio: 'Sale-to-List Ratio',
-      avg_sale_to_list_ratio: 'Sale-to-List Ratio', // Handle potential naming variations
-      sold_above_list: 'Sold Above List',
-      homes_sold_above_list: 'Sold Above List',
-      off_market_in_two_weeks: 'Off Market in 2 Weeks',
-      off_market_2_weeks: 'Off Market in 2 Weeks',
+      avg_sale_to_list_ratio: 'Sale-to-List Ratio',// Handle potential naming variations     
+      median_dom: 'Median Days on Market', 
     };
     
     return metricNames[normalizedKey] || normalizedKey.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');

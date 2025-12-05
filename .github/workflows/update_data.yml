@@ -59,13 +59,9 @@ jobs:
         
         tippecanoe -o public/data/zip-codes-master.pmtiles \
           -l zip_codes \
-          -Z 2 \
+          -Z 3 \
           -z 12 \
-          --simplify-only-low-zooms \
           --drop-densest-as-needed \
-          --drop-smallest-as-needed \
-          --detect-shared-borders \
-          --simplification 50 \
           --force \
           public/data/zip-codes-master.geojson
 
