@@ -1,7 +1,7 @@
 {
   "name": "Domapus - Housing Data Analysis",
   "short_name": "Domapus",
-  "description": "An interactive map of the U.S. housing market by ZIP code.",
+  "description": "Interactive analysis map of the U.S. housing market by ZIP code",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
