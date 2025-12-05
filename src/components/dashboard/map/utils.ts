@@ -26,10 +26,12 @@ export function getMetricDisplay(data: ZipData, selectedMetric: string): string 
   const metricMap: Record<string, { key: keyof ZipData; label: string; format: 'currency' | 'number' | 'percent' | 'ratio' }> = {
     "median_sale_price": { key: "median_sale_price", label: "Median Sale Price", format: 'currency' },
     "median_list_price": { key: "median_list_price", label: "Median List Price", format: 'currency' },
+    "median_ppsf": { key: "median_ppsf", label: "Median Price per Sq Ft", format: 'currency' },
     "median_dom": { key: "median_dom", label: "Median Days on Market", format: 'number' },
     "inventory": { key: "inventory", label: "Inventory", format: 'number' },
     "new_listings": { key: "new_listings", label: "New Listings", format: 'number' },
     "homes_sold": { key: "homes_sold", label: "Homes Sold", format: 'number' },
+    "pending_sales": { key: "pending_sales", label: "Pending Sales", format: 'number' },
     "avg_sale_to_list_ratio": { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", format: 'ratio' },
     "sold_above_list": { key: "sold_above_list", label: "% Sold Above List", format: 'percent' },
     "off_market_in_two_weeks": { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", format: 'percent' },

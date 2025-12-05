@@ -273,7 +273,7 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
           {includeTitle && (
             <header className="text-center mb-4">
               <h1 className="text-2xl font-bold text-gray-900 mb-1">
-                {selectedMetric.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} by ZIP Code
+                {selectedMetric.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} by ZIP Code
               </h1>
               <p className="text-sm text-gray-600">
                 {regionScope === 'national' ? 'United States' : regionScope === 'state' ? selectedState || 'State' : selectedMetro || 'Metro Area'} • {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
@@ -294,7 +294,7 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
                     <Legend
                       selectedMetric={selectedMetric}
                       metricValues={filteredData
-                        .map(d => d[selectedMetric.replace(/-/g, "_") as keyof ZipData] as number)
+                        .map(d => d[selectedMetric as keyof ZipData] as number)
                         .filter(v => typeof v === "number" && v > 0)}
                       isExport={true}
                     />
