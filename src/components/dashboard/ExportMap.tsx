@@ -56,7 +56,14 @@ export function ExportMap({ filteredData, geoJSON, selectedMetric, regionScope, 
   }, [geoJSON, regionScope, filteredData]);
 
   useEffect(() => {
-    // --- FIX: Apply our new interface to the configs array ---
+    // Clean up any existing maps first
+    Object.keys(maps).forEach(key => {
+      if (maps[key]) {
+        maps[key]!.remove();
+        maps[key] = null;
+      }
+    });
+
     const mapConfigs: MapConfig[] = [
       { key: 'main', ref: mainMapRef, center: [-98.5, 39.8] as [number, number], zoom: 3.5, data: continental as GeoJSON.FeatureCollection },
       ...(regionScope === 'national' ? [
@@ -66,32 +73,59 @@ export function ExportMap({ filteredData, geoJSON, selectedMetric, regionScope, 
     ];
 
     const activeMaps = mapConfigs.filter(c => c.data).length;
-    let mapsToLoad = activeMaps;
     let loadedMaps = 0;
 
     const onMapIdle = () => {
-        loadedMaps++;
-        if (loadedMaps === mapsToLoad && onRenderComplete) {
-            onRenderComplete();
-        }
+      loadedMaps++;
+      if (loadedMaps === activeMaps && onRenderComplete) {
+        onRenderComplete();
+      }
     };
     
     mapConfigs.forEach(({ key, ref, center, zoom, data }) => {
-      if (!ref.current || maps[key]) return;
-      const map = new maplibregl.Map({ container: ref.current, style: { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#ffffff' } }] }, center, zoom, interactive: false, attributionControl: false,});
+      if (!ref.current) return;
+      
+      const map = new maplibregl.Map({
+        container: ref.current,
+        style: { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#ffffff' } }] },
+        center,
+        zoom,
+        interactive: false,
+        attributionControl: false,
+        canvasContextAttributes: { preserveDrawingBuffer: true }, // Critical for canvas export
+      });
       maps[key] = map;
+      
       map.on('load', () => {
-        if (!data || !colorScale || data.features.length === 0) { map.once("idle", onMapIdle); return; }
+        if (!data || !colorScale || data.features.length === 0) {
+          map.once("idle", onMapIdle);
+          return;
+        }
+        
         const dataWithMetrics = {
-            ...data,
-            features: data.features.map(f => {
-                const zip = filteredData.find(z => z.zipCode === f.properties!.zipCode);
-                const metricValue = zip ? zip[selectedMetric as keyof ZipData] : 0;
-                return {...f, properties: {...f.properties, metricValue }};
-            })
+          ...data,
+          features: data.features.map(f => {
+            const zip = filteredData.find(z => z.zipCode === f.properties!.zipCode);
+            const metricValue = zip ? zip[selectedMetric as keyof ZipData] : 0;
+            return { ...f, properties: { ...f.properties, metricValue } };
+          })
         };
+        
         map.addSource(key, { type: 'geojson', data: dataWithMetrics });
-        map.addLayer({ id: `${key}-fill`, type: 'fill', source: key, paint: { "fill-color": ["case", ["!", ["has", "metricValue"]], "#ccc", ["interpolate", ["linear"], ["get", "metricValue"], ...colorScale.domain().flatMap(d => [d, colorScale(d)])]], "fill-opacity": 0.8 } });
+        map.addLayer({
+          id: `${key}-fill`,
+          type: 'fill',
+          source: key,
+          paint: {
+            "fill-color": [
+              "case",
+              ["!", ["has", "metricValue"]], "#ccc",
+              ["interpolate", ["linear"], ["get", "metricValue"], ...colorScale.domain().flatMap(d => [d, colorScale(d)])]
+            ],
+            "fill-opacity": 0.8
+          }
+        });
+        
         if (key === 'main' && (regionScope === 'state' || regionScope === 'metro')) {
           const bounds = new maplibregl.LngLatBounds();
           data.features.forEach(f => {
@@ -103,7 +137,15 @@ export function ExportMap({ filteredData, geoJSON, selectedMetric, regionScope, 
         map.once('idle', onMapIdle);
       });
     });
-    return () => {};
+    
+    return () => {
+      Object.keys(maps).forEach(key => {
+        if (maps[key]) {
+          maps[key]!.remove();
+          maps[key] = null;
+        }
+      });
+    };
   }, [continental, alaska, hawaii, colorScale, onRenderComplete, regionScope, selectedMetric, filteredData]);
 
   return (

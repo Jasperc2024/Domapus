@@ -78,17 +78,12 @@ export function ExportRenderer({
 
   const getMetricDisplayName = (metric: string): string => {
     const metricNames: Record<string, string> = { 
-        "median_sale_price": "Median Sale Price",
-        "median_list_price": "Median List Price",
-        "median_dom": "Median Days on Market",
-        "inventory": "Inventory",
-        "new_listings": "New Listings",
-        "homes_sold": "Homes Sold",
-        "sale_to_list_ratio": "Sale to List Ratio",
-        "homes_sold_above_list": "Homes Sold Above List",
-        "off_market_2_weeks": "Off Market in 2 Weeks"
+      "median_sale_price": "Median Sale Price",
+      "median_ppsf": "Median Price per Sq Ft",
+      "avg_sale_to_list_ratio": "Sale-to-List Ratio",
+      "median_dom": "Median Days on Market",
     };
-    return metricNames[metric] || metric.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    return metricNames[metric] || metric.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   };
   
   const getRegionDisplayName = (): string => {
