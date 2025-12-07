@@ -6,7 +6,7 @@ permissions:
 
 on:
   schedule:
-    - cron: '0 5 1 * *' # Runs at 05:00 UTC on the 1st of every month
+    - cron: '0 0 1 * *' # Runs at 00:00 UTC on the 1st of every month
   workflow_dispatch: # Allows manual triggering
 
 jobs:
@@ -17,71 +17,51 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # --- STEP 1: INSTALL TIPPECANOE (Felt Fork) ---
-    - name: Install Tippecanoe
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential libsqlite3-dev zlib1g-dev
-        git clone https://github.com/felt/tippecanoe.git
-        cd tippecanoe
-        make -j2 && sudo make install
-        cd ..
-
-    # --- STEP 2: SETUP PYTHON ---
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
 
-    - name: Install Python dependencies
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install pandas requests
 
-    # --- STEP 3: FETCH DATA & MERGE (Python) ---
     - name: Run Redfin Data Pipeline
       run: |
-        # Reads: public/data/us-zip-codes.geojson.gz
-        # Should handle converting null geometries to points internally
-        python -u scripts/market_data_to_geojson.py
+        python -u scripts/parse_redfin_zip_data.py
 
-    - name: Verify GeoJSON Output
-      run: | 
-        if [ ! -f "public/data/zip-codes-master.geojson" ]; then
-          echo "Error: public/data/zip-codes-master.geojson was not found."
-          exit 1
+    - name: Display Logs
+      if: always() 
+      run: |
+        echo "--- Displaying contents of data_pipeline.log ---"
+        cat data_pipeline.log
+        echo "--- End of log ---"
+
+    - name: Check for changes in ZIP data file
+      id: check_changes
+      run: |
+        if [ ! -f public/data/zip-data.json ]; then
+          echo "File not found, changes=true"
+          echo "changes=true" >> $GITHUB_OUTPUT
+        elif git diff --quiet HEAD -- public/data/zip-data.json; then
+          echo "No changes detected in zip-data.json"
+          echo "changes=false" >> $GITHUB_OUTPUT
+        else
+          echo "Changes detected in zip-data.json"
+          echo "changes=true" >> $GITHUB_OUTPUT
         fi
 
-    # --- STEP 4: GENERATE TILES (Tippecanoe) ---
-    - name: Generate PMTiles
-      run: |
-        echo "Generating PMTiles..."
-        
-        tippecanoe -o public/data/zip-codes-master.pmtiles \
-          -l zip_codes \
-          -Z 3 \
-          -z 12 \
-          --drop-densest-as-needed \
-          --force \
-          public/data/zip-codes-master.geojson
-
-    # --- STEP 5: CLEANUP ---
-    - name: Clean up intermediate GeoJSON
-      run: |
-        # Remove the huge GeoJSON to keep the repo size down
-        rm public/data/zip-codes-master.geojson
-
-    # --- STEP 6: COMMIT ---
-    - name: Commit and push
+    - name: Commit and push if changed
+      # Only run if the check_changes step output 'changes=true'
+      if: steps.check_changes.outputs.changes == 'true'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         
         echo "Adding and committing changes..."
-        git add public/data/zip-codes-master.pmtiles public/data/last_updated.json
-        
-        # --allow-empty forces a commit even if the file is identical to the previous run
-        git commit --allow-empty -m "Update Redfin ZIP data - $(date +'%Y-%m-%d %H:%M:%S' --utc)"
+        git add public/data/zip-data.json public/data/last_updated.json
+        git commit -m "Update Redfin ZIP data - $(date +'%Y-%m-%d %H:%M:%S' --utc)"
         git push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

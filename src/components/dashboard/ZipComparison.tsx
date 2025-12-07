@@ -59,15 +59,21 @@ export function ZipComparison({ currentZip, allZipData, onClose }: ZipComparison
     return diff > 0 ? 'higher' : 'lower';
   };
 
-  // The list of metrics to compare, using the correct snake_case keys
+  // The list of metrics to compare
   const metrics = [
     { key: "median_sale_price", label: "Median Sale Price", type: "price" },
     { key: "median_list_price", label: "Median List Price", type: "price" },
-    { key: "median_dom", label: "Median Days on Market", type: "days" },
-    { key: "inventory", label: "Inventory", type: "number" },
-    { key: "new_listings", label: "New Listings", type: "number" },
+    { key: "median_ppsf", label: "Median Price per Sq Ft", type: "price" },
     { key: "homes_sold", label: "Homes Sold", type: "number" },
+    { key: "pending_sales", label: "Pending Sales", type: "number" },
+    { key: "new_listings", label: "New Listings", type: "number" },
+    { key: "inventory", label: "Inventory", type: "number" },
+    { key: "months_of_supply", label: "Months of Supply", type: "number" },
+    { key: "median_dom", label: "Median Days on Market", type: "days" },
     { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", type: "ratio" },
+    { key: "sold_above_list", label: "% Sold Above List", type: "percentage" },
+    { key: "price_drops", label: "% Price Drops", type: "percentage" },
+    { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", type: "percentage" },
   ];
 
   return (

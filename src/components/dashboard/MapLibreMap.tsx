@@ -185,8 +185,7 @@ export function MapLibreMap({
           }
 
           const props = features[0].properties ?? {};
-          // FIX: Added ZCTA5CE20 to the list of keys to check
-          const zipCode = props.zipCode ?? props.zip ?? props.ZCTA5CE10 ?? props.ZCTA5CE20 ?? props.id;
+          const zipCode = props.zipCode ?? props.ZCTA5CE20 ?? props.id;
           
           const { zipData: currentZipData, selectedMetric: currentMetric } = propsRef.current;
 
@@ -251,11 +250,26 @@ export function MapLibreMap({
     if (map.getSource("zips")) return;
 
     try {
+      const styleLayers = map.getStyle().layers; 
+      styleLayers.forEach((layer) => {
+        // Identify layers that use the 'transportation' source (roads, bridges, tunnels, rail)
+        // We also hide 'transportation_name' to remove road labels
+        if (
+          layer["source-layer"] === "transportation" || 
+          layer["source-layer"] === "transportation_name"
+        ) {
+          // Set their visibility to none
+          map.setLayoutProperty(layer.id, "visibility", "none");
+        }
+      });
+
       console.log("[MapLibreMap] Adding source and layer...");
       map.addSource("zips", { type: "geojson", data: baseGeoJSON });
 
       const layers = map.getStyle().layers;
       let beforeId: string | undefined;
+      
+      // We look for watername_ocean to place zips below text labels but above the background
       const labelLayer = layers.find((l) => l.id === "watername_ocean");
       if (labelLayer) beforeId = labelLayer.id;
 

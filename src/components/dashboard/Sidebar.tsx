@@ -53,9 +53,11 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
     { key: "pending_sales", label: "Pending Sales", type: "number", momKey: "pending_sales_mom_pct", yoyKey: "pending_sales_yoy_pct" },
     { key: "new_listings", label: "New Listings", type: "number", momKey: "new_listings_mom_pct", yoyKey: "new_listings_yoy_pct" },
     { key: "inventory", label: "Inventory", type: "number", momKey: "inventory_mom_pct", yoyKey: "inventory_yoy_pct" },
+    { key: "months_of_supply", label: "Months of Supply", type: "number", momKey: "months_of_supply_mom_pct", yoyKey: "months_of_supply_yoy_pct" },
     { key: "median_dom", label: "Median Days on Market", type: "days", momKey: "median_dom_mom_pct", yoyKey: "median_dom_yoy_pct" },
     { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", type: "ratio", momKey: "avg_sale_to_list_ratio_mom_pct", yoyKey: "avg_sale_to_list_ratio_yoy_pct" },
     { key: "sold_above_list", label: "% Sold Above List", type: "percentage", momKey: "sold_above_list_mom_pct", yoyKey: "sold_above_list_yoy_pct" },
+    { key: "price_drops", label: "% Price Drops", type: "percentage", momKey: "price_drops_mom_pct", yoyKey: "price_drops_yoy_pct" },
     { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", type: "percentage", momKey: "off_market_in_two_weeks_mom_pct", yoyKey: "off_market_in_two_weeks_yoy_pct" },
   ]
   .map(metric => ({ ...metric, value: zipData[metric.key as keyof ZipData] }))

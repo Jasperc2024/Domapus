@@ -63,33 +63,29 @@ npm run build && npm run preview
 
 ## 🏗️ Project Structure
 
-```
-src/
-├── components/
-│   ├── dashboard/        # Map and analytics components
-│   ├── ui/               # Reusable UI (shadcn/ui)
-├── hooks/                # Custom React hooks
-├── utils/                # Helper functions
-├── workers/              # Web workers
-└── pages/                # Page components
-
-```
+see [tree.txt](tree.txt)
 
 ---
 
 ## 📈 Metrics Overview
 
-| Metric                    | Description                 |
-| ------------------------- | --------------------------- |
-| **Median Sale Price**     | Typical price of sold homes |
-| **Median List Price**     | Typical asking price        |
-| **Days on Market**        | Average listing duration    |
-| **Inventory**             | Homes available for sale    |
-| **New Listings**          | Homes newly added           |
-| **Homes Sold**            | Closed transactions         |
-| **Sale-to-List Ratio**    | Sale price ÷ asking price   |
-| **Homes Sold Above List** | % of homes sold above ask   |
-| **Off Market in 2 Weeks** | % of homes selling rapidly  |
+| Metric                         | Description                             |
+| ------------------------------ | --------------------------------------- |
+| **Median Sale Price***         | Typical price of sold homes             |
+| **Median List Price**          | Typical asking price                    |
+| **Median Price per Sq Ft***    | Cost per square foot                    |
+| **Homes Sold**                 | Closed transactions                     |
+| **Pending Sales**              | Homes under contract                    |
+| **New Listings**               | Homes newly added                       |
+| **Inventory**                  | Homes available for sale                |
+| **Months of Supply**           | Time to sell all inventory at current rate |
+| **Median Days on Market***     | Time from listing to pending            |
+| **Sale-to-List Ratio***        | Sale price ÷ asking price               |
+| **% Sold Above List**          | % of homes sold above asking price      |
+| **% Price Drops**              | % of listings that reduced price        |
+| **% Off Market in 2 Weeks**    | % of homes selling within 14 days       |
+
+*\* Available as choropleth metric*
 
 ---
 
@@ -115,7 +111,7 @@ src/
 VITE_BASE_URL=/Domapus/
 
 # Data source URLs (configured in components)
-VITE_DATA_CDN=https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/
+VITE_DATA_CDN=https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json
 ```
 
 ### Build Configuration
