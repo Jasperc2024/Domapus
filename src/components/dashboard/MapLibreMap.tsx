@@ -3,9 +3,9 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getMetricDisplay } from "./map/utils";
 import { ZipData } from "./map/types";
+import { addPMTilesProtocol } from "@/lib/pmtiles-protocol";
 
 const BASE_PATH = import.meta.env.BASE_URL;
-(window as any).maplibregl = maplibregl;
 
 interface MapProps {
   selectedMetric: string;
@@ -17,13 +17,45 @@ interface MapProps {
   processData: (message: { type: string; data?: any }) => Promise<any>;
 }
 
+// Color palette for choropleth (light yellow to deep purple)
+const CHOROPLETH_COLORS = ["#FFF9B0", "#FFEB84", "#FFD166", "#FF9A56", "#E84C61", "#C13584", "#7B2E8D", "#2E0B59"];
+
+function getMetricValue(data: ZipData | undefined, metric: string): number {
+  if (!data) return 0;
+  const value = data[metric as keyof ZipData];
+  return typeof value === "number" && isFinite(value) ? value : 0;
+}
+
+function computeQuantileBuckets(values: number[], numBuckets = 8): number[] {
+  const sorted = [...values].filter(v => v > 0).sort((a, b) => a - b);
+  if (sorted.length === 0) return [];
+  
+  const minVal = sorted[0];
+  const maxVal = sorted[sorted.length - 1];
+  if (minVal === maxVal) return [minVal];
+  
+  const thresholds: number[] = [];
+  const epsilon = (maxVal - minVal) * 1e-6 || 1e-6;
+  
+  const q = (p: number) => sorted[Math.floor(p * (sorted.length - 1))];
+  
+  for (let i = 1; i < numBuckets; i++) {
+    let val = q(i / numBuckets);
+    if (thresholds.length && val <= thresholds[thresholds.length - 1]) {
+      val = thresholds[thresholds.length - 1] + epsilon;
+    }
+    thresholds.push(val);
+  }
+  
+  return thresholds;
+}
+
 export function MapLibreMap({
   selectedMetric,
   onZipSelect,
   searchZip,
   zipData,
   isLoading,
-  processData,
 }: MapProps) {
   console.log('[MapLibreMap] Component render');
   
@@ -32,9 +64,7 @@ export function MapLibreMap({
   const [isMapReady, setIsMapReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const interactionsSetup = useRef(false);
-  const [baseGeoJSON, setBaseGeoJSON] = useState<GeoJSON.FeatureCollection | null>(null);
-  const processingRef = useRef(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const [pmtilesLoaded, setPmtilesLoaded] = useState(false);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const mousemoveRafRef = useRef<number | null>(null);
   const lastMouseEventRef = useRef<any>(null);
@@ -48,8 +78,11 @@ export function MapLibreMap({
     propsRef.current = { zipData, selectedMetric, onZipSelect };
   }, [zipData, selectedMetric, onZipSelect]);
 
-  // 1. Initialize Map
+  // 1. Initialize Map with PMTiles
   const createAndInitializeMap = useCallback((container: HTMLDivElement) => {
+    // Register PMTiles protocol
+    addPMTilesProtocol();
+    
     const map = new maplibregl.Map({
       container,
       style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
@@ -108,19 +141,14 @@ export function MapLibreMap({
       didUnmount = true;
       ro.disconnect();
       resizeObserverRef.current = null;
-      // cancel any pending RAF for mouse handlers, etc.
       if (mousemoveRafRef.current) {
         cancelAnimationFrame(mousemoveRafRef.current);
         mousemoveRafRef.current = null;
       }
-
-      // Remove popup
       if (popupRef.current) {
         popupRef.current.remove();
         popupRef.current = null;
       }
-
-      // remove map if exists
       if (mapRef.current) {
         try {
           console.log('[MapLibreMap] Removing map instance');
@@ -135,28 +163,7 @@ export function MapLibreMap({
     };
   }, [createAndInitializeMap]);
 
-  // 3. Load GeoJSON
-  useEffect(() => {
-    if (!isMapReady || baseGeoJSON) return;
-    const controller = new AbortController();
-
-    (async () => {
-      try {
-        const url = new URL(`${BASE_PATH}data/us-zip-codes.geojson`, window.location.origin).href;
-        console.log("Fetching GeoJSON...", url);
-        const resp = await fetch(url, { signal: controller.signal });
-        if (!resp.ok) throw new Error("Fetch failed");
-        const data = await resp.json();
-        setBaseGeoJSON(data);
-      } catch (err: any) {
-        if (err.name !== "AbortError") console.error("GeoJSON load failed", err);
-      }
-    })();
-
-    return () => controller.abort();
-  }, [isMapReady, baseGeoJSON]);
-
-  // 4. Setup Interactions (Global Listeners)
+  // 3. Setup Interactions (Global Listeners)
   const setupMapInteractions = useCallback(() => {
     const map = mapRef.current;
     if (!map || interactionsSetup.current) return;
@@ -173,7 +180,6 @@ export function MapLibreMap({
         mousemoveRafRef.current = null;
         
         try {
-          // Query rendered features under the cursor
           const features = map.queryRenderedFeatures(ev.point, { layers: [layerId] });
           const isHovering = features.length > 0;
 
@@ -185,11 +191,13 @@ export function MapLibreMap({
           }
 
           const props = features[0].properties ?? {};
-          const zipCode = props.zipCode ?? props.ZCTA5CE20 ?? props.id;
+          // PMTiles uses ZCTA5CE20 as the zip code attribute
+          const zipCode = props.ZCTA5CE20 || props.zipCode || props.id;
           
           const { zipData: currentZipData, selectedMetric: currentMetric } = propsRef.current;
 
           if (!zipCode || !currentZipData[zipCode]) {
+            popupRef.current?.remove();
             return;
           }
 
@@ -216,8 +224,7 @@ export function MapLibreMap({
       if (!features.length) return;
 
       const props = features[0].properties ?? {};
-      // FIX: Added ZCTA5CE20 here as well
-      const zipCode = props.zipCode ?? props.zip ?? props.ZCTA5CE10 ?? props.ZCTA5CE20 ?? props.id;
+      const zipCode = props.ZCTA5CE20 || props.zipCode || props.id;
       
       const { zipData: currentZipData, onZipSelect: currentOnSelect } = propsRef.current;
 
@@ -242,34 +249,36 @@ export function MapLibreMap({
     interactionsSetup.current = true;
   }, []);
 
-  // 5. Add Source & Layer
+  // 4. Add PMTiles Source & Layer
   useEffect(() => {
-    if (!isMapReady || !baseGeoJSON || !mapRef.current) return;
+    if (!isMapReady || !mapRef.current) return;
     const map = mapRef.current;
 
     if (map.getSource("zips")) return;
 
     try {
-      const styleLayers = map.getStyle().layers; 
+      // Hide transportation layers for cleaner look
+      const styleLayers = map.getStyle().layers;
       styleLayers.forEach((layer) => {
-        // Identify layers that use the 'transportation' source (roads, bridges, tunnels, rail)
-        // We also hide 'transportation_name' to remove road labels
-        if (
-          layer["source-layer"] === "transportation" || 
-          layer["source-layer"] === "transportation_name"
-        ) {
-          // Set their visibility to none
-          map.setLayoutProperty(layer.id, "visibility", "none");
+        // Type guard for layers with source-layer property
+        if ('source-layer' in layer) {
+          const sourceLayer = layer['source-layer'] as string;
+          if (sourceLayer === "transportation" || sourceLayer === "transportation_name") {
+            map.setLayoutProperty(layer.id, "visibility", "none");
+          }
         }
       });
 
-      console.log("[MapLibreMap] Adding source and layer...");
-      map.addSource("zips", { type: "geojson", data: baseGeoJSON });
+      console.log("[MapLibreMap] Adding PMTiles source...");
+      const pmtilesUrl = new URL(`${BASE_PATH}data/us_zip_codes.pmtiles`, window.location.origin).href;
+      
+      map.addSource("zips", {
+        type: "vector",
+        url: `pmtiles://${pmtilesUrl}`,
+      });
 
       const layers = map.getStyle().layers;
       let beforeId: string | undefined;
-      
-      // We look for watername_ocean to place zips below text labels but above the background
       const labelLayer = layers.find((l) => l.id === "watername_ocean");
       if (labelLayer) beforeId = labelLayer.id;
 
@@ -277,72 +286,79 @@ export function MapLibreMap({
         id: "zips-fill",
         type: "fill",
         source: "zips",
+        "source-layer": "us_zip_codes", // PMTiles layer name
         paint: {
-          "fill-color": [
-            "case",
-            ["has", "metricColor"], ["get", "metricColor"],
-            "transparent"
-          ],
+          "fill-color": "#cccccc", // Default gray, will be updated with choropleth
           "fill-opacity": 0.75,
           "fill-outline-color": "rgba(0,0,0,0.08)"
         }
       }, beforeId);
 
+      map.once("idle", () => {
+        console.log("[MapLibreMap] PMTiles layer loaded");
+        setPmtilesLoaded(true);
+      });
+
       setupMapInteractions();
 
     } catch (err) {
-      console.error("Add layer failed", err);
+      console.error("Add PMTiles layer failed", err);
+      setError("Failed to load map data. Try refreshing.");
     }
-  }, [isMapReady, baseGeoJSON, setupMapInteractions]);
+  }, [isMapReady, setupMapInteractions]);
 
-  // 6. Process Data Updates
+  // 5. Update Choropleth Colors using setFeatureState
   useEffect(() => {
-    if (!isMapReady || !mapRef.current || !baseGeoJSON || Object.keys(zipData).length === 0) return;
+    if (!isMapReady || !mapRef.current || !pmtilesLoaded || Object.keys(zipData).length === 0) return;
     
-    const currentDataKeys = Object.keys(zipData).sort().join(',');
-    if (processingRef.current || 
-       (lastProcessedMetric.current === selectedMetric && lastProcessedDataKeys.current === currentDataKeys)) {
+    const currentDataKeys = Object.keys(zipData).length.toString();
+    if (lastProcessedMetric.current === selectedMetric && lastProcessedDataKeys.current === currentDataKeys) {
       return;
     }
 
     lastProcessedMetric.current = selectedMetric;
     lastProcessedDataKeys.current = currentDataKeys;
-    processingRef.current = true;
 
-    if (abortControllerRef.current) abortControllerRef.current.abort();
-    abortControllerRef.current = new AbortController();
+    const map = mapRef.current;
 
-    (async () => {
-      try {
-        console.log("[MapLibreMap] Processing data...");
-        const processed = await processData({
-          type: "PROCESS_GEOJSON",
-          data: { geojson: baseGeoJSON, zipData, selectedMetric },
-        });
+    console.log("[MapLibreMap] Updating choropleth colors...");
+    
+    // Compute quantile buckets from current data
+    const values = Object.values(zipData).map(d => getMetricValue(d, selectedMetric));
+    const buckets = computeQuantileBuckets(values);
+    
+    if (buckets.length === 0) {
+      console.warn("[MapLibreMap] No valid data for choropleth");
+      return;
+    }
 
-        if (abortControllerRef.current?.signal.aborted) return;
+    // Build step expression for choropleth coloring
+    // Use feature-state for dynamic coloring based on zipData
+    const stepExpression: any[] = [
+      "step",
+      ["coalesce", ["feature-state", "metricValue"], 0],
+      "transparent", // Default for no data
+      0.001, // Threshold for "has data"
+      CHOROPLETH_COLORS[0],
+      ...buckets.flatMap((threshold, i) => [threshold, CHOROPLETH_COLORS[Math.min(i + 1, CHOROPLETH_COLORS.length - 1)]])
+    ];
 
-        const map = mapRef.current;
-        if (map && map.getSource("zips")) {
-          (map.getSource("zips") as maplibregl.GeoJSONSource).setData({
-            type: "FeatureCollection",
-            features: processed.features ?? [],
-          });
+    // Set feature states for each ZIP code
+    for (const [zipCode, data] of Object.entries(zipData)) {
+      const metricValue = getMetricValue(data, selectedMetric);
+      map.setFeatureState(
+        { source: "zips", sourceLayer: "us_zip_codes", id: zipCode },
+        { metricValue }
+      );
+    }
 
-          if (processed.bucketExpression) {
-            map.setPaintProperty("zips-fill", "fill-color", processed.bucketExpression);
-          }
-          console.log("[MapLibreMap] Data updated on map");
-        }
-      } catch (err) {
-        console.error("Data process failed", err);
-      } finally {
-        processingRef.current = false;
-      }
-    })();
-  }, [isMapReady, baseGeoJSON, zipData, selectedMetric, processData]);
+    // Update paint property with step expression
+    map.setPaintProperty("zips-fill", "fill-color", stepExpression);
+    
+    console.log(`[MapLibreMap] Choropleth updated for ${Object.keys(zipData).length} ZIPs, ${buckets.length} buckets`);
+  }, [isMapReady, pmtilesLoaded, zipData, selectedMetric]);
 
-  // 7. Fly to Search
+  // 6. Fly to Search
   useEffect(() => {
     if (!isMapReady || !mapRef.current || !searchZip || !zipData[searchZip]) return;
     const { longitude, latitude } = zipData[searchZip];

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useDataWorker } from "@/hooks/useDataWorker";
 import { ZipData } from "./map/types";
 import { MapExport } from "@/components/MapExport";
+import { buildSpatialIndex } from "@/lib/spatial-index";
 
 import { TopBar } from "./TopBar";
 import { MapLibreMap } from "./MapLibreMap";
@@ -9,6 +10,7 @@ import { Legend } from "./Legend";
 import { SponsorBanner } from "./SponsorBanner";
 import { Sidebar } from "./Sidebar";
 import { MetricType } from "./MetricSelector";
+
 interface DataPayload { 
   last_updated_utc: string;
   zip_codes: Record<string, ZipData>;
@@ -23,7 +25,6 @@ export function HousingDashboard() {
   const [searchZip, setSearchZip] = useState<string>("");
   const [zipData, setZipData] = useState<Record<string, ZipData>>({});
   const [dataBounds, setDataBounds] = useState<{ min: number; max: number } | null>(null);
-  const [fullGeoJSON, setFullGeoJSON] = useState<GeoJSON.FeatureCollection | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed] = useState(false);
   const [showSponsorBanner, setShowSponsorBanner] = useState(false);
@@ -40,8 +41,7 @@ export function HousingDashboard() {
       console.log('[HousingDashboard] Starting initial data load');
       
       const dataUrl = new URL(`${BASE_PATH}data/zip-data.json`, window.location.origin).href;
-      const geoJsonUrl = new URL(`${BASE_PATH}data/us-zip-codes.geojson`, window.location.origin).href;
-      console.log('[HousingDashboard] Data URLs:', { dataUrl, geoJsonUrl });
+      console.log('[HousingDashboard] Data URL:', dataUrl);
 
       try {
         console.log('[HousingDashboard] Calling processData for ZIP data');
@@ -59,26 +59,18 @@ export function HousingDashboard() {
           console.log(`[HousingDashboard] ZIP data loaded: ${Object.keys(result.zip_codes).length} ZIPs`);
           setZipData(result.zip_codes);
           setDataBounds(result.bounds);
+          
+          // Build spatial index for efficient lookups (async, non-blocking)
+          setTimeout(() => {
+            buildSpatialIndex(result.zip_codes);
+          }, 100);
         }
 
-        console.log('[HousingDashboard] Fetching GeoJSON');
-        const geoResponse = await fetch(geoJsonUrl);
-        if (!geoResponse.ok) throw new Error(`Failed to fetch GeoJSON: ${geoResponse.status}`);
-
-        if (!isMounted) {
-          console.log('[HousingDashboard] Component unmounted after GeoJSON fetch, aborting');
-          return;
-        }
-
-        const geoData = await geoResponse.json();
-        console.log(`[HousingDashboard] GeoJSON loaded: ${geoData.features?.length || 0} features`);
-        if (!isMounted) return;
-        setFullGeoJSON(geoData);
         console.log('[HousingDashboard] Initial data load complete');
-            } catch (error) {
+      } catch (error) {
         console.error("[HousingDashboard] Failed to load initial data:", error);
-            }
-          };
+      }
+    };
     loadInitialData();
     const timer = setTimeout(() => setShowSponsorBanner(true), 30000);
     
@@ -102,7 +94,6 @@ export function HousingDashboard() {
       <TopBar selectedMetric={selectedMetric} onMetricChange={setSelectedMetric} onSearch={setSearchZip}>
         <MapExport 
           allZipData={zipData} 
-          fullGeoJSON={fullGeoJSON} 
           selectedMetric={selectedMetric}
           onExportModeChange={setIsExportMode}
         />
@@ -117,7 +108,7 @@ export function HousingDashboard() {
               searchZip={searchZip}
               zipData={zipData}
               colorScaleDomain={dataBounds ? [dataBounds.min, dataBounds.max] : null}
-              isLoading={isLoading || !fullGeoJSON}
+              isLoading={isLoading}
               processData={processData}
             />
           </div>

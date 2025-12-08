@@ -1,5 +1,5 @@
-import { useRef, useCallback, useMemo } from "react";
-import { ExportMap } from "./ExportMap";
+import { useRef, useCallback, useMemo, useEffect, useState } from "react";
+import { ExportPreviewMap } from "./ExportPreviewMap";
 import { Legend } from "./Legend";
 import { DomapusLogo } from "@/components/ui/domapus-logo";
 import { ZipData } from "./map/types";
@@ -9,7 +9,6 @@ import jsPDF from "jspdf";
 
 interface ExportRendererProps {
   filteredData: ZipData[];
-  filteredGeoJSON: GeoJSON.FeatureCollection | null;
   selectedMetric: string;
   exportOptions: ExportOptions;
   onExportComplete: () => void;
@@ -17,64 +16,71 @@ interface ExportRendererProps {
 
 export function ExportRenderer({
   filteredData,
-  filteredGeoJSON,
   selectedMetric,
   exportOptions,
   onExportComplete,
 }: ExportRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [mapReady, setMapReady] = useState(false);
 
-  const handleRenderComplete = useCallback(async () => {
-    if (!containerRef.current) {
-      console.error("[ExportRenderer] Export failed: Render container not found.");
-      onExportComplete();
-      return;
-    }
-    console.log('[ExportRenderer] Starting export render process');
-    try {
-      // High DPI scale: 4x for crisp output
-      const scale = 4;
-      console.log(`[ExportRenderer] Capturing canvas with html2canvas at ${scale}x scale`);
+  const handleMapRenderComplete = useCallback(() => {
+    console.log('[ExportRenderer] Map render complete');
+    setMapReady(true);
+  }, []);
+
+  // Wait for map to be ready, then capture
+  useEffect(() => {
+    if (!mapReady || !containerRef.current) return;
+
+    const captureExport = async () => {
+      console.log('[ExportRenderer] Starting export capture');
       
-      const canvas = await html2canvas(containerRef.current, {
-        scale, 
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-      });
-      console.log(`[ExportRenderer] Canvas captured: ${canvas.width}x${canvas.height}`);
+      // Give a small delay for final paint
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      if (exportOptions.fileFormat === "png") {
-        console.log('[ExportRenderer] Exporting as PNG');
-        const link = document.createElement("a");
-        link.download = `domapus-map-${selectedMetric}.png`;
-        link.href = canvas.toDataURL("image/png", 1.0);
-        link.click();
-      } else {
-        console.log('[ExportRenderer] Exporting as high-DPI PDF');
-        const imgData = canvas.toDataURL("image/png", 1.0);
+      try {
+        const scale = 4;
+        console.log(`[ExportRenderer] Capturing canvas at ${scale}x scale`);
         
-        // PDF at 300 DPI: convert pixel dimensions to points (72 DPI)
-        // Scale factor from screen (96 DPI * render scale) to PDF points
-        const pdfWidth = canvas.width / scale * 0.75; // Convert to points (72/96)
-        const pdfHeight = canvas.height / scale * 0.75;
-        
-        const pdf = new jsPDF({ 
-          orientation: pdfWidth > pdfHeight ? "landscape" : "portrait", 
-          unit: "pt", 
-          format: [pdfWidth, pdfHeight] 
+        const canvas = await html2canvas(containerRef.current!, {
+          scale, 
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          logging: false,
         });
+        console.log(`[ExportRenderer] Canvas captured: ${canvas.width}x${canvas.height}`);
         
-        // Add high-res image scaled to fit PDF page
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-        pdf.save(`domapus-map-${selectedMetric}.pdf`);
+        if (exportOptions.fileFormat === "png") {
+          console.log('[ExportRenderer] Exporting as PNG');
+          const link = document.createElement("a");
+          link.download = `domapus-map-${selectedMetric}.png`;
+          link.href = canvas.toDataURL("image/png", 1.0);
+          link.click();
+        } else {
+          console.log('[ExportRenderer] Exporting as high-DPI PDF');
+          const imgData = canvas.toDataURL("image/png", 1.0);
+          
+          const pdfWidth = canvas.width / scale * 0.75;
+          const pdfHeight = canvas.height / scale * 0.75;
+          
+          const pdf = new jsPDF({ 
+            orientation: pdfWidth > pdfHeight ? "landscape" : "portrait", 
+            unit: "pt", 
+            format: [pdfWidth, pdfHeight] 
+          });
+          
+          pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+          pdf.save(`domapus-map-${selectedMetric}.pdf`);
+        }
+      } catch (error) {
+        console.error("[ExportRenderer] Export failed:", error);
+      } finally {
+        onExportComplete();
       }
-    } catch (error) {
-      console.error("[ExportRenderer] Export failed during screenshot process:", error);
-    } finally {
-      onExportComplete();
-    }
-  }, [exportOptions, selectedMetric, onExportComplete]);
+    };
+
+    captureExport();
+  }, [mapReady, exportOptions, selectedMetric, onExportComplete]);
 
   const getMetricDisplayName = (metric: string): string => {
     const metricNames: Record<string, string> = { 
@@ -94,11 +100,9 @@ export function ExportRenderer({
   
   const getCurrentDate = (): string => new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
-  // Extract values for the legend
   const metricValues = useMemo(() => {
-    const dataKey = selectedMetric.replace(/-/g, "_") as keyof ZipData;
     return filteredData
-      .map((d) => d[dataKey] as number)
+      .map((d) => d[selectedMetric as keyof ZipData] as number)
       .filter((v) => typeof v === "number" && v > 0);
   }, [filteredData, selectedMetric]);
 
@@ -106,7 +110,7 @@ export function ExportRenderer({
     <div 
         ref={containerRef} 
         className="fixed top-0 left-0 w-[1200px] h-[900px] bg-white p-8 flex flex-col font-sans" 
-        style={{ transform: "translateX(-9999px)" }} // Keep off-screen
+        style={{ transform: "translateX(-9999px)" }}
     >
       {exportOptions.includeTitle && (
         <header className="text-center mb-6">
@@ -116,14 +120,13 @@ export function ExportRenderer({
       )}
 
       <main className="flex-grow border border-gray-200 rounded-xl overflow-hidden bg-gray-50 relative shadow-sm">
-        {filteredGeoJSON && filteredData.length > 0 ? (
+        {filteredData.length > 0 ? (
           <>
-            <ExportMap
+            <ExportPreviewMap
               filteredData={filteredData}
-              geoJSON={filteredGeoJSON}
               selectedMetric={selectedMetric}
               regionScope={exportOptions.regionScope}
-              onRenderComplete={handleRenderComplete}
+              onRenderComplete={handleMapRenderComplete}
             />
             {exportOptions.includeLegend && (
               <div className="absolute bottom-6 right-6 w-72">
