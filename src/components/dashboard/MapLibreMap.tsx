@@ -275,6 +275,7 @@ export function MapLibreMap({
       map.addSource("zips", {
         type: "vector",
         url: `pmtiles://${pmtilesUrl}`,
+        promoteId: "ZCTA5CE20"
       });
 
       const layers = map.getStyle().layers;
@@ -309,8 +310,13 @@ export function MapLibreMap({
 
   // 5. Update Choropleth Colors using setFeatureState
   useEffect(() => {
-    if (!isMapReady || !mapRef.current || !pmtilesLoaded || Object.keys(zipData).length === 0) return;
-    
+    if (!isMapReady || !mapRef.current || !pmtilesLoaded) return;
+    const map = mapRef.current;
+    const src = map.getSource("zips") as any;
+    if (!src || !src._loaded) return;
+    if (!map.getLayer("zips-fill")) return;
+    if (Object.keys(zipData).length === 0) return;
+      
     const currentDataKeys = Object.keys(zipData).length.toString();
     if (lastProcessedMetric.current === selectedMetric && lastProcessedDataKeys.current === currentDataKeys) {
       return;
@@ -318,8 +324,6 @@ export function MapLibreMap({
 
     lastProcessedMetric.current = selectedMetric;
     lastProcessedDataKeys.current = currentDataKeys;
-
-    const map = mapRef.current;
 
     console.log("[MapLibreMap] Updating choropleth colors...");
     

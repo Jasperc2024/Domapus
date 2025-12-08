@@ -1,5 +1,5 @@
 import { ZipData } from "../components/dashboard/map/types";
-import { WorkerMessage, LoadDataRequest, ProcessGeoJSONRequest } from "./worker-types";
+import { WorkerMessage, LoadDataRequest } from "./worker-types";
 
 let currentAbortController: AbortController | null = null;
 
@@ -135,48 +135,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         self.postMessage({ type: "DATA_PROCESSED", id, data: { zip_codes: zipData, last_updated_utc, bounds } });
         break;
       }
-
-      case "PROCESS_GEOJSON": {
-        const { geojson, zipData, selectedMetric } = data as ProcessGeoJSONRequest;
-        if (!geojson?.features) throw new Error("Invalid GeoJSON");
-        console.log(`[Worker] Processing GeoJSON: ${geojson.features.length} features, metric: ${selectedMetric}`);
-
-        self.postMessage({ type: "PROGRESS", data: { phase: "Processing features..." } });
-
-        const indexedFeatures: GeoJSON.Feature[] = [];
-
-        for (let f of geojson.features) {
-          if (signal.aborted) return;
-          const zipCode = f.properties?.ZCTA5CE20;
-          if (!zipCode || !zipData[zipCode]) continue;
-          geoJSONIndex[zipCode] = f;
-          indexedFeatures.push(f);
-        }
-        
-        const visibleFeatures = indexedFeatures;
-
-        // Bucket coloring with more granular steps for smoother choropleth
-        const values = Object.values(zipData).map(d => getMetricValue(d, selectedMetric));
-        const buckets = getMetricBuckets(values);
-        
-        // Attach metric value to each feature for color expression
-        const enrichedFeatures = visibleFeatures.map((f: GeoJSON.Feature) => ({
-          ...f,
-          properties: {
-            ...f.properties,
-            metricValue: getMetricValue(zipData[f.properties!.ZCTA5CE20], selectedMetric)
-          }
-        }));
-        
-        const expression: any[] = ["step", ["get", "metricValue"], bucketColor(0), ...buckets.flatMap((v, i) => [v, bucketColor(i + 1)])];
-        console.log(`[Worker] GeoJSON processed: ${enrichedFeatures.length} features, ${buckets.length} buckets, color steps applied`);
-
-        self.postMessage({ type: "GEOJSON_PROCESSED", id, data: { type: "FeatureCollection", features: enrichedFeatures, bucketExpression: expression } });
-        break;
-      }
-
-      default:
-        throw new Error(`Unknown type: ${type}`);
     }
   } catch (err) {
     if (!signal.aborted) {
@@ -186,8 +144,4 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   }
 };
 
-// --- Helper: choropleth color palette (light yellow to deep purple) ---
-function bucketColor(i: number) {
-  const palette = ["#FFF9B0", "#FFEB84", "#FFD166", "#FF9A56", "#E84C61", "#C13584", "#7B2E8D", "#2E0B59"];
-  return palette[Math.min(i, palette.length - 1)];
-}
+
