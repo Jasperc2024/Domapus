@@ -242,15 +242,6 @@ def main():
             json.dump(update_info, f, indent=2)
             f.flush()
         logging.info(f"Successfully wrote update stats to {last_updated_path}")
-
-        # Log a random sample for verification
-        if output_data_content:
-            sample_zip = random.choice(list(output_data_content.keys()))
-            pretty_sample = json.dumps({sample_zip: output_data_content[sample_zip]}, indent=2)
-            print("\n--- Verification Sample ---"); print(pretty_sample); print("-------------------------")
-            logging.info(f"Verification sample for ZIP {sample_zip}:\n{pretty_sample}")
-        
-        logging.info("--- Data Pipeline Run Finished Successfully ---")
             
     except Exception as e:
         logging.error(f"An error occurred during the main processing block: {e}")
