@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { ExportMap } from "./ExportMap";
+import { ExportPreviewMap } from "./ExportPreviewMap";
 import { Legend } from "./Legend";
 import { cn } from "@/lib/utils";
 
@@ -22,14 +22,13 @@ export interface ExportOptions {
 
 interface ExportSidebarProps {
   allZipData: Record<string, ZipData>;
-  fullGeoJSON: GeoJSON.FeatureCollection | null;
   selectedMetric: string;
   isExporting: boolean;
   onExport: (options: ExportOptions) => void;
   onCancel: () => void;
 }
 
-export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExporting, onExport, onCancel }: ExportSidebarProps) {
+export function ExportSidebar({ allZipData, selectedMetric, isExporting, onExport, onCancel }: ExportSidebarProps) {
   const [regionScope, setRegionScope] = useState<"national" | "state" | "metro">("national");
   const [selectedState, setSelectedState] = useState<string>("");
   const [selectedMetro, setSelectedMetro] = useState<string>("");
@@ -77,7 +76,6 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
     
     const metros = Array.from(metroSet).sort();
     
-    // Filter based on the DEBOUNCED search term
     const filtered = debouncedMetroSearch 
       ? metros.filter(m => m.toLowerCase().includes(debouncedMetroSearch.toLowerCase()))
       : metros;
@@ -85,15 +83,12 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
     return { availableStates: Array.from(stateSet).sort(), filteredMetros: filtered };
   }, [allZipData, debouncedMetroSearch]);
 
-  // If user selects "Metro" scope but hasn't typed anything, show all (or top) metros initially?
-  // Or keep list closed until they focus. We'll show list if open.
-
-  const { filteredData, filteredGeoJSON } = useMemo(() => {
-    if (Object.keys(allZipData).length === 0 || !fullGeoJSON) {
-      return { filteredData: [], filteredGeoJSON: null };
+  const filteredData = useMemo(() => {
+    if (Object.keys(allZipData).length === 0) {
+      return [];
     }
     
-    const filteredZips = Object.values(allZipData).filter(zip => {
+    return Object.values(allZipData).filter(zip => {
       if (regionScope === 'state' && selectedState) {
         return zip.state === selectedState;
       }
@@ -102,17 +97,7 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
       }
       return true;
     });
-
-    const filteredZipCodes = new Set(filteredZips.map(z => z.zipCode));
-    const filteredFeatures = fullGeoJSON.features.filter(f =>
-      filteredZipCodes.has(f.properties?.zipCode)
-    );
-
-    return {
-      filteredData: filteredZips,
-      filteredGeoJSON: { type: "FeatureCollection", features: filteredFeatures } as GeoJSON.FeatureCollection
-    };
-  }, [allZipData, fullGeoJSON, regionScope, selectedState, selectedMetro]);
+  }, [allZipData, regionScope, selectedState, selectedMetro]);
 
   const handleExportClick = () => {
     onExport({ regionScope, selectedState, selectedMetro, fileFormat, includeLegend, includeTitle });
@@ -127,7 +112,6 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
 
   const handleScopeChange = (value: string) => {
     setRegionScope(value as "national" | "state" | "metro");
-    // Reset selections when switching scopes to avoid confusion
     if (value !== 'metro') {
       setIsMetroListOpen(false);
     }
@@ -137,7 +121,7 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
 
   const selectMetro = (metroName: string) => {
     setSelectedMetro(metroName);
-    setMetroSearch(metroName); // Update input to show full name
+    setMetroSearch(metroName);
     setIsMetroListOpen(false);
   };
 
@@ -176,7 +160,6 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
               </Select>
             )}
 
-            {/* Custom Debounced Search for Metro */}
             {regionScope === 'metro' && (
               <div className="space-y-2 relative" ref={metroContainerRef}>
                 <div className="relative">
@@ -188,7 +171,7 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
                       setMetroSearch(e.target.value);
                       setIsMetroListOpen(true);
                       if (selectedMetro && e.target.value !== selectedMetro) {
-                        setSelectedMetro(""); // Clear selection if user modifies text
+                        setSelectedMetro("");
                       }
                     }}
                     onFocus={() => setIsMetroListOpen(true)}
@@ -204,7 +187,6 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
                   )}
                 </div>
                 
-                {/* Suggestions Dropdown */}
                 {isMetroListOpen && (
                   <div className="absolute z-10 w-full mt-1 bg-popover text-popover-foreground border rounded-md shadow-md max-h-[250px] overflow-y-auto">
                     {filteredMetros.length > 0 ? (
@@ -281,11 +263,10 @@ export function ExportSidebar({ allZipData, fullGeoJSON, selectedMetric, isExpor
             </header>
           )}
           <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 relative">
-            {filteredGeoJSON && filteredData.length > 0 ? (
+            {filteredData.length > 0 ? (
               <>
-                <ExportMap
+                <ExportPreviewMap
                   filteredData={filteredData}
-                  geoJSON={filteredGeoJSON}
                   selectedMetric={selectedMetric}
                   regionScope={regionScope}
                 />

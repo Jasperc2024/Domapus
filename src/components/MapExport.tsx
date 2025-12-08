@@ -9,21 +9,20 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MapExportProps {
   allZipData: Record<string, ZipData>;
-  fullGeoJSON: GeoJSON.FeatureCollection | null;
   selectedMetric: string;
   onExportModeChange: (isExportMode: boolean) => void;
 }
 
-export function MapExport({ allZipData, fullGeoJSON, selectedMetric, onExportModeChange }: MapExportProps) {
+export function MapExport({ allZipData, selectedMetric, onExportModeChange }: MapExportProps) {
   const [isExportMode, setIsExportMode] = useState(false);
   const [exportOptions, setExportOptions] = useState<ExportOptions | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportTimeoutId, setExportTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const isMobile = useIsMobile();
 
-  const { filteredData, filteredGeoJSON } = useMemo(() => {
-    if (!exportOptions || Object.keys(allZipData).length === 0 || !fullGeoJSON) {
-      return { filteredData: [], filteredGeoJSON: null };
+  const { filteredData } = useMemo(() => {
+    if (!exportOptions || Object.keys(allZipData).length === 0) {
+      return { filteredData: [] };
     }
     
     const filteredZips = Object.values(allZipData).filter(zip => {
@@ -36,16 +35,8 @@ export function MapExport({ allZipData, fullGeoJSON, selectedMetric, onExportMod
       return true;
     });
 
-    const filteredZipCodes = new Set(filteredZips.map(z => z.zipCode));
-    const filteredFeatures = fullGeoJSON.features.filter(f =>
-      filteredZipCodes.has(f.properties?.zipCode)
-    );
-
-    return {
-      filteredData: filteredZips,
-      filteredGeoJSON: { type: "FeatureCollection", features: filteredFeatures } as GeoJSON.FeatureCollection
-    };
-  }, [allZipData, fullGeoJSON, exportOptions]);
+    return { filteredData: filteredZips };
+  }, [allZipData, exportOptions]);
 
   useEffect(() => {
     return () => {
@@ -57,7 +48,6 @@ export function MapExport({ allZipData, fullGeoJSON, selectedMetric, onExportMod
     setExportOptions(options);
     setIsExporting(true);
     
-    // Set timeout for 60 seconds
     const timeoutId = setTimeout(() => {
       if (isExporting) {
         setIsExporting(false);
@@ -80,7 +70,6 @@ export function MapExport({ allZipData, fullGeoJSON, selectedMetric, onExportMod
       title: "Export Complete",
       description: "Your map has been downloaded successfully.",
     });
-    // Keep in export mode so user can export again with different settings
   };
 
   const handleCancelExport = () => {
@@ -100,7 +89,6 @@ export function MapExport({ allZipData, fullGeoJSON, selectedMetric, onExportMod
       <>
         <ExportSidebar
           allZipData={allZipData}
-          fullGeoJSON={fullGeoJSON}
           selectedMetric={selectedMetric}
           isExporting={isExporting}
           onExport={handleStartExport}
@@ -109,7 +97,6 @@ export function MapExport({ allZipData, fullGeoJSON, selectedMetric, onExportMod
         
         {isExporting && (
           <>
-            {/* Processing overlay */}
             <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center">
               <div className="bg-white p-8 rounded-lg shadow-lg border text-center space-y-4">
                 <div role="progressbar" aria-label="Generating export" className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
@@ -122,10 +109,8 @@ export function MapExport({ allZipData, fullGeoJSON, selectedMetric, onExportMod
               </div>
             </div>
             
-            {/* Hidden renderer */}
             <ExportRenderer
               filteredData={filteredData}
-              filteredGeoJSON={filteredGeoJSON}
               selectedMetric={selectedMetric}
               exportOptions={exportOptions!}
               onExportComplete={handleExportComplete}
@@ -136,11 +121,10 @@ export function MapExport({ allZipData, fullGeoJSON, selectedMetric, onExportMod
     );
   }
 
-  // Export button
   return (
-  <Button variant="outline" size="sm" onClick={() => setIsExportMode(true)}>
-    <Download className="h-4 w-4 mr-2" />
-    {!isMobile && <span>Export</span>}
-  </Button>
-);
+    <Button variant="outline" size="sm" onClick={() => setIsExportMode(true)}>
+      <Download className="h-4 w-4 mr-2" />
+      {!isMobile && <span>Export</span>}
+    </Button>
+  );
 }
