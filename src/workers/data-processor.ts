@@ -10,43 +10,6 @@ export function getMetricValue(data: ZipData, metric: string): number {
   return typeof value === "number" && isFinite(value) ? value : 0;
 }
 
-// --- Worker state ---
-let geoJSONIndex: Record<string, GeoJSON.Feature> = {};
-
-// --- Bucketed expression for choropleth coloring ---
-function getMetricBuckets(values: number[], numBuckets = 8) {
-  const sorted = [...values].filter(v => v > 0).sort((a, b) => a - b);
-  if (sorted.length === 0) return [];
-
-  const minVal = sorted[0];
-  const maxVal = sorted[sorted.length - 1];
-
-  // If all values are the same, return a single threshold
-  if (minVal === maxVal) return [minVal];
-
-  const thresholds: number[] = [];
-  const epsilon = (maxVal - minVal) * 1e-6 || 1e-6; // small step relative to range
-
-  const q = (p: number) => {
-    const idx = Math.floor(p * (sorted.length - 1));
-    return sorted[idx];
-  };
-
-  for (let i = 1; i < numBuckets; i++) {
-    let val = q(i / numBuckets);
-
-    // enforce strictly increasing
-    if (thresholds.length && val <= thresholds[thresholds.length - 1]) {
-      val = thresholds[thresholds.length - 1] + epsilon;
-    }
-
-    thresholds.push(val);
-  }
-
-  console.log('[Worker] Computed thresholds:', thresholds);
-  return thresholds;
-}
-
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const { id, type, data } = e.data;
   console.log(`[Worker] Received message: ${type}`, { id, data });
