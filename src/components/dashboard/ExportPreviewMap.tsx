@@ -177,10 +177,11 @@ export function ExportPreviewMap({ filteredData, selectedMetric, regionScope, on
       mapsRef.current[key] = map;
 
       map.on('load', () => {
-        // Add PMTiles source
+        // Add PMTiles source with promoteId for feature state
         map.addSource("zips", {
           type: "vector",
           url: `pmtiles://${pmtilesUrl}`,
+          promoteId: "ZCTA5CE20"
         });
 
         // Build step expression for choropleth
