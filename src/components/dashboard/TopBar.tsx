@@ -9,7 +9,7 @@ const BASE_PATH = import.meta.env.BASE_URL;
 interface TopBarProps {
   selectedMetric: MetricType;
   onMetricChange: (metric: MetricType) => void;
-  onSearch: (zipCode: string) => void;
+  onSearch: (zipCode: string, trigger: number) => void;
   children?: React.ReactNode; // Optional buttons like <MapExport />
 }
 

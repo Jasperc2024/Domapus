@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useDataWorker } from "@/hooks/useDataWorker";
 import { ZipData } from "./map/types";
 import { MapExport } from "@/components/MapExport";
@@ -23,11 +23,13 @@ export function HousingDashboard() {
   const [selectedMetric, setSelectedMetric] = useState<MetricType>("median_sale_price");
   const [selectedZip, setSelectedZip] = useState<ZipData | null>(null);
   const [searchZip, setSearchZip] = useState<string>("");
+  const [searchTrigger, setSearchTrigger] = useState<number>(0);
   const [zipData, setZipData] = useState<Record<string, ZipData>>({});
   const [dataBounds, setDataBounds] = useState<{ min: number; max: number } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed] = useState(false);
   const [showSponsorBanner, setShowSponsorBanner] = useState(false);
+  const [isExportMode, setIsExportMode] = useState(false);
   
   const { processData, isLoading } = useDataWorker();
 
@@ -41,19 +43,14 @@ export function HousingDashboard() {
       console.log('[HousingDashboard] Starting initial data load');
       
       const dataUrl = new URL(`${BASE_PATH}data/zip-data.json`, window.location.origin).href;
-      console.log('[HousingDashboard] Data URL:', dataUrl);
 
       try {
-        console.log('[HousingDashboard] Calling processData for ZIP data');
         const result = await processData({
           type: 'LOAD_AND_PROCESS_DATA',
           data: { url: dataUrl, selectedMetric: 'median_sale_price' }
         }) as DataPayload;
 
-        if (!isMounted) {
-          console.log('[HousingDashboard] Component unmounted, aborting');
-          return;
-        }
+        if (!isMounted) return;
         
         if (result) {
           console.log(`[HousingDashboard] ZIP data loaded: ${Object.keys(result.zip_codes).length} ZIPs`);
@@ -65,8 +62,6 @@ export function HousingDashboard() {
             buildSpatialIndex(result.zip_codes);
           }, 100);
         }
-
-        console.log('[HousingDashboard] Initial data load complete');
       } catch (error) {
         console.error("[HousingDashboard] Failed to load initial data:", error);
       }
@@ -80,18 +75,22 @@ export function HousingDashboard() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Stable search handler that updates both zip and trigger
+  const handleSearch = useCallback((zip: string, trigger: number) => {
+    setSearchZip(zip);
+    setSearchTrigger(trigger);
+  }, []);
   
-  const handleZipSelect = (zip: ZipData) => { 
-    console.log('[HousingDashboard] ZIP selected:', zip.zipCode);
+  const handleZipSelect = useCallback((zip: ZipData) => { 
     setSelectedZip(zip); 
     setSidebarOpen(true); 
-  };
-  const [isExportMode, setIsExportMode] = useState(false);
+  }, []);
   
   return (
     <div className="w-full h-screen bg-dashboard-bg overflow-hidden flex flex-col">
       {showSponsorBanner && <SponsorBanner onClose={() => setShowSponsorBanner(false)} />}
-      <TopBar selectedMetric={selectedMetric} onMetricChange={setSelectedMetric} onSearch={setSearchZip}>
+      <TopBar selectedMetric={selectedMetric} onMetricChange={setSelectedMetric} onSearch={handleSearch}>
         <MapExport 
           allZipData={zipData} 
           selectedMetric={selectedMetric}
@@ -99,13 +98,22 @@ export function HousingDashboard() {
         />
       </TopBar>
       <div className="flex flex-1 relative h-full min-h-[400px]">
-        {sidebarOpen && <Sidebar isOpen={sidebarOpen} isCollapsed={sidebarCollapsed} zipData={selectedZip} allZipData={zipData} onClose={() => setSidebarOpen(false)} />}
+        {sidebarOpen && (
+          <Sidebar 
+            isOpen={sidebarOpen} 
+            isCollapsed={sidebarCollapsed} 
+            zipData={selectedZip} 
+            allZipData={zipData} 
+            onClose={() => setSidebarOpen(false)} 
+          />
+        )}
         <div className="flex-1 relative">
           <div className="absolute inset-0 min-h-[400px]">
             <MapLibreMap
               selectedMetric={selectedMetric}
               onZipSelect={handleZipSelect}
               searchZip={searchZip}
+              searchTrigger={searchTrigger}
               zipData={zipData}
               colorScaleDomain={dataBounds ? [dataBounds.min, dataBounds.max] : null}
               isLoading={isLoading}
