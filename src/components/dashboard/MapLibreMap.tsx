@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getMetricDisplay } from "./map/utils";
@@ -11,6 +11,7 @@ interface MapProps {
   selectedMetric: string;
   onZipSelect: (zipData: ZipData) => void;
   searchZip?: string;
+  searchTrigger?: number; // Increment this to force a new search even with same zip
   zipData: Record<string, ZipData>;
   colorScaleDomain: [number, number] | null;
   isLoading: boolean;
@@ -54,23 +55,24 @@ export function MapLibreMap({
   selectedMetric,
   onZipSelect,
   searchZip,
+  searchTrigger,
   zipData,
   isLoading,
 }: MapProps) {
-  console.log('[MapLibreMap] Component render');
-  
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const interactionsSetup = useRef(false);
   const [pmtilesLoaded, setPmtilesLoaded] = useState(false);
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const mousemoveRafRef = useRef<number | null>(null);
   const lastMouseEventRef = useRef<any>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const lastProcessedMetric = useRef<string>("");
   const lastProcessedDataKeys = useRef<string>("");
+  const highlightedZipRef = useRef<string | null>(null);
+  const containerSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Refs for current data to avoid stale closures
   const propsRef = useRef({ zipData, selectedMetric, onZipSelect });
@@ -78,9 +80,11 @@ export function MapLibreMap({
     propsRef.current = { zipData, selectedMetric, onZipSelect };
   }, [zipData, selectedMetric, onZipSelect]);
 
-  // 1. Initialize Map with PMTiles
+  // Memoize whether we have data to prevent unnecessary effects
+  const hasData = useMemo(() => Object.keys(zipData).length > 0, [zipData]);
+
+  // 1. Initialize Map with PMTiles (stable, only runs once)
   const createAndInitializeMap = useCallback((container: HTMLDivElement) => {
-    // Register PMTiles protocol
     addPMTilesProtocol();
     
     const map = new maplibregl.Map({
@@ -90,7 +94,8 @@ export function MapLibreMap({
       zoom: 3.5,
       minZoom: 3,
       maxZoom: 12,
-      attributionControl: false
+      attributionControl: false,
+      canvasContextAttributes: { preserveDrawingBuffer: true },
     });
 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
@@ -109,7 +114,7 @@ export function MapLibreMap({
     return map;
   }, []);
 
-  // 2. Setup Map Instance
+  // 2. Setup Map Instance (stable, with debounced resize)
   useEffect(() => {
     if (!mapContainer.current) return;
     if (mapRef.current) return;
@@ -124,23 +129,47 @@ export function MapLibreMap({
       try {
         const m = createAndInitializeMap(container);
         mapRef.current = m;
+        containerSizeRef.current = { width: container.clientWidth, height: container.clientHeight };
       } catch (err) {
         console.error("Map init failed", err);
       }
     };
 
-    const ro = new ResizeObserver(() => {
-      tryInit();
-      mapRef.current?.resize();
-    });
-    resizeObserverRef.current = ro;
+    // Debounced resize handler to prevent constant re-renders
+    const handleResize = () => {
+      if (!mapRef.current || didUnmount) return;
+      
+      const newWidth = container.clientWidth;
+      const newHeight = container.clientHeight;
+      
+      // Only resize if dimensions actually changed significantly (> 5px)
+      const widthDiff = Math.abs(newWidth - containerSizeRef.current.width);
+      const heightDiff = Math.abs(newHeight - containerSizeRef.current.height);
+      
+      if (widthDiff > 5 || heightDiff > 5) {
+        if (resizeTimeoutRef.current) {
+          clearTimeout(resizeTimeoutRef.current);
+        }
+        
+        resizeTimeoutRef.current = setTimeout(() => {
+          if (!didUnmount && mapRef.current) {
+            containerSizeRef.current = { width: newWidth, height: newHeight };
+            mapRef.current.resize();
+          }
+        }, 150); // Debounce resize by 150ms
+      }
+    };
+
+    const ro = new ResizeObserver(handleResize);
     ro.observe(container);
     tryInit();
 
     return () => {
       didUnmount = true;
       ro.disconnect();
-      resizeObserverRef.current = null;
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
       if (mousemoveRafRef.current) {
         cancelAnimationFrame(mousemoveRafRef.current);
         mousemoveRafRef.current = null;
@@ -151,7 +180,6 @@ export function MapLibreMap({
       }
       if (mapRef.current) {
         try {
-          console.log('[MapLibreMap] Removing map instance');
           mapRef.current.remove();
         } catch (err) {
           console.warn("[MapLibreMap] error removing map", err);
@@ -169,7 +197,6 @@ export function MapLibreMap({
     if (!map || interactionsSetup.current) return;
 
     const layerId = "zips-fill";
-    console.log(`[MapLibreMap] Setting up interactions for layer: ${layerId}`);
 
     const mousemoveHandler = (e: any) => {
       lastMouseEventRef.current = e;
@@ -191,7 +218,6 @@ export function MapLibreMap({
           }
 
           const props = features[0].properties ?? {};
-          // PMTiles uses ZCTA5CE20 as the zip code attribute
           const zipCode = props.ZCTA5CE20 || props.zipCode || props.id;
           
           const { zipData: currentZipData, selectedMetric: currentMetric } = propsRef.current;
@@ -228,18 +254,14 @@ export function MapLibreMap({
       
       const { zipData: currentZipData, onZipSelect: currentOnSelect } = propsRef.current;
 
-      console.log(`[MapLibreMap] Clicked ZIP: ${zipCode}`);
-
       if (zipCode && currentZipData[zipCode]) {
         currentOnSelect(currentZipData[zipCode]);
-      } else {
-        console.warn(`[MapLibreMap] ZIP ${zipCode} found on map but missing in zipData`);
       }
     };
 
     const mouseoutHandler = () => {
-        map.getCanvas().style.cursor = "";
-        popupRef.current?.remove();
+      map.getCanvas().style.cursor = "";
+      popupRef.current?.remove();
     };
 
     map.on("mousemove", mousemoveHandler);
@@ -249,7 +271,7 @@ export function MapLibreMap({
     interactionsSetup.current = true;
   }, []);
 
-  // 4. Add PMTiles Source & Layer
+  // 4. Add PMTiles Source & Layer with zoom-dependent border width
   useEffect(() => {
     if (!isMapReady || !mapRef.current) return;
     const map = mapRef.current;
@@ -260,7 +282,6 @@ export function MapLibreMap({
       // Hide transportation layers for cleaner look
       const styleLayers = map.getStyle().layers;
       styleLayers.forEach((layer) => {
-        // Type guard for layers with source-layer property
         if ('source-layer' in layer) {
           const sourceLayer = layer['source-layer'] as string;
           if (sourceLayer === "transportation" || sourceLayer === "transportation_name") {
@@ -269,7 +290,6 @@ export function MapLibreMap({
         }
       });
 
-      console.log("[MapLibreMap] Adding PMTiles source...");
       const pmtilesUrl = new URL(`${BASE_PATH}data/us_zip_codes.pmtiles`, window.location.origin).href;
       
       map.addSource("zips", {
@@ -283,15 +303,38 @@ export function MapLibreMap({
       const labelLayer = layers.find((l) => l.id === "watername_ocean");
       if (labelLayer) beforeId = labelLayer.id;
 
+      // Fill layer
       map.addLayer({
         id: "zips-fill",
         type: "fill",
         source: "zips",
-        "source-layer": "us_zip_codes", // PMTiles layer name
+        "source-layer": "us_zip_codes",
         paint: {
-          "fill-color": "#cccccc", // Default gray, will be updated with choropleth
+          "fill-color": "#cccccc",
           "fill-opacity": 0.75,
-          "fill-outline-color": "rgba(0,0,0,0.08)"
+        }
+      }, beforeId);
+
+      // Border layer with zoom-dependent width
+      map.addLayer({
+        id: "zips-border",
+        type: "line",
+        source: "zips",
+        "source-layer": "us_zip_codes",
+        paint: {
+          "line-color": [
+            "case",
+            ["boolean", ["feature-state", "highlighted"], false],
+            "#ff6b35", // Highlight color for searched ZIP
+            "rgba(0,0,0,0.15)"
+          ],
+          "line-width": [
+            "interpolate", ["linear"], ["zoom"],
+            3, ["case", ["boolean", ["feature-state", "highlighted"], false], 2, 0.3],
+            6, ["case", ["boolean", ["feature-state", "highlighted"], false], 3, 0.6],
+            10, ["case", ["boolean", ["feature-state", "highlighted"], false], 4, 1.5],
+            12, ["case", ["boolean", ["feature-state", "highlighted"], false], 5, 2]
+          ]
         }
       }, beforeId);
 
@@ -310,12 +353,11 @@ export function MapLibreMap({
 
   // 5. Update Choropleth Colors using setFeatureState
   useEffect(() => {
-    if (!isMapReady || !mapRef.current || !pmtilesLoaded) return;
+    if (!isMapReady || !mapRef.current || !pmtilesLoaded || !hasData) return;
     const map = mapRef.current;
     const src = map.getSource("zips") as any;
     if (!src || !src._loaded) return;
     if (!map.getLayer("zips-fill")) return;
-    if (Object.keys(zipData).length === 0) return;
       
     const currentDataKeys = Object.keys(zipData).length.toString();
     if (lastProcessedMetric.current === selectedMetric && lastProcessedDataKeys.current === currentDataKeys) {
@@ -327,7 +369,6 @@ export function MapLibreMap({
 
     console.log("[MapLibreMap] Updating choropleth colors...");
     
-    // Compute quantile buckets from current data
     const values = Object.values(zipData).map(d => getMetricValue(d, selectedMetric));
     const buckets = computeQuantileBuckets(values);
     
@@ -336,18 +377,15 @@ export function MapLibreMap({
       return;
     }
 
-    // Build step expression for choropleth coloring
-    // Use feature-state for dynamic coloring based on zipData
     const stepExpression: any[] = [
       "step",
       ["coalesce", ["feature-state", "metricValue"], 0],
-      "transparent", // Default for no data
-      0.001, // Threshold for "has data"
+      "transparent",
+      0.001,
       CHOROPLETH_COLORS[0],
       ...buckets.flatMap((threshold, i) => [threshold, CHOROPLETH_COLORS[Math.min(i + 1, CHOROPLETH_COLORS.length - 1)]])
     ];
 
-    // Set feature states for each ZIP code
     for (const [zipCode, data] of Object.entries(zipData)) {
       const metricValue = getMetricValue(data, selectedMetric);
       map.setFeatureState(
@@ -356,20 +394,39 @@ export function MapLibreMap({
       );
     }
 
-    // Update paint property with step expression
     map.setPaintProperty("zips-fill", "fill-color", stepExpression);
     
-    console.log(`[MapLibreMap] Choropleth updated for ${Object.keys(zipData).length} ZIPs, ${buckets.length} buckets`);
-  }, [isMapReady, pmtilesLoaded, zipData, selectedMetric]);
+    console.log(`[MapLibreMap] Choropleth updated for ${Object.keys(zipData).length} ZIPs`);
+  }, [isMapReady, pmtilesLoaded, zipData, selectedMetric, hasData]);
 
-  // 6. Fly to Search
+  // 6. Fly to Search and Highlight ZIP - ALWAYS responsive to searchTrigger
   useEffect(() => {
-    if (!isMapReady || !mapRef.current || !searchZip || !zipData[searchZip]) return;
+    if (!isMapReady || !mapRef.current || !pmtilesLoaded) return;
+    if (!searchZip || !zipData[searchZip]) return;
+    
+    const map = mapRef.current;
     const { longitude, latitude } = zipData[searchZip];
-    if (longitude && latitude) {
-      mapRef.current.flyTo({ center: [longitude, latitude], zoom: 10 });
+    
+    // Clear previous highlight
+    if (highlightedZipRef.current && highlightedZipRef.current !== searchZip) {
+      map.setFeatureState(
+        { source: "zips", sourceLayer: "us_zip_codes", id: highlightedZipRef.current },
+        { highlighted: false }
+      );
     }
-  }, [isMapReady, searchZip, zipData]);
+    
+    // Set new highlight
+    map.setFeatureState(
+      { source: "zips", sourceLayer: "us_zip_codes", id: searchZip },
+      { highlighted: true }
+    );
+    highlightedZipRef.current = searchZip;
+    
+    // Always fly to the location when searchTrigger changes
+    if (longitude && latitude) {
+      map.flyTo({ center: [longitude, latitude], zoom: 10, duration: 1500 });
+    }
+  }, [isMapReady, pmtilesLoaded, searchZip, searchTrigger, zipData]);
 
   return (
     <div className="absolute inset-0 w-full h-full min-h-[400px]">

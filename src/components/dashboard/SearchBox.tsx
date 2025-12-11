@@ -1,26 +1,30 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 interface SearchBoxProps {
-  onSearch: (zipCode: string) => void;
+  onSearch: (zipCode: string, trigger: number) => void;
 }
 
 export function SearchBox({ onSearch }: SearchBoxProps) {
   const [searchValue, setSearchValue] = useState("");
+  const [searchTrigger, setSearchTrigger] = useState(0);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, "");
     setSearchValue(value);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (searchValue.trim()) {
-      onSearch(searchValue.trim()); // flyTo triggered ONLY here
+      // Increment trigger to force flyTo even if same ZIP
+      const newTrigger = searchTrigger + 1;
+      setSearchTrigger(newTrigger);
+      onSearch(searchValue.trim(), newTrigger);
     }
-  };
+  }, [searchValue, searchTrigger, onSearch]);
 
   return (
     <form onSubmit={handleSubmit} className="flex items-center space-x-2">
