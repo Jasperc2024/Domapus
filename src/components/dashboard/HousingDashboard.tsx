@@ -98,7 +98,7 @@ export function HousingDashboard() {
           onExportModeChange={setIsExportMode}
         />
       </TopBar>
-      <div className="flex flex-1 relative min-h-[400px]">
+      <div className="flex flex-1 relative h-full min-h-[400px]">
         {sidebarOpen && <Sidebar isOpen={sidebarOpen} isCollapsed={sidebarCollapsed} zipData={selectedZip} allZipData={zipData} onClose={() => setSidebarOpen(false)} />}
         <div className="flex-1 relative">
           <div className="absolute inset-0 min-h-[400px]">

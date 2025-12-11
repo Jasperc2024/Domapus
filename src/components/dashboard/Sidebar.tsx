@@ -64,7 +64,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
   .filter(metric => metric.value !== null && metric.value !== undefined);
 
   return (
-    <div className={`absolute left-0 top-14 bottom-0 bg-dashboard-panel border-r border-dashboard-border shadow-lg z-40 transition-all duration-300 ${isCollapsed ? "w-16" : "w-96"}`}>
+    <div className={`absolute left-0 bg-dashboard-panel border-r border-dashboard-border shadow-lg z-40 transition-all duration-300 h-full flex flex-col ${isCollapsed ? "w-16" : "w-96"}`}>
       <div 
         className="flex items-center justify-between px-3 py-2 border-b border-dashboard-border"
         role="banner"
@@ -91,7 +91,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
       </div>
             
       {!isCollapsed && (
-        <div className="flex flex-col h-full overflow-hidden">
+        <div className="flex flex-col flex-1 overflow-hidden min-h-0">
           {showComparison ? (
             <div className="p-4 flex-1 overflow-y-auto">
               <ZipComparison currentZip={zipData} allZipData={allZipData} onClose={() => setShowComparison(false)} />
