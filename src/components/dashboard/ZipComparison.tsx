@@ -68,11 +68,9 @@ export function ZipComparison({ currentZip, allZipData, onClose }: ZipComparison
     { key: "pending_sales", label: "Pending Sales", type: "number" },
     { key: "new_listings", label: "New Listings", type: "number" },
     { key: "inventory", label: "Inventory", type: "number" },
-    { key: "months_of_supply", label: "Months of Supply", type: "number" },
     { key: "median_dom", label: "Median Days on Market", type: "days" },
     { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", type: "ratio" },
     { key: "sold_above_list", label: "% Sold Above List", type: "percentage" },
-    { key: "price_drops", label: "% Price Drops", type: "percentage" },
     { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", type: "percentage" },
   ];
 

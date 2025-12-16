@@ -15,14 +15,16 @@ ROOT_DIR = Path(__file__).resolve().parent.parent       # /.../Domapus
 DATA_DIR = ROOT_DIR / "public" / "data"
 
 def load_zip_mapping_data(file_path=None):
-    """Loads the pre-cleaned ZIP to city, county, and coordinate mapping file."""
+    """Loads the pre-cleaned ZIP to city, county, metro and coordinate mapping file."""
     try:
         if file_path is None:
-            file_path = DATA_DIR / "zip-city-mapping.csv"
+            file_path = DATA_DIR / "zcta-meta.csv"
 
         logging.info(f"Loading ZIP mapping data from {file_path}...")
-        df = pd.read_csv(file_path, dtype={'ZipCode': str})
-        df.set_index('ZipCode', inplace=True)
+        
+        # CHANGED: Updated dtype and index to match the 'zcta' header from your snippet
+        df = pd.read_csv(file_path, dtype={'zcta': str})
+        df.set_index('zcta', inplace=True)
         logging.info(f"Successfully loaded {len(df)} unique mapping entries.")
         return df.to_dict('index')
 
@@ -53,7 +55,9 @@ def extract_zip_code(region_str):
 def get_full_column_mapping():
     """Defines the mapping for ALL Redfin columns to our snake_case standard."""
     return {
-        'STATE': 'state', 'PARENT_METRO_REGION': 'parent_metro', 'PERIOD_END': 'period_end',
+        'STATE': 'redfin_state', # Renamed to avoid conflict with CSV state, though we usually prefer CSV
+        'PARENT_METRO_REGION': 'redfin_metro', # Renamed to prioritize CSV metro
+        'PERIOD_END': 'period_end',
         'MEDIAN_SALE_PRICE': 'median_sale_price', 'MEDIAN_SALE_PRICE_MOM': 'median_sale_price_mom_pct', 'MEDIAN_SALE_PRICE_YOY': 'median_sale_price_yoy_pct',
         'MEDIAN_LIST_PRICE': 'median_list_price', 'MEDIAN_LIST_PRICE_MOM': 'median_list_price_mom_pct', 'MEDIAN_LIST_PRICE_YOY': 'median_list_price_yoy_pct',
         'MEDIAN_PPSF': 'median_ppsf', 'MEDIAN_PPSF_MOM': 'median_ppsf_mom_pct', 'MEDIAN_PPSF_YOY': 'median_ppsf_yoy_pct',
@@ -93,7 +97,7 @@ def format_final_json(df, zip_mapping):
     result = {}
     # Define the desired order of keys in the final JSON object
     key_order = [
-        'city', 'county', 'state', 'parent_metro', 'latitude', 'longitude', 'period_end',
+        'city', 'county', 'state', 'metro', 'latitude', 'longitude', 'period_end',
         'median_sale_price', 'median_sale_price_mom_pct', 'median_sale_price_yoy_pct',
         'median_list_price', 'median_list_price_mom_pct', 'median_list_price_yoy_pct',
         'median_ppsf', 'median_ppsf_mom_pct', 'median_ppsf_yoy_pct',
@@ -101,11 +105,9 @@ def format_final_json(df, zip_mapping):
         'pending_sales', 'pending_sales_mom_pct', 'pending_sales_yoy_pct',
         'new_listings', 'new_listings_mom_pct', 'new_listings_yoy_pct',
         'inventory', 'inventory_mom_pct', 'inventory_yoy_pct',
-        'months_of_supply', 'months_of_supply_mom_pct', 'months_of_supply_yoy_pct',
         'median_dom', 'median_dom_mom_pct', 'median_dom_yoy_pct',
         'avg_sale_to_list_ratio', 'avg_sale_to_list_mom_pct', 'avg_sale_to_list_ratio_yoy_pct',
         'sold_above_list', 'sold_above_list_mom_pct', 'sold_above_list_yoy_pct',
-        'price_drops', 'price_drops_mom_pct', 'price_drops_yoy_pct',
         'off_market_in_two_weeks', 'off_market_in_two_weeks_mom_pct', 'off_market_in_two_weeks_yoy_pct'
     ]
     
@@ -113,26 +115,28 @@ def format_final_json(df, zip_mapping):
         zip_code = row['zip_code']
         raw_data = row.to_dict()
         
-        # Add data from the ZIP code mapping
+        # Add data from the ZIP code mapping (CSV)
+        # CHANGED: Updated keys to match the CSV headers (zcta,state,metro,county,city,lat,lng)
         if zip_mapping and zip_code in zip_mapping:
             zip_info = zip_mapping[zip_code]
-            raw_data['city'] = zip_info.get('City')
-            raw_data['county'] = zip_info.get('CountyName')
-            raw_data['latitude'] = zip_info.get('latitude')
-            raw_data['longitude'] = zip_info.get('longitude')
+            raw_data['city'] = zip_info.get('city')
+            raw_data['county'] = zip_info.get('county')
+            raw_data['state'] = zip_info.get('state')  # Overwrites Redfin state with CSV state
+            raw_data['metro'] = zip_info.get('metro')  # Uses CSV metro
+            raw_data['latitude'] = zip_info.get('lat')
+            raw_data['longitude'] = zip_info.get('lng')
         
         ordered_data = {}
         for key in key_order:
             if key in raw_data:
                 value = raw_data[key]
                 # Standardize data types and formats
-                if pd.isna(value): 
+                if pd.isna(value) or value == "": 
                     ordered_data[key] = None
                 elif isinstance(value, pd.Timestamp): 
                     ordered_data[key] = value.strftime('%Y-%m-%d')
                 elif key in ['latitude', 'longitude']: 
                     ordered_data[key] = round(float(value), 5) if not pd.isna(value) else None
-                # MODIFICATION HERE: Added specific keys to the percentage logic
                 elif 'pct' in key or key in ['sold_above_list', 'off_market_in_two_weeks']: 
                     # Convert ratios (0.05) to percentages (5.0)
                     ordered_data[key] = round(float(value) * 100, 1) if not pd.isna(value) else None
@@ -142,6 +146,8 @@ def format_final_json(df, zip_mapping):
                     ordered_data[key] = round(value, 2) if not pd.isna(value) else None
                 else: 
                     ordered_data[key] = value
+            else:
+                ordered_data[key] = None
                     
         result[zip_code] = ordered_data
     return result

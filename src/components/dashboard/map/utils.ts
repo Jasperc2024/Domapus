@@ -30,11 +30,9 @@ export function getMetricDisplay(data: ZipData, selectedMetric: string): string 
     "pending_sales": { key: "pending_sales", label: "Pending Sales", format: 'number' },
     "new_listings": { key: "new_listings", label: "New Listings", format: 'number' },
     "inventory": { key: "inventory", label: "Inventory", format: 'number' },
-    "months_of_supply": { key: "months_of_supply", label: "Months of Supply", format: 'number' },
     "median_dom": { key: "median_dom", label: "Median Days on Market", format: 'number' },
     "avg_sale_to_list_ratio": { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", format: 'ratio' },
     "sold_above_list": { key: "sold_above_list", label: "% Sold Above List", format: 'percent' },
-    "price_drops": { key: "price_drops", label: "% Price Drops", format: 'percent' },
     "off_market_in_two_weeks": { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", format: 'percent' },
   };
 

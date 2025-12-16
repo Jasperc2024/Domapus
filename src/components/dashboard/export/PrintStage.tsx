@@ -1,4 +1,3 @@
-// PrintStage: The exact layout for both preview and export capture
 import { useEffect, useRef, useMemo, forwardRef, useImperativeHandle } from "react";
 import maplibregl, { ExpressionSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -67,7 +66,9 @@ const getMetricDisplayName = (metric: string): string => {
   return metricNames[metric] || metric.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 };
 
-const getCurrentDate = (): string => new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+const getDate = (): string =>
+  new Date(new Date().setMonth(new Date().getMonth() - 1))
+    .toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
 export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
   filteredData,
@@ -134,7 +135,18 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     
     const points = validData.map(d => point([d.longitude!, d.latitude!]));
     const fc = featureCollection(points);
-    const [minLng, minLat, maxLng, maxLat] = bbox(fc);
+    let [minLng, minLat, maxLng, maxLat] = bbox(fc);
+    
+    // Bounds Safety: If points are identical or collinear (zero width/height), 
+    // add a buffer to prevent MapLibre errors.
+    if (minLng === maxLng) {
+      minLng -= 0.1;
+      maxLng += 0.1;
+    }
+    if (minLat === maxLat) {
+      minLat -= 0.1;
+      maxLat += 0.1;
+    }
     
     return {
       bounds: [[minLng, minLat], [maxLng, maxLat]] as [[number, number], [number, number]],
@@ -151,7 +163,10 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       mapsRef.current[key] = null;
     });
 
-    if (filteredData.length === 0) return;
+    if (filteredData.length === 0) {
+      if (onReady) onReady(); // Nothing to render, ready immediately
+      return;
+    }
 
     const pmtilesUrl = new URL(`${BASE_PATH}data/us_zip_codes.pmtiles`, window.location.origin).href;
     
@@ -164,6 +179,20 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       CHOROPLETH_COLORS[0],
       ...buckets.flatMap((threshold, i) => [threshold, CHOROPLETH_COLORS[Math.min(i + 1, CHOROPLETH_COLORS.length - 1)]])
     ] as ExpressionSpecification;
+
+    // Track loading state
+    let loadedCount = 0;
+    const requiredMaps = regionScope === 'national' 
+      ? 1 + (alaskaZips.size > 0 ? 1 : 0) + (hawaiiZips.size > 0 ? 1 : 0)
+      : 1;
+
+    const checkAllReady = () => {
+      loadedCount++;
+      // Wait for all maps to trigger 'idle' at least once
+      if (loadedCount >= requiredMaps && onReady) {
+        onReady();
+      }
+    };
 
     const createMap = (
       container: HTMLDivElement | null, 
@@ -187,7 +216,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       mapsRef.current[key] = map;
 
       map.on('load', () => {
-        // Fit to bounds if provided
         if (bounds) {
           map.fitBounds(bounds, { padding: 40, maxZoom: 10 });
         }
@@ -229,47 +257,27 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
               { metricValue }
             );
           });
+          
+          // Trigger one more repaint to ensure feature state is visible
           map.triggerRepaint();
+          
+          // Wait for the final idle after repaint
+          map.once('idle', checkAllReady);
         });
       });
 
       return map;
     };
 
-    let loadedCount = 0;
-    const checkAllReady = () => {
-      loadedCount++;
-      const totalMaps = regionScope === 'national' 
-        ? 1 + (alaskaZips.size > 0 ? 1 : 0) + (hawaiiZips.size > 0 ? 1 : 0)
-        : 1;
-      if (loadedCount >= totalMaps && onReady) {
-        setTimeout(onReady, 200);
-      }
-    };
-
     // Create maps based on region
     if (regionScope === 'national') {
-      // Main map for continental US
-      const mainMap = createMap(mainMapRef.current, 'main', [-98.5, 39.5], 3.8);
-      if (mainMap) mainMap.once('idle', checkAllReady);
-
-      // Alaska inset
-      if (alaskaZips.size > 0) {
-        const akMap = createMap(alaskaMapRef.current, 'alaska', [-152, 64], 2.8);
-        if (akMap) akMap.once('idle', checkAllReady);
-      }
-
-      // Hawaii inset
-      if (hawaiiZips.size > 0) {
-        const hiMap = createMap(hawaiiMapRef.current, 'hawaii', [-157, 21], 5.5);
-        if (hiMap) hiMap.once('idle', checkAllReady);
-      }
+      createMap(mainMapRef.current, 'main', [-98.5, 39.5], 3.8);
+      if (alaskaZips.size > 0) createMap(alaskaMapRef.current, 'alaska', [-152, 64], 2.8);
+      if (hawaiiZips.size > 0) createMap(hawaiiMapRef.current, 'hawaii', [-157, 21], 5.5);
     } else {
-      // Single map for state/metro
       const bounds = regionBounds?.bounds;
       const center = regionBounds?.center || [-98.5, 39.5];
-      const mainMap = createMap(mainMapRef.current, 'main', center, 5, bounds);
-      if (mainMap) mainMap.once('idle', checkAllReady);
+      createMap(mainMapRef.current, 'main', center, 5, bounds);
     }
 
     return () => {
@@ -294,7 +302,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
               {getMetricDisplayName(selectedMetric)} by ZIP Code
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {regionName} • {getCurrentDate()}
+              {regionName} • {getDate()}
             </p>
           </div>
         )}

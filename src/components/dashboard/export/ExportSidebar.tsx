@@ -42,7 +42,9 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
   const [fileFormat, setFileFormat] = useState<"png" | "pdf">("png");
   const [includeLegend, setIncludeLegend] = useState(true);
   const [includeTitle, setIncludeTitle] = useState(true);
+  
   const [isExporting, setIsExporting] = useState(false);
+  const [isMapReady, setIsMapReady] = useState(false); // New state to track map readiness
   
   const printStageRef = useRef<PrintStageRef>(null);
 
@@ -62,6 +64,11 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Reset map readiness when core data/settings change
+  useEffect(() => {
+    setIsMapReady(false);
+  }, [regionScope, selectedState, selectedMetro, selectedMetric, includeLegend, includeTitle]);
 
   const { availableStates, filteredMetros } = useMemo(() => {
     if (Object.keys(allZipData).length === 0) return { availableStates: [], filteredMetros: [] };
@@ -100,6 +107,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
   const isExportDisabled = () => {
     if (isExporting) return true;
+    if (!isMapReady) return true; // Prevent export if map is loading
     if (regionScope === "state" && !selectedState) return true;
     if (regionScope === "metro" && !selectedMetro) return true;
     if (filteredData.length === 0) return true;
@@ -113,15 +121,16 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     setIsExporting(true);
 
     try {
-      // Wait for any map repaints
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Small delay to allow UI to update "Exporting..." state
+      await new Promise(resolve => requestAnimationFrame(resolve));
 
-      const scale = 3;
+      const scale = 3
       const canvas = await html2canvas(element, {
         scale,
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
+        allowTaint: true,
       });
 
       if (fileFormat === "png") {
@@ -288,6 +297,11 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                 Exporting...
               </>
+            ) : !isMapReady && filteredData.length > 0 ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                Rendering...
+              </>
             ) : (
               <>
                 <Download className="h-4 w-4 mr-2" />
@@ -299,16 +313,15 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         </div>
       </div>
 
-      {/* Right Preview Area - Exact same as export output */}
+      {/* Right Preview Area */}
       <div className="flex-1 p-6 overflow-hidden flex flex-col bg-gray-100">
         <div className="mb-3">
           <h3 className="text-base font-semibold text-gray-700">Preview</h3>
           <p className="text-xs text-gray-500">
-            {filteredData.length.toLocaleString()} ZIP codes • This is exactly what will be exported
+            {filteredData.length.toLocaleString()} ZIP codes
           </p>
         </div>
         
-        {/* Preview container with 4:3 aspect ratio */}
         <div className="flex-1 flex items-center justify-center">
           <div 
             className="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200"
@@ -326,6 +339,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
               regionName={regionName}
               includeLegend={includeLegend}
               includeTitle={includeTitle}
+              onReady={() => setIsMapReady(true)}
             />
           </div>
         </div>
