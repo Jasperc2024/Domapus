@@ -30,16 +30,19 @@ def load_zip_mapping_data(file_path=None):
         logging.error(f"CRITICAL ERROR loading mapping: {e}")
         return None
 
-def download_file(url, label, retries=3):
-    for attempt in range(1, retries + 1):
-        try:
-            logging.info(f"Attempt {attempt}: Downloading {label}...")
-            response = requests.get(url, timeout=300)
-            response.raise_for_status()
-            return response.content
-        except Exception as e:
-            logging.error(f"Download {label} failed: {e}")
-    return None
+def download_file(url, label, save_path):
+    """Downloads a file in chunks to disk to save RAM."""
+    try:
+        logging.info(f"Streaming {label} to {save_path}...")
+        with requests.get(url, stream=True, timeout=600) as r:
+            r.raise_for_status()
+            with open(save_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        return True
+    except Exception as e:
+        logging.error(f"Failed to download {label}: {e}")
+        return False
 
 def process_zillow_data(content):
     try:
@@ -131,16 +134,18 @@ def main():
 
     # 2. Redfin Integration (Chunked for Memory Safety)
     redfin_url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/zip_code_market_tracker.tsv000.gz"
-    redfin_content = download_file(redfin_url, "Redfin")
-    if not redfin_content: return
+    temp_redfin_file = DATA_DIR / "redfin_temp.tsv.gz"
+    
+    success = download_file(redfin_url, "Redfin", temp_redfin_file)
+    if not success: return
 
     col_map = get_full_column_mapping()
     latest_records = {} 
 
     try:
-        buffer = BytesIO(redfin_content)
-        with gzip.GzipFile(fileobj=buffer) as f:
-            # Processing in chunks to prevent MemoryError
+        # Use the file path directly with gzip
+        with gzip.open(temp_redfin_file, 'rt') as f:
+            # chunksize=100000 keeps RAM usage low
             reader = pd.read_csv(f, sep='\t', chunksize=100000)
             for chunk in reader:
                 chunk['zip_code'] = chunk['REGION'].apply(extract_zip_code)
@@ -149,9 +154,12 @@ def main():
                 
                 for _, row in chunk.iterrows():
                     z = row['zip_code']
-                    # Only keep the record with the most recent date for each ZIP
                     if z not in latest_records or row['PERIOD_END'] > latest_records[z]['PERIOD_END']:
                         latest_records[z] = row
+        
+        # CLEAN UP: Delete the temp file to free up runner disk space
+        if temp_redfin_file.exists():
+            temp_redfin_file.unlink()
 
         # 3. Final Assembly and Formatting
         output_data = {}
