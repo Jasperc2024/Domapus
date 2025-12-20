@@ -30,19 +30,30 @@ def load_zip_mapping_data(file_path=None):
         logging.error(f"CRITICAL ERROR loading mapping: {e}")
         return None
 
-def download_file(url, label, save_path):
-    """Downloads a file in chunks to disk to save RAM."""
+def download_file(url, label, save_path=None, timeout=300):
+    """
+    Generic download: 
+    If save_path is provided, saves to disk and returns True.
+    If save_path is None, returns bytes in memory.
+    """
     try:
-        logging.info(f"Streaming {label} to {save_path}...")
-        with requests.get(url, stream=True, timeout=600) as r:
-            r.raise_for_status()
-            with open(save_path, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-        return True
+        logging.info(f"Downloading {label}...")
+        if save_path:
+            # Ensure parent directories exist for the save path
+            Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+            with requests.get(url, stream=True, timeout=timeout) as r:
+                r.raise_for_status()
+                with open(save_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=65536):
+                        f.write(chunk)
+            return True
+        else:
+            response = requests.get(url, timeout=timeout)
+            response.raise_for_status()
+            return response.content
     except Exception as e:
-        logging.error(f"Failed to download {label}: {e}")
-        return False
+        logging.error(f"Download {label} failed: {e}")
+        return None
 
 def process_zillow_data(content):
     try:
@@ -59,14 +70,16 @@ def process_zillow_data(content):
         
         for _, row in df.iterrows():
             zip_code = row['RegionName'].zfill(5)
-            val, val_mom, val_yoy = row[curr], row[mom], row[yoy]
+            val = row[curr]
+            val_mom = row[mom]
+            val_yoy = row[yoy]
             
             if pd.isna(val): continue
             
             zillow_results[zip_code] = {
                 'zhvi': round(float(val), 2),
-                'zhvi_mom': round(((val / val_mom) - 1) * 100, 1) if val_mom else None,
-                'zhvi_yoy': round(((val / val_yoy) - 1) * 100, 1) if val_yoy else None
+                'zhvi_mom': round(((val / val_mom) - 1) * 100, 1) if val_mom and val_mom != 0 else None,
+                'zhvi_yoy': round(((val / val_yoy) - 1) * 100, 1) if val_yoy and val_yoy != 0 else None
             }
         return zillow_results
     except Exception as e:
@@ -79,7 +92,6 @@ def extract_zip_code(region_str):
     return match.group(1) if match else None
 
 def get_full_column_mapping():
-    """EXACT restoration of your requested keys."""
     return {
         'PERIOD_END': 'period_end',
         'MEDIAN_SALE_PRICE': 'median_sale_price', 'MEDIAN_SALE_PRICE_MOM': 'median_sale_price_mom', 'MEDIAN_SALE_PRICE_YOY': 'median_sale_price_yoy',
@@ -95,31 +107,6 @@ def get_full_column_mapping():
         'OFF_MARKET_IN_TWO_WEEKS': 'off_market_in_two_weeks', 'OFF_MARKET_IN_TWO_WEEKS_MOM': 'off_market_in_two_weeks_mom', 'OFF_MARKET_IN_TWO_WEEKS_YOY': 'off_market_in_two_weeks_yoy'
     }
 
-def format_value(key, val):
-    """Handles rounding and conversion based on your strict rules."""
-    if pd.isna(val) or val == "": return None
-    try:
-        if key == 'period_end':
-            return val.strftime('%Y-%m-%d') if hasattr(val, 'strftime') else val
-        if key in ['latitude', 'longitude']:
-            return round(float(val), 5)
-        if key == 'zhvi':
-            return round(float(val), 2)
-        
-        # Percentages: Redfin decimals (0.05) -> 5.0, Zillow (already 5.0)
-        if any(x in key for x in ['_mom', '_yoy', 'sold_above_list', 'off_market_in_two_weeks', 'ratio']):
-            if 'zhvi' in key: # Zillow keys are already processed in process_zillow
-                return round(float(val), 1)
-            return round(float(val) * 100, 1)
-        
-        # Whole Numbers
-        if any(c in key for c in ['price', 'sold', 'inventory', 'dom', 'ppsf', 'listings', 'pending']):
-            return int(float(val))
-            
-        return val
-    except:
-        return None
-
 def main():
     logging.info("--- Starting Data Pipeline Run ---")
     zip_mapping = load_zip_mapping_data()
@@ -129,23 +116,21 @@ def main():
 
     # 1. Zillow Integration
     zillow_url = "https://files.zillowstatic.com/research/public_csvs/zhvi/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
-    zillow_content = download_file(zillow_url, "Zillow")
+    zillow_content = download_file(zillow_url, "Zillow") # Fixed: Uses default save_path=None
     zillow_data = process_zillow_data(zillow_content) if zillow_content else {}
 
     # 2. Redfin Integration (Chunked for Memory Safety)
     redfin_url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/zip_code_market_tracker.tsv000.gz"
     temp_redfin_file = DATA_DIR / "redfin_temp.tsv.gz"
     
-    success = download_file(redfin_url, "Redfin", temp_redfin_file)
+    success = download_file(redfin_url, "Redfin", save_path=temp_redfin_file)
     if not success: return
 
     col_map = get_full_column_mapping()
     latest_records = {} 
 
     try:
-        # Use the file path directly with gzip
         with gzip.open(temp_redfin_file, 'rt') as f:
-            # chunksize=100000 keeps RAM usage low
             reader = pd.read_csv(f, sep='\t', chunksize=100000)
             for chunk in reader:
                 chunk['zip_code'] = chunk['REGION'].apply(extract_zip_code)
@@ -157,14 +142,11 @@ def main():
                     if z not in latest_records or row['PERIOD_END'] > latest_records[z]['PERIOD_END']:
                         latest_records[z] = row
         
-        # CLEAN UP: Delete the temp file to free up runner disk space
         if temp_redfin_file.exists():
             temp_redfin_file.unlink()
 
-        # 3. Final Assembly and Formatting
+        # 3. Final Assembly
         output_data = {}
-        
-        # YOUR EXACT KEY ORDER
         key_order = [
             'city', 'county', 'state', 'metro', 'latitude', 'longitude', 'period_end',
             'zhvi', 'zhvi_mom', 'zhvi_yoy',
@@ -182,10 +164,8 @@ def main():
         ]
 
         for zip_code, redfin_row in latest_records.items():
-            # Initializing raw data with Redfin columns mapped to your keys
             raw_data = {col_map.get(k, k): v for k, v in redfin_row.to_dict().items()}
             
-            # Add Metadata
             if zip_code in zip_mapping:
                 zm = zip_mapping[zip_code]
                 raw_data.update({
@@ -193,11 +173,9 @@ def main():
                     'metro': zm.get('metro'), 'latitude': zm.get('lat'), 'longitude': zm.get('lng')
                 })
             
-            # Add Zillow Data
             if zip_code in zillow_data:
                 raw_data.update(zillow_data[zip_code])
             
-            # THE FORMATTING LOOP (Your logic, explicitly laid out)
             ordered_data = {}
             for key in key_order:
                 val = raw_data.get(key)
@@ -211,7 +189,7 @@ def main():
                 elif key == 'zhvi':
                     ordered_data[key] = round(float(val), 2)
                 elif any(x in key for x in ['_mom', '_yoy', 'sold_above_list', 'off_market_in_two_weeks']):
-                    # Redfin provides decimals (0.05), Zillow logic already provided percent (5.0)
+                    # Redfin provides decimals, Zillow logic provides direct percent
                     if 'zhvi' in key:
                         ordered_data[key] = round(float(val), 1)
                     else:
@@ -223,7 +201,7 @@ def main():
             
             output_data[zip_code] = ordered_data
 
-        # 4. Save and Compare
+        # 4. Save and Update stats
         zip_data_path = DATA_DIR / "zip-data.json"
         zip_codes_changed = 0
         data_points_changed = 0
@@ -244,11 +222,9 @@ def main():
             except Exception as e:
                 logging.warning(f"Comparison failed: {e}")
 
-        # Write output (Compact JSON)
         with open(zip_data_path, 'w', encoding='utf-8') as f:
             json.dump({"zip_codes": output_data}, f, separators=(",", ":"))
 
-        # Write last_updated.json
         with open(DATA_DIR / "last_updated.json", 'w') as f:
             json.dump({
                 "last_updated_utc": datetime.now(timezone.utc).isoformat(),
@@ -262,5 +238,6 @@ def main():
     except Exception as e:
         logging.error(f"Pipeline failed: {e}")
         raise
+
 if __name__ == "__main__":
     main()
