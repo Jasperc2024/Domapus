@@ -2,258 +2,257 @@ import pandas as pd
 import requests
 import gzip
 import json
-import random
 import re
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
-import logging
 from io import BytesIO
 
-# Configure logging
-logging.basicConfig(filename='data_pipeline.log', filemode='w', level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
-ROOT_DIR = Path(__file__).resolve().parent.parent       # /.../Domapus
+# --- Configuration ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    handlers=[logging.FileHandler('data_pipeline.log', 'w'), logging.StreamHandler()]
+)
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT_DIR / "public" / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 def load_zip_mapping_data(file_path=None):
-    """Loads the pre-cleaned ZIP to city, county, metro and coordinate mapping file."""
+    file_path = file_path or DATA_DIR / "zcta-meta.csv"
     try:
-        if file_path is None:
-            file_path = DATA_DIR / "zcta-meta.csv"
-
-        logging.info(f"Loading ZIP mapping data from {file_path}...")
-        
-        # CHANGED: Updated dtype and index to match the 'zcta' header from your snippet
+        logging.info(f"Loading ZIP mapping from {file_path}...")
         df = pd.read_csv(file_path, dtype={'zcta': str})
         df.set_index('zcta', inplace=True)
-        logging.info(f"Successfully loaded {len(df)} unique mapping entries.")
         return df.to_dict('index')
-
     except Exception as e:
-        logging.error(f"CRITICAL ERROR loading {file_path}: {e}")
+        logging.error(f"CRITICAL ERROR loading mapping: {e}")
         return None
 
-def download_redfin_data(url, timeout=300, retries=3):
-    """Downloads the Redfin data file with retries."""
+def download_file(url, label, retries=3):
     for attempt in range(1, retries + 1):
         try:
-            logging.info(f"Attempt {attempt}: Downloading data from {url}...")
-            response = requests.get(url, timeout=timeout, stream=True)
+            logging.info(f"Attempt {attempt}: Downloading {label}...")
+            response = requests.get(url, timeout=300)
             response.raise_for_status()
-            logging.info(f"Successfully downloaded data (attempt {attempt}).")
             return response.content
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Download failed (attempt {attempt}): {e}")
-    logging.critical("All download attempts failed.")
+        except Exception as e:
+            logging.error(f"Download {label} failed: {e}")
     return None
 
+def process_zillow_data(content):
+    try:
+        logging.info("Processing Zillow ZHVI data...")
+        df = pd.read_csv(BytesIO(content), dtype={'RegionName': str})
+        date_cols = sorted([c for c in df.columns if re.match(r'\d{4}-\d{2}-\d{2}', c)])
+        
+        if len(date_cols) < 13:
+            logging.error("Insufficient Zillow history.")
+            return {}
+
+        curr, mom, yoy = date_cols[-1], date_cols[-2], date_cols[-13]
+        zillow_results = {}
+        
+        for _, row in df.iterrows():
+            zip_code = row['RegionName'].zfill(5)
+            val, val_mom, val_yoy = row[curr], row[mom], row[yoy]
+            
+            if pd.isna(val): continue
+            
+            zillow_results[zip_code] = {
+                'zhvi': round(float(val), 2),
+                'zhvi_mom': round(((val / val_mom) - 1) * 100, 1) if val_mom else None,
+                'zhvi_yoy': round(((val / val_yoy) - 1) * 100, 1) if val_yoy else None
+            }
+        return zillow_results
+    except Exception as e:
+        logging.error(f"Zillow processing error: {e}")
+        return {}
+
 def extract_zip_code(region_str):
-    """Extracts a 5-digit ZIP code from the Redfin 'region' string."""
     if pd.isna(region_str): return None
     match = re.search(r'Zip Code:\s*(\d{5})', str(region_str))
     return match.group(1) if match else None
 
 def get_full_column_mapping():
-    """Defines the mapping for ALL Redfin columns to our snake_case standard."""
+    """EXACT restoration of your requested keys."""
     return {
-        'STATE': 'redfin_state', # Renamed to avoid conflict with CSV state, though we usually prefer CSV
-        'PARENT_METRO_REGION': 'redfin_metro', # Renamed to prioritize CSV metro
         'PERIOD_END': 'period_end',
-        'MEDIAN_SALE_PRICE': 'median_sale_price', 'MEDIAN_SALE_PRICE_MOM': 'median_sale_price_mom_pct', 'MEDIAN_SALE_PRICE_YOY': 'median_sale_price_yoy_pct',
-        'MEDIAN_LIST_PRICE': 'median_list_price', 'MEDIAN_LIST_PRICE_MOM': 'median_list_price_mom_pct', 'MEDIAN_LIST_PRICE_YOY': 'median_list_price_yoy_pct',
-        'MEDIAN_PPSF': 'median_ppsf', 'MEDIAN_PPSF_MOM': 'median_ppsf_mom_pct', 'MEDIAN_PPSF_YOY': 'median_ppsf_yoy_pct',
-        'MEDIAN_LIST_PPSF': 'median_list_ppsf', 'MEDIAN_LIST_PPSF_MOM': 'median_list_ppsf_mom_pct', 'MEDIAN_LIST_PPSF_YOY': 'median_list_ppsf_yoy_pct',
-        'HOMES_SOLD': 'homes_sold', 'HOMES_SOLD_MOM': 'homes_sold_mom_pct', 'HOMES_SOLD_YOY': 'homes_sold_yoy_pct',
-        'PENDING_SALES': 'pending_sales', 'PENDING_SALES_MOM': 'pending_sales_mom_pct', 'PENDING_SALES_YOY': 'pending_sales_yoy_pct',
-        'NEW_LISTINGS': 'new_listings', 'NEW_LISTINGS_MOM': 'new_listings_mom_pct', 'NEW_LISTINGS_YOY': 'new_listings_yoy_pct',
-        'INVENTORY': 'inventory', 'INVENTORY_MOM': 'inventory_mom_pct', 'INVENTORY_YOY': 'inventory_yoy_pct',
-        'MONTHS_OF_SUPPLY': 'months_of_supply', 'MONTHS_OF_SUPPLY_MOM': 'months_of_supply_mom_pct', 'MONTHS_OF_SUPPLY_YOY': 'months_of_supply_yoy_pct',
-        'MEDIAN_DOM': 'median_dom', 'MEDIAN_DOM_MOM': 'median_dom_mom_pct', 'MEDIAN_DOM_YOY': 'median_dom_yoy_pct',
-        'AVG_SALE_TO_LIST': 'avg_sale_to_list_ratio', 'AVG_SALE_TO_LIST_MOM': 'avg_sale_to_list_mom_pct', 'AVG_SALE_TO_LIST_YOY': 'avg_sale_to_list_ratio_yoy_pct',
-        'SOLD_ABOVE_LIST': 'sold_above_list', 'SOLD_ABOVE_LIST_MOM': 'sold_above_list_mom_pct', 'SOLD_ABOVE_LIST_YOY': 'sold_above_list_yoy_pct',
-        'PRICE_DROPS': 'price_drops', 'PRICE_DROPS_MOM': 'price_drops_mom_pct', 'PRICE_DROPS_YOY': 'price_drops_yoy_pct',
-        'OFF_MARKET_IN_TWO_WEEKS': 'off_market_in_two_weeks', 'OFF_MARKET_IN_TWO_WEEKS_MOM': 'off_market_in_two_weeks_mom_pct', 'OFF_MARKET_IN_TWO_WEEKS_YOY': 'off_market_in_two_weeks_yoy_pct'
+        'MEDIAN_SALE_PRICE': 'median_sale_price', 'MEDIAN_SALE_PRICE_MOM': 'median_sale_price_mom', 'MEDIAN_SALE_PRICE_YOY': 'median_sale_price_yoy',
+        'MEDIAN_LIST_PRICE': 'median_list_price', 'MEDIAN_LIST_PRICE_MOM': 'median_list_price_mom', 'MEDIAN_LIST_PRICE_YOY': 'median_list_price_yoy',
+        'MEDIAN_PPSF': 'median_ppsf', 'MEDIAN_PPSF_MOM': 'median_ppsf_mom', 'MEDIAN_PPSF_YOY': 'median_ppsf_yoy',
+        'HOMES_SOLD': 'homes_sold', 'HOMES_SOLD_MOM': 'homes_sold_mom', 'HOMES_SOLD_YOY': 'homes_sold_yoy',
+        'PENDING_SALES': 'pending_sales', 'PENDING_SALES_MOM': 'pending_sales_mom', 'PENDING_SALES_YOY': 'pending_sales_yoy',
+        'NEW_LISTINGS': 'new_listings', 'NEW_LISTINGS_MOM': 'new_listings_mom', 'NEW_LISTINGS_YOY': 'new_listings_yoy',
+        'INVENTORY': 'inventory', 'INVENTORY_MOM': 'inventory_mom', 'INVENTORY_YOY': 'inventory_yoy',
+        'MEDIAN_DOM': 'median_dom', 'MEDIAN_DOM_MOM': 'median_dom_mom', 'MEDIAN_DOM_YOY': 'median_dom_yoy',
+        'AVG_SALE_TO_LIST': 'avg_sale_to_list_ratio', 'AVG_SALE_TO_LIST_MOM': 'avg_sale_to_list_mom', 'AVG_SALE_TO_LIST_YOY': 'avg_sale_to_list_ratio_yoy',
+        'SOLD_ABOVE_LIST': 'sold_above_list', 'SOLD_ABOVE_LIST_MOM': 'sold_above_list_mom', 'SOLD_ABOVE_LIST_YOY': 'sold_above_list_yoy',
+        'OFF_MARKET_IN_TWO_WEEKS': 'off_market_in_two_weeks', 'OFF_MARKET_IN_TWO_WEEKS_MOM': 'off_market_in_two_weeks_mom', 'OFF_MARKET_IN_TWO_WEEKS_YOY': 'off_market_in_two_weeks_yoy'
     }
 
-def process_chunk(chunk_df, column_mapping):
-    """Processes a single chunk of Redfin data."""
-    # Find which columns from the mapping are actually in this chunk
-    available_cols = {k: v for k, v in column_mapping.items() if k in chunk_df.columns}
-    chunk_df.rename(columns=available_cols, inplace=True)
-    
-    # Extract ZIP code
-    chunk_df['zip_code'] = chunk_df['REGION'].apply(extract_zip_code)
-    chunk_df = chunk_df.dropna(subset=['zip_code'])
-    
-    # Convert date
-    chunk_df['period_end'] = pd.to_datetime(chunk_df['period_end'])
-    
-    # Filter to only the columns we care about
-    final_cols = list(column_mapping.values()) + ['zip_code']
-    existing_cols = [col for col in final_cols if col in chunk_df.columns]
-    return chunk_df[existing_cols]
-
-def format_final_json(df, zip_mapping):
-    """Formats the data for JSON output with a specific, logical key order."""
-    result = {}
-    # Define the desired order of keys in the final JSON object
-    key_order = [
-        'city', 'county', 'state', 'metro', 'latitude', 'longitude', 'period_end',
-        'median_sale_price', 'median_sale_price_mom_pct', 'median_sale_price_yoy_pct',
-        'median_list_price', 'median_list_price_mom_pct', 'median_list_price_yoy_pct',
-        'median_ppsf', 'median_ppsf_mom_pct', 'median_ppsf_yoy_pct',
-        'homes_sold', 'homes_sold_mom_pct', 'homes_sold_yoy_pct',
-        'pending_sales', 'pending_sales_mom_pct', 'pending_sales_yoy_pct',
-        'new_listings', 'new_listings_mom_pct', 'new_listings_yoy_pct',
-        'inventory', 'inventory_mom_pct', 'inventory_yoy_pct',
-        'median_dom', 'median_dom_mom_pct', 'median_dom_yoy_pct',
-        'avg_sale_to_list_ratio', 'avg_sale_to_list_mom_pct', 'avg_sale_to_list_ratio_yoy_pct',
-        'sold_above_list', 'sold_above_list_mom_pct', 'sold_above_list_yoy_pct',
-        'off_market_in_two_weeks', 'off_market_in_two_weeks_mom_pct', 'off_market_in_two_weeks_yoy_pct'
-    ]
-    
-    for _, row in df.iterrows():
-        zip_code = row['zip_code']
-        raw_data = row.to_dict()
+def format_value(key, val):
+    """Handles rounding and conversion based on your strict rules."""
+    if pd.isna(val) or val == "": return None
+    try:
+        if key == 'period_end':
+            return val.strftime('%Y-%m-%d') if hasattr(val, 'strftime') else val
+        if key in ['latitude', 'longitude']:
+            return round(float(val), 5)
+        if key == 'zhvi':
+            return round(float(val), 2)
         
-        # Add data from the ZIP code mapping (CSV)
-        # CHANGED: Updated keys to match the CSV headers (zcta,state,metro,county,city,lat,lng)
-        if zip_mapping and zip_code in zip_mapping:
-            zip_info = zip_mapping[zip_code]
-            raw_data['city'] = zip_info.get('city')
-            raw_data['county'] = zip_info.get('county')
-            raw_data['state'] = zip_info.get('state')  # Overwrites Redfin state with CSV state
-            raw_data['metro'] = zip_info.get('metro')  # Uses CSV metro
-            raw_data['latitude'] = zip_info.get('lat')
-            raw_data['longitude'] = zip_info.get('lng')
+        # Percentages: Redfin decimals (0.05) -> 5.0, Zillow (already 5.0)
+        if any(x in key for x in ['_mom', '_yoy', 'sold_above_list', 'off_market_in_two_weeks', 'ratio']):
+            if 'zhvi' in key: # Zillow keys are already processed in process_zillow
+                return round(float(val), 1)
+            return round(float(val) * 100, 1)
         
-        ordered_data = {}
-        for key in key_order:
-            if key in raw_data:
-                value = raw_data[key]
-                # Standardize data types and formats
-                if pd.isna(value) or value == "": 
-                    ordered_data[key] = None
-                elif isinstance(value, pd.Timestamp): 
-                    ordered_data[key] = value.strftime('%Y-%m-%d')
-                elif key in ['latitude', 'longitude']: 
-                    ordered_data[key] = round(float(value), 5) if not pd.isna(value) else None
-                elif 'pct' in key or key in ['sold_above_list', 'off_market_in_two_weeks']: 
-                    # Convert ratios (0.05) to percentages (5.0)
-                    ordered_data[key] = round(float(value) * 100, 1) if not pd.isna(value) else None
-                elif any(c in key for c in ['price', 'homes_sold', 'inventory', 'dom', 'ppsf', 'listings', 'pending']): 
-                    ordered_data[key] = int(float(value)) if not pd.isna(value) else None
-                elif isinstance(value, float): 
-                    ordered_data[key] = round(value, 2) if not pd.isna(value) else None
-                else: 
-                    ordered_data[key] = value
-            else:
-                ordered_data[key] = None
-                    
-        result[zip_code] = ordered_data
-    return result
+        # Whole Numbers
+        if any(c in key for c in ['price', 'sold', 'inventory', 'dom', 'ppsf', 'listings', 'pending']):
+            return int(float(val))
+            
+        return val
+    except:
+        return None
 
 def main():
     logging.info("--- Starting Data Pipeline Run ---")
     zip_mapping = load_zip_mapping_data()
-    if zip_mapping is None: 
-        logging.critical("Failed to load ZIP mapping. Exiting.")
-        exit(1)
+    if not zip_mapping: 
+        logging.error("Mapping data not found. Exiting.")
+        return
 
-    url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/zip_code_market_tracker.tsv000.gz"
-    data = download_redfin_data(url)
-    if data is None: 
-        logging.critical("Failed to download Redfin data. Exiting.")
-        exit(1)
-    
+    # 1. Zillow Integration
+    zillow_url = "https://files.zillowstatic.com/research/public_csvs/zhvi/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
+    zillow_content = download_file(zillow_url, "Zillow")
+    zillow_data = process_zillow_data(zillow_content) if zillow_content else {}
+
+    # 2. Redfin Integration (Chunked for Memory Safety)
+    redfin_url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/zip_code_market_tracker.tsv000.gz"
+    redfin_content = download_file(redfin_url, "Redfin")
+    if not redfin_content: return
+
+    col_map = get_full_column_mapping()
+    latest_records = {} 
+
     try:
-        logging.info("Processing downloaded data...")
-        column_mapping = get_full_column_mapping()
-        buffer = BytesIO(data)
-        chunk_iterator = pd.read_csv(gzip.GzipFile(fileobj=buffer), sep='\t', chunksize=100000)
-        
-        processed_chunks = [process_chunk(chunk, column_mapping) for chunk in chunk_iterator]
-        df_full = pd.concat(processed_chunks, ignore_index=True)
-        
-        # Get only the latest entry for each ZIP code
-        df_latest = df_full.sort_values('period_end').groupby('zip_code').tail(1)
-        logging.info(f"Processed data. Found {len(df_latest)} unique ZIP codes with latest data.")
-        
-        output_data_content = format_final_json(df_latest, zip_mapping)
+        buffer = BytesIO(redfin_content)
+        with gzip.GzipFile(fileobj=buffer) as f:
+            # Processing in chunks to prevent MemoryError
+            reader = pd.read_csv(f, sep='\t', chunksize=100000)
+            for chunk in reader:
+                chunk['zip_code'] = chunk['REGION'].apply(extract_zip_code)
+                chunk = chunk.dropna(subset=['zip_code'])
+                chunk['PERIOD_END'] = pd.to_datetime(chunk['PERIOD_END'])
+                
+                for _, row in chunk.iterrows():
+                    z = row['zip_code']
+                    # Only keep the record with the most recent date for each ZIP
+                    if z not in latest_records or row['PERIOD_END'] > latest_records[z]['PERIOD_END']:
+                        latest_records[z] = row
 
-        final_output = {
-            "zip_codes": output_data_content
-        }
+        # 3. Final Assembly and Formatting
+        output_data = {}
         
-        output_dir = Path("public/data")
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # YOUR EXACT KEY ORDER
+        key_order = [
+            'city', 'county', 'state', 'metro', 'latitude', 'longitude', 'period_end',
+            'zhvi', 'zhvi_mom', 'zhvi_yoy',
+            'median_sale_price', 'median_sale_price_mom', 'median_sale_price_yoy',
+            'median_list_price', 'median_list_price_mom', 'median_list_price_yoy',
+            'median_ppsf', 'median_ppsf_mom', 'median_ppsf_yoy',
+            'homes_sold', 'homes_sold_mom', 'homes_sold_yoy',
+            'pending_sales', 'pending_sales_mom', 'pending_sales_yoy',
+            'new_listings', 'new_listings_mom', 'new_listings_yoy',
+            'inventory', 'inventory_mom', 'inventory_yoy',
+            'median_dom', 'median_dom_mom', 'median_dom_yoy',
+            'avg_sale_to_list_ratio', 'avg_sale_to_list_mom', 'avg_sale_to_list_ratio_yoy',
+            'sold_above_list', 'sold_above_list_mom', 'sold_above_list_yoy',
+            'off_market_in_two_weeks', 'off_market_in_two_weeks_mom', 'off_market_in_two_weeks_yoy'
+        ]
 
-        # Load previous data from plain JSON
-        previous_data = None
-        zip_data_path = output_dir / "zip-data.json"
-        try:
-            if zip_data_path.exists():
-                logging.info(f"Loading previous data from {zip_data_path} for comparison...")
-                with open(zip_data_path, 'r', encoding='utf-8') as f:
-                    previous_data = json.load(f).get('zip_codes', {})
-                logging.info("Successfully loaded previous data.")
-        except Exception as e:
-            logging.warning(f"Could not load previous data for comparison: {e}")
+        for zip_code, redfin_row in latest_records.items():
+            # Initializing raw data with Redfin columns mapped to your keys
+            raw_data = {col_map.get(k, k): v for k, v in redfin_row.to_dict().items()}
+            
+            # Add Metadata
+            if zip_code in zip_mapping:
+                zm = zip_mapping[zip_code]
+                raw_data.update({
+                    'city': zm.get('city'), 'county': zm.get('county'), 'state': zm.get('state'), 
+                    'metro': zm.get('metro'), 'latitude': zm.get('lat'), 'longitude': zm.get('lng')
+                })
+            
+            # Add Zillow Data
+            if zip_code in zillow_data:
+                raw_data.update(zillow_data[zip_code])
+            
+            # THE FORMATTING LOOP (Your logic, explicitly laid out)
+            ordered_data = {}
+            for key in key_order:
+                val = raw_data.get(key)
+                
+                if pd.isna(val) or val == "": 
+                    ordered_data[key] = None
+                elif key == 'period_end':
+                    ordered_data[key] = val.strftime('%Y-%m-%d') if hasattr(val, 'strftime') else val
+                elif key in ['latitude', 'longitude']:
+                    ordered_data[key] = round(float(val), 5)
+                elif key == 'zhvi':
+                    ordered_data[key] = round(float(val), 2)
+                elif any(x in key for x in ['_mom', '_yoy', 'sold_above_list', 'off_market_in_two_weeks']):
+                    # Redfin provides decimals (0.05), Zillow logic already provided percent (5.0)
+                    if 'zhvi' in key:
+                        ordered_data[key] = round(float(val), 1)
+                    else:
+                        ordered_data[key] = round(float(val) * 100, 1)
+                elif any(c in key for c in ['price', 'sold', 'inventory', 'dom', 'ppsf', 'listings', 'pending']):
+                    ordered_data[key] = int(float(val))
+                else:
+                    ordered_data[key] = val
+            
+            output_data[zip_code] = ordered_data
 
-        # Calculate changes
+        # 4. Save and Compare
+        zip_data_path = DATA_DIR / "zip-data.json"
         zip_codes_changed = 0
         data_points_changed = 0
         
-        if previous_data:
-            new_zips = set(output_data_content.keys())
-            old_zips = set(previous_data.keys())
-            
-            # Count new or removed ZIP codes
-            zip_codes_changed = len(new_zips ^ old_zips)
-            
-            # Count changed data points in existing ZIP codes
-            for zip_code in new_zips & old_zips:
-                new_data = output_data_content[zip_code]
-                old_data = previous_data[zip_code]
+        if zip_data_path.exists():
+            try:
+                with open(zip_data_path, 'r') as f:
+                    old_data = json.load(f).get('zip_codes', {})
                 
-                for key in new_data:
-                    # Check if key exists in old data and if values are different
-                    if key in old_data and new_data[key] != old_data[key]:
-                        data_points_changed += 1
-                    # Count if key is new for this zip_code
-                    elif key not in old_data:
-                        data_points_changed += 1
-            logging.info(f"Comparison complete: {zip_codes_changed} ZIPs added/removed, {data_points_changed} data points changed.")
-        else:
-            logging.info("No previous data found. Skipping comparison.")
+                new_zips = set(output_data.keys())
+                old_zips = set(old_data.keys())
+                zip_codes_changed = len(new_zips ^ old_zips)
+                
+                for z in new_zips & old_zips:
+                    for k in output_data[z]:
+                        if output_data[z][k] != old_data[z].get(k):
+                            data_points_changed += 1
+            except Exception as e:
+                logging.warning(f"Comparison failed: {e}")
 
-        # Write output to plain JSON
-        logging.info(f"Writing {len(output_data_content)} ZIP codes to {zip_data_path}...")
-        # Use separators for compact JSON
-        json_string = json.dumps(final_output, sort_keys=True, separators=(",", ":"))
-        
+        # Write output (Compact JSON)
         with open(zip_data_path, 'w', encoding='utf-8') as f:
-            f.write(json_string)
-            f.flush()
+            json.dump({"zip_codes": output_data}, f, separators=(",", ":"))
 
-        # Write last_updated.json with change statistics
-        update_info = {
-            "last_updated_utc": datetime.now(timezone.utc).isoformat(),
-            "total_zip_codes": len(output_data_content),
-            "zip_codes_changed": zip_codes_changed,
-            "data_points_changed": data_points_changed
-        }
-        
-        last_updated_path = output_dir / "last_updated.json"
-        with open(last_updated_path, 'w') as f:
-            json.dump(update_info, f, indent=2)
-            f.flush()
-        logging.info(f"Successfully wrote update stats to {last_updated_path}")
-            
+        # Write last_updated.json
+        with open(DATA_DIR / "last_updated.json", 'w') as f:
+            json.dump({
+                "last_updated_utc": datetime.now(timezone.utc).isoformat(),
+                "total_zip_codes": len(output_data),
+                "zip_codes_changed": zip_codes_changed,
+                "data_points_changed": data_points_changed
+            }, f, indent=2)
+
+        logging.info(f"Run completed. Processed {len(output_data)} ZIP codes.")
+
     except Exception as e:
-        logging.error(f"An error occurred during the main processing block: {e}")
-        logging.error("--- Data Pipeline Run FAILED ---")
+        logging.error(f"Pipeline failed: {e}")
         raise
-
-
 if __name__ == "__main__":
     main()

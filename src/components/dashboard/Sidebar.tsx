@@ -99,7 +99,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
               <Card><CardHeader><CardTitle className="text-sm flex items-center"><MapPin className="h-4 w-4 mr-2" />Location Information</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">
                 <div className="flex justify-between"><span>City:</span><span className="font-medium">{zipData.city}</span></div>
                 <div className="flex justify-between"><span>County:</span><span className="font-medium">{zipData.county}</span></div>
-                <div className="flex justify-between"><span>Metro Area:</span><span className="font-medium">{zipData.parent_metro}</span></div>
+                <div className="flex justify-between"><span>Metro Area:</span><span className="font-medium">{zipData.metro}</span></div>
               </CardContent></Card>
               <h3 className="text-sm font-medium pt-2 flex items-center"><Building className="h-4 w-4 mr-2" />Market Data</h3>
               <div className="space-y-3">

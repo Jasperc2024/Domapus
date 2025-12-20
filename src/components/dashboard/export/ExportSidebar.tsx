@@ -78,7 +78,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     
     for (const zip of Object.values(allZipData)) {
       if (zip.state) stateSet.add(zip.state);
-      if (zip.parent_metro) metroSet.add(zip.parent_metro);
+      if (zip.metro) metroSet.add(zip.metro);
     }
     
     const metros = Array.from(metroSet).sort();
@@ -94,7 +94,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     
     return Object.values(allZipData).filter(zip => {
       if (regionScope === 'state' && selectedState) return zip.state === selectedState;
-      if (regionScope === 'metro' && selectedMetro) return zip.parent_metro === selectedMetro;
+      if (regionScope === 'metro' && selectedMetro) return zip.metro === selectedMetro;
       return true;
     });
   }, [allZipData, regionScope, selectedState, selectedMetro]);
@@ -124,7 +124,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
       // Small delay to allow UI to update "Exporting..." state
       await new Promise(resolve => requestAnimationFrame(resolve));
 
-      const scale = 3
+      const scale = 10
       const canvas = await html2canvas(element, {
         scale,
         useCORS: true,

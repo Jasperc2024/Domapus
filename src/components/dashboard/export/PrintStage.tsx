@@ -205,7 +205,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
       const map = new maplibregl.Map({
         container,
-        style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#f8f9fa' } }] },
+        style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#ffffffff' } }] },
         center,
         zoom,
         interactive: false,
