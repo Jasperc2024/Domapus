@@ -58,6 +58,7 @@ function computeQuantileBuckets(values: number[], numBuckets = 8): number[] {
 
 const getMetricDisplayName = (metric: string): string => {
   const metricNames: Record<string, string> = { 
+    "zhvi": "Zillow Home Value Index",
     "median_sale_price": "Median Sale Price",
     "median_ppsf": "Median Price per Sq Ft",
     "avg_sale_to_list_ratio": "Sale-to-List Ratio",

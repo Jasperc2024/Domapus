@@ -1,12 +1,14 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export type MetricType = 
+  | "zhvi"
   | "median_sale_price"
   | "median_ppsf"
   | "avg_sale_to_list_ratio"
   | "median_dom";
 
 export const METRICS = {
+  "zhvi": "Zillow Home Value Index",
   "median_sale_price": "Median Sale Price",
   "median_ppsf": "Median Price per Sq Ft",
   "avg_sale_to_list_ratio": "Sale-to-List Ratio",

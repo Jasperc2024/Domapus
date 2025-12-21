@@ -46,18 +46,19 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
   // The list of all metrics to display for a single ZIP code
   // All metrics in user-specified order
   const allMetrics = [
-    { key: "median_sale_price", label: "Median Sale Price", type: "price", momKey: "median_sale_price_mom_pct", yoyKey: "median_sale_price_yoy_pct" },
-    { key: "median_list_price", label: "Median List Price", type: "price", momKey: "median_list_price_mom_pct", yoyKey: "median_list_price_yoy_pct" },
-    { key: "median_ppsf", label: "Median Price per Sq Ft", type: "price", momKey: "median_ppsf_mom_pct", yoyKey: "median_ppsf_yoy_pct" },
-    { key: "homes_sold", label: "Homes Sold", type: "number", momKey: "homes_sold_mom_pct", yoyKey: "homes_sold_yoy_pct" },
-    { key: "pending_sales", label: "Pending Sales", type: "number", momKey: "pending_sales_mom_pct", yoyKey: "pending_sales_yoy_pct" },
-    { key: "new_listings", label: "New Listings", type: "number", momKey: "new_listings_mom_pct", yoyKey: "new_listings_yoy_pct" },
-    { key: "inventory", label: "Inventory", type: "number", momKey: "inventory_mom_pct", yoyKey: "inventory_yoy_pct" },
-    { key: "median_dom", label: "Median Days on Market", type: "days", momKey: "median_dom_mom_pct", yoyKey: "median_dom_yoy_pct" },
-    { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", type: "ratio", momKey: "avg_sale_to_list_ratio_mom_pct", yoyKey: "avg_sale_to_list_ratio_yoy_pct" },
-    { key: "sold_above_list", label: "% Sold Above List", type: "percentage", momKey: "sold_above_list_mom_pct", yoyKey: "sold_above_list_yoy_pct" },
-    { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", type: "percentage", momKey: "off_market_in_two_weeks_mom_pct", yoyKey: "off_market_in_two_weeks_yoy_pct" },
-  ]
+    { key: "zhvi", label: "Zillow Home Value Index", type: "price", momKey: "zhvi_mom", yoyKey: "zhvi_yoy" },
+    { key: "median_sale_price", label: "Median Sale Price", type: "price", momKey: "median_sale_price_mom", yoyKey: "median_sale_price_yoy" },
+    { key: "median_list_price", label: "Median List Price", type: "price", momKey: "median_list_price_mom", yoyKey: "median_list_price_yoy" },
+    { key: "median_ppsf", label: "Median Price per Sq Ft", type: "price", momKey: "median_ppsf_mom", yoyKey: "median_ppsf_yoy" },
+    { key: "homes_sold", label: "Homes Sold", type: "number", momKey: "homes_sold_mom", yoyKey: "homes_sold_yoy" },
+    { key: "pending_sales", label: "Pending Sales", type: "number", momKey: "pending_sales_mom", yoyKey: "pending_sales_yoy" },
+    { key: "new_listings", label: "New Listings", type: "number", momKey: "new_listings_mom", yoyKey: "new_listings_yoy" },
+    { key: "inventory", label: "Inventory", type: "number", momKey: "inventory_mom", yoyKey: "inventory_yoy" },
+    { key: "median_dom", label: "Median Days on Market", type: "days", momKey: "median_dom_mom", yoyKey: "median_dom_yoy" },
+    { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", type: "ratio", momKey: "avg_sale_to_list_ratio_mom", yoyKey: "avg_sale_to_list_ratio_yoy" },
+    { key: "sold_above_list", label: "% Sold Above List", type: "percentage", momKey: "sold_above_list_mom", yoyKey: "sold_above_list_yoy" },
+    { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", type: "percentage", momKey: "off_market_in_two_weeks_mom", yoyKey: "off_market_in_two_weeks_yoy" }
+]
   .map(metric => ({ ...metric, value: zipData[metric.key as keyof ZipData] }))
   .filter(metric => metric.value !== null && metric.value !== undefined);
 

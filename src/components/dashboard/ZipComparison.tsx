@@ -4,12 +4,12 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Search, X } from 'lucide-react';
-import { ZipData } from './map/types'; // Import the single source of truth for the data type
+import { ZipData } from './map/types';
 
 // Define the props this component now accepts from its parent (Sidebar)
 interface ZipComparisonProps {
   currentZip: ZipData;
-  allZipData: Record<string, ZipData>; // It now receives the full dataset
+  allZipData: Record<string, ZipData>;
   onClose: () => void;
 }
 
@@ -19,7 +19,6 @@ export function ZipComparison({ currentZip, allZipData, onClose }: ZipComparison
   const [compareZip, setCompareZip] = useState<ZipData | null>(null);
   const [error, setError] = useState('');
 
-  // The search is now an instant, in-memory lookup. No loading state is needed.
   const handleSearch = () => {
     if (!searchZip.trim()) return;
     
@@ -61,6 +60,7 @@ export function ZipComparison({ currentZip, allZipData, onClose }: ZipComparison
 
   // The list of metrics to compare
   const metrics = [
+    { key: "zhvi", label: "Zillow Home Value Index", type: "price" },
     { key: "median_sale_price", label: "Median Sale Price", type: "price" },
     { key: "median_list_price", label: "Median List Price", type: "price" },
     { key: "median_ppsf", label: "Median Price per Sq Ft", type: "price" },

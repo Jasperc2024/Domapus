@@ -4,6 +4,8 @@ import gzip
 import json
 import re
 import logging
+import sys
+import random
 from datetime import datetime, timezone
 from pathlib import Path
 from io import BytesIO
@@ -31,15 +33,9 @@ def load_zip_mapping_data(file_path=None):
         return None
 
 def download_file(url, label, save_path=None, timeout=300):
-    """
-    Generic download: 
-    If save_path is provided, saves to disk and returns True.
-    If save_path is None, returns bytes in memory.
-    """
     try:
         logging.info(f"Downloading {label}...")
         if save_path:
-            # Ensure parent directories exist for the save path
             Path(save_path).parent.mkdir(parents=True, exist_ok=True)
             with requests.get(url, stream=True, timeout=timeout) as r:
                 r.raise_for_status()
@@ -52,7 +48,7 @@ def download_file(url, label, save_path=None, timeout=300):
             response.raise_for_status()
             return response.content
     except Exception as e:
-        logging.error(f"Download {label} failed: {e}")
+        logging.warning(f"Download {label} failed (Link likely changed/invalid): {e}")
         return None
 
 def process_zillow_data(content):
@@ -116,22 +112,29 @@ def main():
 
     # 1. Zillow Integration
     zillow_url = "https://files.zillowstatic.com/research/public_csvs/zhvi/Zip_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
-    zillow_content = download_file(zillow_url, "Zillow") # Fixed: Uses default save_path=None
-    zillow_data = process_zillow_data(zillow_content) if zillow_content else {}
+    zillow_content = download_file(zillow_url, "Zillow")
+    if zillow_content is None:
+        logging.info("Link invalid. Exiting gracefully with success.")
+        sys.exit(0)
+    
+    zillow_data = process_zillow_data(zillow_content)
 
-    # 2. Redfin Integration (Chunked for Memory Safety)
+    # 2. Redfin Integration
     redfin_url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/zip_code_market_tracker.tsv000.gz"
     temp_redfin_file = DATA_DIR / "redfin_temp.tsv.gz"
     
     success = download_file(redfin_url, "Redfin", save_path=temp_redfin_file)
-    if not success: return
+    if not success:
+        logging.info("Link invalid. Exiting gracefully with success.")
+        sys.exit(0)
 
     col_map = get_full_column_mapping()
     latest_records = {} 
 
     try:
         with gzip.open(temp_redfin_file, 'rt') as f:
-            reader = pd.read_csv(f, sep='\t', chunksize=100000)
+            use_cols = list(col_map.keys()) + ['REGION']
+            reader = pd.read_csv(f, sep='\t', chunksize=100000, usecols=use_cols)
             for chunk in reader:
                 chunk['zip_code'] = chunk['REGION'].apply(extract_zip_code)
                 chunk = chunk.dropna(subset=['zip_code'])
@@ -140,7 +143,7 @@ def main():
                 for _, row in chunk.iterrows():
                     z = row['zip_code']
                     if z not in latest_records or row['PERIOD_END'] > latest_records[z]['PERIOD_END']:
-                        latest_records[z] = row
+                        latest_records[z] = row.to_dict()
         
         if temp_redfin_file.exists():
             temp_redfin_file.unlink()
@@ -148,7 +151,7 @@ def main():
         # 3. Final Assembly
         output_data = {}
         key_order = [
-            'city', 'county', 'state', 'metro', 'latitude', 'longitude', 'period_end',
+            'city', 'county', 'state', 'metro', 'lat', 'lng', 'period_end',
             'zhvi', 'zhvi_mom', 'zhvi_yoy',
             'median_sale_price', 'median_sale_price_mom', 'median_sale_price_yoy',
             'median_list_price', 'median_list_price_mom', 'median_list_price_yoy',
@@ -163,14 +166,14 @@ def main():
             'off_market_in_two_weeks', 'off_market_in_two_weeks_mom', 'off_market_in_two_weeks_yoy'
         ]
 
-        for zip_code, redfin_row in latest_records.items():
-            raw_data = {col_map.get(k, k): v for k, v in redfin_row.to_dict().items()}
+        for zip_code, redfin_dict in latest_records.items():
+            raw_data = {col_map.get(k, k): v for k, v in redfin_dict.items()}
             
             if zip_code in zip_mapping:
                 zm = zip_mapping[zip_code]
                 raw_data.update({
                     'city': zm.get('city'), 'county': zm.get('county'), 'state': zm.get('state'), 
-                    'metro': zm.get('metro'), 'latitude': zm.get('lat'), 'longitude': zm.get('lng')
+                    'metro': zm.get('metro'), 'lat': zm.get('lat'), 'lng': zm.get('lng')
                 })
             
             if zip_code in zillow_data:
@@ -179,42 +182,46 @@ def main():
             ordered_data = {}
             for key in key_order:
                 val = raw_data.get(key)
-                
                 if pd.isna(val) or val == "": 
                     ordered_data[key] = None
                 elif key == 'period_end':
-                    ordered_data[key] = val.strftime('%Y-%m-%d') if hasattr(val, 'strftime') else val
-                elif key in ['latitude', 'longitude']:
+                    ordered_data[key] = val.strftime('%Y-%m-%d') if hasattr(val, 'strftime') else str(val)[:10]
+                elif key in ['lat', 'lng']:
                     ordered_data[key] = round(float(val), 5)
                 elif key == 'zhvi':
+                    ordered_data[key] = int(float(val))
+                elif key == 'median_ppsf':
                     ordered_data[key] = round(float(val), 2)
+                elif key == 'avg_sale_to_list_ratio':
+                    ordered_data[key] = round(float(val) * 100, 1)
                 elif any(x in key for x in ['_mom', '_yoy', 'sold_above_list', 'off_market_in_two_weeks']):
-                    # Redfin provides decimals, Zillow logic provides direct percent
                     if 'zhvi' in key:
                         ordered_data[key] = round(float(val), 1)
                     else:
                         ordered_data[key] = round(float(val) * 100, 1)
-                elif any(c in key for c in ['price', 'sold', 'inventory', 'dom', 'ppsf', 'listings', 'pending']):
+                elif any(c in key for c in ['price', 'sold', 'inventory', 'dom', 'listings', 'pending']):
                     ordered_data[key] = int(float(val))
                 else:
                     ordered_data[key] = val
             
             output_data[zip_code] = ordered_data
 
-        # 4. Save and Update stats
+        # 4. Save and Compare
         zip_data_path = DATA_DIR / "zip-data.json"
         zip_codes_changed = 0
         data_points_changed = 0
+
+        # Verification Print
+        if output_data:
+            random_zip = random.choice(list(output_data.keys()))
+            logging.info(f"VERIFICATION - Random ZIP Data ({random_zip}): {json.dumps(output_data[random_zip], indent=2)}")
         
         if zip_data_path.exists():
             try:
                 with open(zip_data_path, 'r') as f:
                     old_data = json.load(f).get('zip_codes', {})
-                
-                new_zips = set(output_data.keys())
-                old_zips = set(old_data.keys())
+                new_zips, old_zips = set(output_data.keys()), set(old_data.keys())
                 zip_codes_changed = len(new_zips ^ old_zips)
-                
                 for z in new_zips & old_zips:
                     for k in output_data[z]:
                         if output_data[z][k] != old_data[z].get(k):

@@ -88,15 +88,12 @@ export function TopBar({
           )}
         </div>
 
-        {/* Right Section - Actions - THIS CONTAINER IS NOW ALWAYS RENDERED */}
+        {/* Right Section - Actions */}
         <div className="flex items-center gap-4 flex-shrink-0">
-            {/* SearchBox is moved to the bottom bar on mobile, so we wrap it in !isMobile */}
             {!isMobile && <SearchBox onSearch={onSearch} />}
-
-            {/* Actions Container - always rendered now */}
             <div className="flex items-center gap-2 ml-1">
             
-            {/* Last Updated - always visible */}
+            {/* Last Updated */}
             <div className="flex items-center text-dashboard-text-secondary gap-2 mr-2">
               <Calendar className="h-4 w-4 opacity-80" />
               <div className="flex flex-col">
@@ -106,10 +103,10 @@ export function TopBar({
                 </span>
               </div>
             </div>
-              {/* Export - always visible */}
+              {/* Export */}
               {children}
               
-              {/* GitHub button - always visible, but hide text on mobile */}
+              {/* GitHub button */}
               <Button
                 variant="outline"
                 size="sm"
@@ -126,7 +123,7 @@ export function TopBar({
                 </a>
               </Button>
 
-              {/* Sponsor button - always visible, but hide text on mobile */}
+              {/* Sponsor button */}
               <Button
                 variant="outline"
                 size="sm"

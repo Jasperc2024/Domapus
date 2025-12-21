@@ -1,4 +1,4 @@
-name: Update Redfin ZIP Data
+name: Update ZIP code market Data
 
 permissions:
   contents: write

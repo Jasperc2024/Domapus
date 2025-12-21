@@ -38,9 +38,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
         let fullPayload;
 
-        // --- MODIFICATION ---
-        // Since we know the data is plain JSON, we can decode and parse directly.
-        // Removed the old logic that checked for content-encoding and used pako.
         try {
           const jsonText = new TextDecoder().decode(buffer);
           fullPayload = JSON.parse(jsonText);
@@ -49,7 +46,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           console.error('[Worker] JSON parse failed:', err);
           throw new Error("Failed to parse JSON: " + (err as Error).message);
         }
-        // --- END MODIFICATION ---
 
         const { last_updated_utc, zip_codes: rawZipData } = fullPayload;
         if (!rawZipData) throw new Error("Missing zip_codes data");
