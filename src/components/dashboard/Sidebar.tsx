@@ -28,8 +28,7 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
       case "price": return `$${numValue.toLocaleString()}`;
       case "days": return `${numValue} days`;
       case "percentage": return `${numValue.toFixed(1)}%`;
-      case "ratio": return `${(numValue * 100).toFixed(1)}%`;
-      case "coordinate": return numValue.toFixed(4);
+      case "ratio": return `${numValue.toFixed(1)}%`;
       default: return numValue.toLocaleString();
     }
   };
@@ -44,7 +43,6 @@ export function Sidebar({ isOpen, isCollapsed, zipData, allZipData, onClose }: S
   };
 
   // The list of all metrics to display for a single ZIP code
-  // All metrics in user-specified order
   const allMetrics = [
     { key: "zhvi", label: "Zillow Home Value Index", type: "price", momKey: "zhvi_mom", yoyKey: "zhvi_yoy" },
     { key: "median_sale_price", label: "Median Sale Price", type: "price", momKey: "median_sale_price_mom", yoyKey: "median_sale_price_yoy" },

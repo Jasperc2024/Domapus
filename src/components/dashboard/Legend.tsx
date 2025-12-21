@@ -9,9 +9,7 @@ interface LegendProps {
 // Number formatting helper
 function formatLegendValue(value: number, metric: string): string {
   const m = metric.toLowerCase();
-  if (m.includes('price') || m.includes('index')) return `$${(value / 1000).toFixed(0)}k`;
-  if (m.includes('ratio') || m.includes('above')) return `${(value * 100).toFixed(0)}%`;
-  if (m.includes('dom')) return `${Math.round(value)}`;
+  if (m.includes('price') || m.includes('zhvi')) return `$${(value / 1000).toFixed(0)}k`;
   return value.toLocaleString();
 }
 
@@ -45,20 +43,16 @@ export function Legend({ selectedMetric, metricValues, isExport = false }: Legen
   }, [metricValues, selectedMetric]);
 
   const getMetricDisplayName = (metric: string): string => {
-    // Normalize input to snake_case for lookup
-    const normalizedKey = metric.replace(/-/g, '_');
-    
     const metricNames: Record<string, string> = {
       zhvi: 'Zillow Home Value Index',
       median_sale_price: 'Median Sale Price',
       median_ppsf: 'Median Price per Sq Ft',
       sale_to_list_ratio: 'Sale-to-List Ratio',
-      avg_sale_to_list_ratio: 'Sale-to-List Ratio',// Handle potential naming variations     
-      median_dom: 'Median Days on Market', 
+      avg_sale_to_list_ratio: 'Sale-to-List Ratio',
+      median_dom: 'Median Days on Market',
     };
-    
-    return metricNames[normalizedKey] || normalizedKey.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-  };
+  return metricNames[metric] || metric.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+};
 
   return (
     <div className={`

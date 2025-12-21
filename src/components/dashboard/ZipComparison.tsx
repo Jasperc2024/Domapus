@@ -42,7 +42,7 @@ export function ZipComparison({ currentZip, allZipData, onClose }: ZipComparison
       case 'price': return `$${numValue.toLocaleString()}`;
       case 'days': return `${numValue} days`;
       case 'percentage': return `${numValue.toFixed(1)}%`;
-      case 'ratio': return `${(numValue * 100).toFixed(1)}%`;
+      case 'ratio': return `${numValue.toFixed(1)}%`;
       default: return numValue.toLocaleString();
     }
   };

@@ -9,7 +9,7 @@ export function formatMetricValue(value: number, format: 'currency' | 'number' |
     case 'percent':
       return `${value.toFixed(1)}%`;
     case 'ratio':
-      return `${(value * 100).toFixed(1)}%`;
+      return `${value.toFixed(1)}%`;
     case 'number':
       return value.toLocaleString();
     default:
@@ -38,7 +38,6 @@ export function getMetricDisplay(data: ZipData, selectedMetric: string): string 
   };
 
   const metricInfo = metricMap[selectedMetric];
-  // The data object is already complete, so we access the key directly.
   const value = metricInfo ? data[metricInfo.key] : null;
 
   let formattedValue = "N/A";
@@ -53,7 +52,7 @@ export function getMetricDisplay(data: ZipData, selectedMetric: string): string 
         break;
       case 'ratio':
         // Assumes the value is a decimal ratio, e.g., 0.98
-        formattedValue = `${(value * 100).toFixed(1)}%`;
+        formattedValue = `${value.toFixed(1)}%`;
         break;
       case 'number':
         formattedValue = value.toLocaleString();

@@ -27,8 +27,10 @@ export function MetricSelector({ selectedMetric, onMetricChange }: MetricSelecto
         Metric:
       </label>
       <Select value={selectedMetric} onValueChange={onMetricChange}>
-        <SelectTrigger className="w-48 h-8 text-sm" aria-label="Select visualization metric">
-          <SelectValue placeholder="Select a metric" />
+        <SelectTrigger className="w-50 h-8 text-sm px-3 justify-between" aria-label="Select visualization metric">
+          <div className="flex-1 text-left truncate pr-2">
+            <SelectValue placeholder="Select a metric" />
+          </div>
         </SelectTrigger>
         <SelectContent className="z-[9999]">
           {Object.entries(METRICS).map(([key, label]) => (

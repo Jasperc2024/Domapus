@@ -74,8 +74,8 @@ def process_zillow_data(content):
             
             zillow_results[zip_code] = {
                 'zhvi': round(float(val), 2),
-                'zhvi_mom': round(((val / val_mom) - 1) * 100, 1) if val_mom and val_mom != 0 else None,
-                'zhvi_yoy': round(((val / val_yoy) - 1) * 100, 1) if val_yoy and val_yoy != 0 else None
+                'zhvi_mom': round(((val / val_mom) - 1), 3) if val_mom and val_mom != 0 else None,
+                'zhvi_yoy': round(((val / val_yoy) - 1), 3) if val_yoy and val_yoy != 0 else None
             }
         return zillow_results
     except Exception as e:
@@ -188,18 +188,16 @@ def main():
                     ordered_data[key] = val.strftime('%Y-%m-%d') if hasattr(val, 'strftime') else str(val)[:10]
                 elif key in ['lat', 'lng']:
                     ordered_data[key] = round(float(val), 5)
-                elif key == 'zhvi':
-                    ordered_data[key] = int(float(val))
                 elif key == 'median_ppsf':
                     ordered_data[key] = round(float(val), 2)
                 elif key == 'avg_sale_to_list_ratio':
                     ordered_data[key] = round(float(val) * 100, 1)
                 elif any(x in key for x in ['_mom', '_yoy', 'sold_above_list', 'off_market_in_two_weeks']):
-                    if 'zhvi' in key:
+                    if 'dom' in key:
                         ordered_data[key] = round(float(val), 1)
                     else:
                         ordered_data[key] = round(float(val) * 100, 1)
-                elif any(c in key for c in ['price', 'sold', 'inventory', 'dom', 'listings', 'pending']):
+                elif any(c in key for c in ['price', 'sold', 'inventory', 'dom', 'listings', 'pending', 'zhvi']):
                     ordered_data[key] = int(float(val))
                 else:
                     ordered_data[key] = val
