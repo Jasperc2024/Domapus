@@ -60,9 +60,23 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         for (let i = 0; i < entries.length; i++) {
           if (signal.aborted) return;
           const [zipCode, rawValue] = entries[i];
-          (rawValue as ZipData).zipCode = zipCode;
-          zipData[zipCode] = rawValue as ZipData;
-          const metric = getMetricValue(rawValue as ZipData, selectedMetric);
+
+          const raw: any = rawValue ?? {};
+          const normalized: ZipData = {
+            ...(raw as ZipData),
+            zipCode,
+            // Support both old (latitude/longitude) and new (lat/lng) field names
+            latitude: (raw.latitude ?? raw.lat ?? null) as any,
+            longitude: (raw.longitude ?? raw.lng ?? null) as any,
+          };
+
+          // Avoid leaking non-typed fields downstream
+          delete (normalized as any).lat;
+          delete (normalized as any).lng;
+
+          zipData[zipCode] = normalized;
+
+          const metric = getMetricValue(normalized, selectedMetric);
           if (metric > 0) metricValues.push(metric);
 
           if (i % 2000 === 0) {

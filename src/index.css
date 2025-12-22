@@ -48,12 +48,22 @@ html, body {
     --dashboard-text-primary: 222.2 84% 4.9%;
     --dashboard-text-secondary: 215.4 16.3% 46.9%;
 
-    /* Data visualization colors - Updated to match map */
-    --data-low: 57 100% 84%; /* #FFF9B0 equivalent */
-    --data-medium-low: 19 100% 71%; /* #FFA873 equivalent */
-    --data-medium: 343 75% 57%; /* #E84C61 equivalent */
-    --data-medium-high: 312 54% 38%; /* #922C7E equivalent */
-    --data-high: 252 67% 20%; /* #2E0B59 equivalent */
+    /* Data visualization colors (choropleth stops) */
+    --choropleth-1: 57 100% 84%;
+    --choropleth-2: 48 100% 76%;
+    --choropleth-3: 39 100% 70%;
+    --choropleth-4: 22 100% 67%;
+    --choropleth-5: 350 76% 60%;
+    --choropleth-6: 323 58% 48%;
+    --choropleth-7: 289 50% 37%;
+    --choropleth-8: 263 78% 20%;
+
+    /* Data visualization semantic shortcuts */
+    --data-low: var(--choropleth-1);
+    --data-medium-low: 19 100% 71%;
+    --data-medium: var(--choropleth-5);
+    --data-medium-high: var(--choropleth-7);
+    --data-high: var(--choropleth-8);
 
     /* Map colors */
     --map-hover: 221.2 83.2% 53.3%;
@@ -99,12 +109,22 @@ html, body {
     --dashboard-text-primary: 210 40% 98%;
     --dashboard-text-secondary: 215 20.2% 65.1%;
 
-    /* Data visualization dark colors - Updated to match map */
-    --data-low: 57 80% 74%; /* Darker #FFF9B0 equivalent */
-    --data-medium-low: 19 80% 61%; /* Darker #FFA873 equivalent */
-    --data-medium: 343 65% 47%; /* Darker #E84C61 equivalent */
-    --data-medium-high: 312 44% 28%; /* Darker #922C7E equivalent */
-    --data-high: 252 57% 15%; /* Darker #2E0B59 equivalent */
+    /* Data visualization dark colors (choropleth stops) */
+    --choropleth-1: 57 70% 74%;
+    --choropleth-2: 48 70% 66%;
+    --choropleth-3: 39 70% 60%;
+    --choropleth-4: 22 70% 58%;
+    --choropleth-5: 350 60% 50%;
+    --choropleth-6: 323 50% 40%;
+    --choropleth-7: 289 40% 30%;
+    --choropleth-8: 263 70% 16%;
+
+    /* Data visualization semantic shortcuts */
+    --data-low: var(--choropleth-1);
+    --data-medium-low: 19 80% 61%;
+    --data-medium: var(--choropleth-5);
+    --data-medium-high: var(--choropleth-7);
+    --data-high: var(--choropleth-8);
 
     /* Map dark colors */
     --map-hover: 217.2 91.2% 59.8%;
