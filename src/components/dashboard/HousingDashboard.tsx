@@ -3,6 +3,7 @@ import { useDataWorker } from "@/hooks/useDataWorker";
 import { ZipData } from "./map/types";
 import { MapExport } from "@/components/MapExport";
 import { buildSpatialIndex } from "@/lib/spatial-index";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import { TopBar } from "./TopBar";
 import { MapLibreMap } from "./MapLibreMap";
@@ -20,6 +21,7 @@ interface DataPayload {
 const BASE_PATH = import.meta.env.BASE_URL;
 
 export function HousingDashboard() {
+  const isMobile = useIsMobile();
   const [selectedMetric, setSelectedMetric] = useState<MetricType>("median_sale_price");
   const [selectedZip, setSelectedZip] = useState<ZipData | null>(null);
   const [searchZip, setSearchZip] = useState<string>("");
@@ -90,7 +92,12 @@ export function HousingDashboard() {
   return (
     <div className="w-full h-screen bg-dashboard-bg overflow-hidden flex flex-col">
       {showSponsorBanner && <SponsorBanner onClose={() => setShowSponsorBanner(false)} />}
-      <TopBar selectedMetric={selectedMetric} onMetricChange={setSelectedMetric} onSearch={handleSearch}>
+      <TopBar
+        selectedMetric={selectedMetric}
+        onMetricChange={setSelectedMetric}
+        onSearch={handleSearch}
+        hideMobileControls={isMobile && sidebarOpen}
+      >
         <MapExport 
           allZipData={zipData} 
           selectedMetric={selectedMetric}
@@ -120,7 +127,7 @@ export function HousingDashboard() {
               processData={processData}
             />
           </div>
-          {!isExportMode && (
+          {!isExportMode && !(isMobile && sidebarOpen) && (
             <div className="absolute bottom-4 right-4 w-64 z-[1000] pointer-events-auto">
               <Legend
                 selectedMetric={selectedMetric}

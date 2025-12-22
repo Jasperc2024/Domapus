@@ -119,10 +119,11 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     const alaska = new Set<string>();
     const hawaii = new Set<string>();
     
-    filteredData.forEach(zip => {
-      if (zip.state === 'Alaska') alaska.add(zip.zipCode);
-      else if (zip.state === 'Hawaii') hawaii.add(zip.zipCode);
-    });
+     filteredData.forEach(zip => {
+       const st = (zip.state ?? '').toString();
+       if (st === 'AK' || st.toLowerCase() === 'alaska') alaska.add(zip.zipCode);
+       else if (st === 'HI' || st.toLowerCase() === 'hawaii') hawaii.add(zip.zipCode);
+     });
     
     return { alaskaZips: alaska, hawaiiZips: hawaii };
   }, [filteredData, regionScope]);
