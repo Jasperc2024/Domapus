@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { ZipData } from "../map/types";
-import { Download, Settings, Map as MapIcon, FileImage, Search, X } from "lucide-react";
+import { Download, Settings, Map as MapIcon, FileImage, Search, X, FileDown, Settings2, Microscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,12 @@ import { cn } from "@/lib/utils";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { toast } from "@/hooks/use-toast";
+
+declare global {
+  interface Window {
+    dataLayer: any[];
+  }
+}
 
 export interface ExportOptions {
   regionScope: "national" | "state" | "metro";
@@ -27,6 +33,20 @@ interface ExportSidebarProps {
   selectedMetric: string;
   onClose: () => void;
 }
+
+const STATE_MAP: Record<string, string> = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+  CO: "Colorado", CT: "Connecticut", DE: "Delaware", DC: "District of Columbia",
+  FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois",
+  IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana",
+  ME: "Maine", MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota",
+  MS: "Mississippi", MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada",
+  NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico", NY: "New York",
+  NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon",
+  PA: "Pennsylvania", PR: "Puerto Rico", RI: "Rhode Island", SC: "South Carolina",
+  SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont",
+  VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming"
+};
 
 export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSidebarProps) {
   const [regionScope, setRegionScope] = useState<"national" | "state" | "metro">("national");
@@ -80,13 +100,20 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
       if (zip.state) stateSet.add(zip.state);
       if (zip.metro) metroSet.add(zip.metro);
     }
+
+    const states = Array.from(stateSet)
+      .map(code => ({
+        code,
+        name: STATE_MAP[code] || code
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
     
     const metros = Array.from(metroSet).sort();
     const filtered = debouncedMetroSearch 
       ? metros.filter(m => m.toLowerCase().includes(debouncedMetroSearch.toLowerCase()))
       : metros;
       
-    return { availableStates: Array.from(stateSet).sort(), filteredMetros: filtered };
+    return { availableStates: states, filteredMetros: filtered };
   }, [allZipData, debouncedMetroSearch]);
 
   // Only compute filtered data when we have a valid selection
@@ -109,7 +136,9 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
   }, [allZipData, regionScope, selectedState, selectedMetro, hasValidSelection]);
 
   const regionName = useMemo(() => {
-    if (regionScope === 'state') return selectedState || "Select a state";
+    if (regionScope === 'state') {
+      return STATE_MAP[selectedState] || selectedState || "Select a state";
+    }
     if (regionScope === 'metro') return selectedMetro || "Select a metro area";
     return "United States";
   }, [regionScope, selectedState, selectedMetro]);
@@ -136,13 +165,26 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     const element = printStageRef.current?.getElement();
     if (!element) return;
 
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: "map_export_click",
+      export_settings: {
+        format: fileFormat,
+        metric: selectedMetric,
+        scope: regionScope,
+        region_name: regionName,
+        include_legend: includeLegend,
+        include_title: includeTitle
+      }
+    });
+
     setIsExporting(true);
 
     try {
       await new Promise(resolve => requestAnimationFrame(resolve));
-      await new Promise(resolve => setTimeout(resolve, 100)); // Extra delay for map rendering
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      const scale = 3; // High resolution
+      const scale = 5; 
       const canvas = await html2canvas(element, {
         scale,
         useCORS: true,
@@ -153,11 +195,10 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
       if (fileFormat === "png") {
         const link = document.createElement("a");
-        link.download = `domapus-${selectedMetric}-${regionScope}.png`;
+        link.download = `Domapus-${selectedMetric}-${regionScope}.png`;
         link.href = canvas.toDataURL("image/png", 1.0);
         link.click();
       } else {
-        // PDF - Landscape A4 with clickable links
         const imgData = canvas.toDataURL("image/png", 1.0);
         const pdf = new jsPDF({ 
           orientation: "landscape", 
@@ -171,7 +212,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         const imgAspect = canvas.width / canvas.height;
         const pdfAspect = pdfWidth / pdfHeight;
         
-        let drawWidth, drawHeight, offsetX, offsetY;
+        let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
         
         if (imgAspect > pdfAspect) {
           drawWidth = pdfWidth;
@@ -187,16 +228,28 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         
         pdf.addImage(imgData, "PNG", offsetX, offsetY, drawWidth, drawHeight);
         
-        // Add clickable links
-        // Domapus link (top right area)
-        pdf.link(pdfWidth - 100, 20, 80, 20, { url: 'https://domapus.com' });
-        // Redfin link (below Domapus)
-        pdf.link(pdfWidth - 100, 40, 80, 15, { url: 'https://www.redfin.com/news/data-center/' });
+        const stageRect = element.getBoundingClientRect();
+        const links = element.querySelectorAll('a');
+
+        links.forEach((link) => {
+          const linkRect = link.getBoundingClientRect();
+          const relX = (linkRect.left - stageRect.left) / stageRect.width;
+          const relY = (linkRect.top - stageRect.top) / stageRect.height;
+          const relW = linkRect.width / stageRect.width;
+          const relH = linkRect.height / stageRect.height;
+
+          const pdfX = offsetX + (relX * drawWidth);
+          const pdfY = offsetY + (relY * drawHeight);
+          const pdfW = relW * drawWidth;
+          const pdfH = relH * drawHeight;
+
+          pdf.link(pdfX, pdfY, pdfW, pdfH, { url: link.href });
+        });
         
-        pdf.save(`domapus-${selectedMetric}-${regionScope}.pdf`);
+        pdf.save(`Domapus-${selectedMetric}-${regionScope}.pdf`);
       }
 
-      toast({ title: "Export Complete", description: "Your map has been downloaded." });
+      toast({ title: "Export Complete", description: "Your map has been downloaded.", duration: 30000, });
     } catch (error) {
       console.error("Export failed:", error);
       toast({ title: "Export Failed", description: "Something went wrong.", variant: "destructive" });
@@ -220,17 +273,16 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
   return (
     <div className="fixed inset-0 bg-background z-50 flex">
-      {/* Left Sidebar - Settings */}
       <div className="w-80 bg-background border-r h-full shadow-xl flex flex-col">
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
           <div className="flex items-center gap-2 pb-2 border-b">
-            <Settings className="h-4 w-4 text-primary" />
-            <h2 className="text-base font-semibold">Export Map</h2>
+            <Download className="h-4 w-4 text-primary" />
+            <h2 className="text-base font-semibold">Export Settings</h2>
           </div>
 
-          <div className="space-y-3">
+          <div className="p-3 rounded-md border bg-muted/20 space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium">
-              <MapIcon className="h-3.5 w-3.5" />
+              <Microscope className="h-3.5 w-3.5" />
               <span>Region Scope</span>
             </div>
             <RadioGroup value={regionScope} onValueChange={(v) => setRegionScope(v as any)} className="space-y-2">
@@ -242,7 +294,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
             {regionScope === 'state' && (
               <Select value={selectedState} onValueChange={setSelectedState}>
                 <SelectTrigger className="h-9"><SelectValue placeholder="Select a state"/></SelectTrigger>
-                <SelectContent>{availableStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                <SelectContent>{availableStates.map(state => (<SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>))}</SelectContent>
               </Select>
             )}
 
@@ -294,7 +346,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
             )}
           </div>
           
-          <div className="space-y-3 pt-2">
+          <div className="p-3 rounded-md border bg-muted/20 space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               <FileImage className="h-3.5 w-3.5" />
               <span>File Format</span>
@@ -305,8 +357,11 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
             </RadioGroup>
           </div>
           
-          <div className="space-y-2 pt-2">
-            <div className="text-sm font-medium">Customization</div>
+          <div className="p-3 rounded-md border bg-muted/20 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Settings2 className="h-3.5 w-3.5" />
+              <span>Customization</span>
+              </div>
             <div className="space-y-2">
               <div className="flex items-center space-x-2"><Checkbox id="c-title" checked={includeTitle} onCheckedChange={(c) => setIncludeTitle(c === true)} /><Label htmlFor="c-title" className="text-sm">Include Title</Label></div>
               <div className="flex items-center space-x-2"><Checkbox id="c-legend" checked={includeLegend} onCheckedChange={(c) => setIncludeLegend(c === true)} /><Label htmlFor="c-legend" className="text-sm">Include Legend</Label></div>
@@ -315,7 +370,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         </div>
         
         <div className="p-4 space-y-2 border-t bg-background">
-          <Button onClick={handleExport} disabled={isExportDisabled()} className="w-full" size="default">
+          <Button id="btn-map-export" onClick={handleExport} disabled={isExportDisabled()} className="w-full" size="default">
             {(isExporting || (!isMapReady && hasValidSelection && filteredData.length > 0)) && (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
             )}
@@ -339,24 +394,31 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         
         <div className="flex-1 flex items-center justify-center">
           <div 
-            className="bg-white rounded-lg shadow-lg overflow-hidden border border-border"
+            className="bg-white rounded-lg shadow-lg overflow-hidden border border-border relative"
             style={{ 
               width: '100%', 
-              maxWidth: '900px',
+              maxWidth: '1200px',
               aspectRatio: '4 / 3'
             }}
           >
             {hasValidSelection ? (
-              <PrintStage
-                ref={printStageRef}
-                filteredData={filteredData}
-                selectedMetric={selectedMetric}
-                regionScope={regionScope}
-                regionName={regionName}
-                includeLegend={includeLegend}
-                includeTitle={includeTitle}
-                onReady={() => setIsMapReady(true)}
-              />
+              <>
+                <PrintStage
+                  ref={printStageRef}
+                  filteredData={filteredData}
+                  selectedMetric={selectedMetric}
+                  regionScope={regionScope}
+                  regionName={regionName}
+                  includeLegend={includeLegend}
+                  includeTitle={includeTitle}
+                  onReady={() => setIsMapReady(true)}
+                />
+                <div 
+                  className="absolute inset-0 z-[5] bg-transparent" 
+                  onContextMenu={(e) => {
+                  }}
+                />
+              </>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                 {regionScope === 'state' ? "Select a state to preview" : "Select a metro area to preview"}

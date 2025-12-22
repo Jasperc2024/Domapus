@@ -138,7 +138,7 @@ export function Legend({ selectedMetric, metricValues, isExport = false }: Legen
 
       <div className="mt-2 pt-2 border-t border-border/60">
         <p className="text-[10px] text-muted-foreground text-center">
-          Click ZIP code to view more info
+          Click ZIP code to view details
         </p>
       </div>
     </div>

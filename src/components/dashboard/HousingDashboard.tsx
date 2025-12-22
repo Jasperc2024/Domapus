@@ -4,7 +4,6 @@ import { ZipData } from "./map/types";
 import { MapExport } from "@/components/MapExport";
 import { buildSpatialIndex } from "@/lib/spatial-index";
 import { useIsMobile } from "@/hooks/use-mobile";
-
 import { TopBar } from "./TopBar";
 import { MapLibreMap } from "./MapLibreMap";
 import { Legend } from "./Legend";
@@ -22,7 +21,7 @@ const BASE_PATH = import.meta.env.BASE_URL;
 
 export function HousingDashboard() {
   const isMobile = useIsMobile();
-  const [selectedMetric, setSelectedMetric] = useState<MetricType>("median_sale_price");
+  const [selectedMetric, setSelectedMetric] = useState<MetricType>("zhvi");
   const [selectedZip, setSelectedZip] = useState<ZipData | null>(null);
   const [searchZip, setSearchZip] = useState<string>("");
   const [searchTrigger, setSearchTrigger] = useState<number>(0);
@@ -49,7 +48,7 @@ export function HousingDashboard() {
       try {
         const result = await processData({
           type: 'LOAD_AND_PROCESS_DATA',
-          data: { url: dataUrl, selectedMetric: 'median_sale_price' }
+          data: { url: dataUrl, selectedMetric: 'zhvi' }
         }) as DataPayload;
 
         if (!isMounted) return;
@@ -59,7 +58,7 @@ export function HousingDashboard() {
           setZipData(result.zip_codes);
           setDataBounds(result.bounds);
           
-          // Build spatial index for efficient lookups (async, non-blocking)
+          // Build spatial index for efficient lookups
           setTimeout(() => {
             buildSpatialIndex(result.zip_codes);
           }, 100);

@@ -120,7 +120,7 @@ export function TopBar({
                   rel="noopener noreferrer"
                   title="GitHub"
                 >
-                  <Github className="h-4 w-4 mr-2" />
+                  <Github className="h-4 w-4" />
                   {!isMobile && <span>GitHub</span>} {/* Hide this span on mobile */}
                 </a>
               </Button>
@@ -138,7 +138,7 @@ export function TopBar({
                   rel="noopener noreferrer"
                   title="Sponsor"
                 >
-                  <Heart className="h-4 w-4 mr-2" />
+                  <Heart className="h-4 w-4" />
                   {!isMobile && <span>Sponsor</span>} {/* Hide this span on mobile */}
                 </a>
               </Button>

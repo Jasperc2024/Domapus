@@ -23,7 +23,7 @@ export function getMetricDisplay(data: ZipData, selectedMetric: string): string 
   }
 
   const metricMap: Record<string, { key: keyof ZipData; label: string; format: 'currency' | 'number' | 'percent' | 'ratio' }> = {
-    "zhvi": { key: "zhvi", label: "Zillow Home Value Index", format: 'currency' },
+    "zhvi": { key: "zhvi", label: "ZHVI", format: 'currency' },
     "median_sale_price": { key: "median_sale_price", label: "Median Sale Price", format: 'currency' },
     "median_list_price": { key: "median_list_price", label: "Median List Price", format: 'currency' },
     "median_ppsf": { key: "median_ppsf", label: "Median Price Per Square Foot", format: 'currency' },

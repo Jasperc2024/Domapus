@@ -95,7 +95,6 @@ export function MapLibreMap({
       minZoom: 3,
       maxZoom: 12,
       attributionControl: false,
-      canvasContextAttributes: { preserveDrawingBuffer: true },
     });
 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');

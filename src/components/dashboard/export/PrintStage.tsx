@@ -8,7 +8,6 @@ import { featureCollection, point } from "@turf/helpers";
 
 const BASE_PATH = import.meta.env.BASE_URL;
 
-// Color palette for choropleth (must match main map)
 const CHOROPLETH_COLORS = ["#FFF9B0", "#FFEB84", "#FFD166", "#FF9A56", "#E84C61", "#C13584", "#7B2E8D", "#2E0B59"];
 
 export interface PrintStageProps {
@@ -69,7 +68,6 @@ const getDate = (): string =>
   new Date(new Date().setMonth(new Date().getMonth() - 1))
     .toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
-// Format legend value
 function formatLegendValue(value: number, metric: string): string {
   const m = metric.toLowerCase();
   if (m.includes("price") || m.includes("zhvi")) return `$${(value / 1000).toFixed(0)}k`;
@@ -105,7 +103,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
   const mapsRef = useRef<{ [key: string]: maplibregl.Map | null }>({});
   const [mapsLoaded, setMapsLoaded] = useState(false);
 
-  // Stable key to prevent unnecessary map recreation
   const stableKey = useMemo(() => {
     return `${regionScope}-${regionName}-${selectedMetric}-${filteredData.length}`;
   }, [regionScope, regionName, selectedMetric, filteredData.length]);
@@ -114,27 +111,23 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     getElement: () => containerRef.current
   }));
 
-  // Create lookup map
   const zipDataMap = useMemo(() => {
     const map: Record<string, ZipData> = {};
     filteredData.forEach(zip => { map[zip.zipCode] = zip; });
     return map;
   }, [filteredData]);
 
-  // Compute buckets
   const buckets = useMemo(() => {
     const values = filteredData.map(d => getMetricValue(d, selectedMetric));
     return computeQuantileBuckets(values);
   }, [filteredData, selectedMetric]);
 
-  // Metric values for legend
   const metricValues = useMemo(() => {
     return filteredData
       .map(d => d[selectedMetric as keyof ZipData] as number)
       .filter(v => typeof v === "number" && v > 0);
   }, [filteredData, selectedMetric]);
 
-  // Legend display values
   const legendDisplay = useMemo(() => {
     if (metricValues.length === 0) return { min: "N/A", mid: "N/A", max: "N/A" };
     const [min, mid, max] = computeQuantiles(metricValues, [0.05, 0.5, 0.95]);
@@ -145,82 +138,63 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     };
   }, [metricValues, selectedMetric]);
 
-  // Set of valid ZIP codes in this region
   const validZipSet = useMemo(() => new Set(filteredData.map(z => z.zipCode)), [filteredData]);
 
-  // Split data for insets (Alaska/Hawaii)
   const { alaskaZips, hawaiiZips, mainlandZips } = useMemo(() => {
-    if (regionScope !== 'national') {
-      return { alaskaZips: new Set<string>(), hawaiiZips: new Set<string>(), mainlandZips: validZipSet };
-    }
-    
     const alaska = new Set<string>();
     const hawaii = new Set<string>();
     const mainland = new Set<string>();
     
     filteredData.forEach(zip => {
+      const val = getMetricValue(zip, selectedMetric);
       const st = (zip.state ?? '').toString();
-      if (st === 'AK' || st.toLowerCase() === 'alaska') alaska.add(zip.zipCode);
-      else if (st === 'HI' || st.toLowerCase() === 'hawaii') hawaii.add(zip.zipCode);
-      else mainland.add(zip.zipCode);
+      // Only include in sets if there is actually data (val > 0)
+      if (val > 0) {
+        if (st === 'AK' || st.toLowerCase() === 'alaska') alaska.add(zip.zipCode);
+        else if (st === 'HI' || st.toLowerCase() === 'hawaii') hawaii.add(zip.zipCode);
+        else mainland.add(zip.zipCode);
+      } else if (regionScope !== 'national') {
+        mainland.add(zip.zipCode);
+      }
     });
     
     return { alaskaZips: alaska, hawaiiZips: hawaii, mainlandZips: mainland };
-  }, [filteredData, regionScope, validZipSet]);
+  }, [filteredData, regionScope, selectedMetric]);
 
-  // Calculate bounds for state/metro with padding
   const regionBounds = useMemo(() => {
     if (regionScope === 'national') return null;
-    
     const validData = filteredData.filter(d => d.latitude && d.longitude);
     if (validData.length === 0) return null;
-    
     const points = validData.map(d => point([d.longitude!, d.latitude!]));
     const fc = featureCollection(points);
     let [minLng, minLat, maxLng, maxLat] = bbox(fc);
-    
-    // Add 10% padding to ensure no cropping
     const lngPad = (maxLng - minLng) * 0.1 || 0.5;
     const latPad = (maxLat - minLat) * 0.1 || 0.5;
-    minLng -= lngPad;
-    maxLng += lngPad;
-    minLat -= latPad;
-    maxLat += latPad;
-    
     return {
-      bounds: [[minLng, minLat], [maxLng, maxLat]] as [[number, number], [number, number]],
+      bounds: [[minLng - lngPad, minLat - latPad], [maxLng + lngPad, maxLat + latPad]] as [[number, number], [number, number]],
       center: [(minLng + maxLng) / 2, (minLat + maxLat) / 2] as [number, number]
     };
   }, [filteredData, regionScope]);
 
-  // Calculate national bounds (excluding AK/HI) to prevent cropping
   const nationalBounds = useMemo(() => {
     if (regionScope !== 'national') return null;
-    
     const mainlandData = filteredData.filter(d => {
       const st = (d.state ?? '').toString();
       const isAkHi = st === 'AK' || st === 'HI' || st.toLowerCase() === 'alaska' || st.toLowerCase() === 'hawaii';
       return !isAkHi && d.latitude && d.longitude;
     });
-    
     if (mainlandData.length === 0) return null;
-    
     const points = mainlandData.map(d => point([d.longitude!, d.latitude!]));
     const fc = featureCollection(points);
     let [minLng, minLat, maxLng, maxLat] = bbox(fc);
-    
-    // Add padding
     const lngPad = (maxLng - minLng) * 0.05 || 0.5;
     const latPad = (maxLat - minLat) * 0.05 || 0.5;
-    
     return [[minLng - lngPad, minLat - latPad], [maxLng + lngPad, maxLat + latPad]] as [[number, number], [number, number]];
   }, [filteredData, regionScope]);
 
   useEffect(() => {
     addPMTilesProtocol();
     setMapsLoaded(false);
-
-    // Cleanup existing maps
     Object.keys(mapsRef.current).forEach(key => {
       mapsRef.current[key]?.remove();
       mapsRef.current[key] = null;
@@ -233,17 +207,15 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
     const pmtilesUrl = new URL(`${BASE_PATH}data/us_zip_codes.pmtiles`, window.location.origin).href;
     
-    // Build step expression for choropleth
     const stepExpression: ExpressionSpecification = [
       "step",
       ["coalesce", ["feature-state", "metricValue"], 0],
-      "transparent",
-      0.001,
+      "#efefef", 
+      0.000001,
       CHOROPLETH_COLORS[0],
       ...buckets.flatMap((threshold, i) => [threshold, CHOROPLETH_COLORS[Math.min(i + 1, CHOROPLETH_COLORS.length - 1)]])
     ] as ExpressionSpecification;
 
-    // Track loading state
     let loadedCount = 0;
     const requiredMaps = regionScope === 'national' 
       ? 1 + (alaskaZips.size > 0 ? 1 : 0) + (hawaiiZips.size > 0 ? 1 : 0)
@@ -272,6 +244,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
         style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#ffffff' } }] },
         center,
         zoom,
+        pixelRatio: 2, // Fix blurriness for exports
         interactive: false,
         attributionControl: false,
         canvasContextAttributes: { preserveDrawingBuffer: true },
@@ -280,9 +253,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       mapsRef.current[key] = map;
 
       map.on('load', () => {
-        if (bounds) {
-          map.fitBounds(bounds, { padding: 30, maxZoom: 10 });
-        }
+        if (bounds) map.fitBounds(bounds, { padding: 30, maxZoom: 10 });
 
         map.addSource("zips", {
           type: "vector",
@@ -290,7 +261,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
           promoteId: "ZCTA5CE20"
         });
 
-        // Fill layer - only show colored zips in this region
         map.addLayer({
           id: "zips-fill",
           type: "fill",
@@ -302,7 +272,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
           }
         });
 
-        // Border layer - only show borders for zips in this region
         map.addLayer({
           id: "zips-border",
           type: "line",
@@ -312,7 +281,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
             "line-color": [
               "case",
               ["boolean", ["feature-state", "inRegion"], false],
-              "rgba(0,0,0,0.2)",
+              "rgba(0,0,0,0.15)",
               "transparent"
             ],
             "line-width": 0.5
@@ -320,10 +289,8 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
         });
 
         map.once('idle', () => {
-          // Set feature states for coloring and border visibility
-          const zipsToColor = validZips || validZipSet;
-          
-          zipsToColor.forEach(zipCode => {
+          const zipsToProcess = validZips || validZipSet;
+          zipsToProcess.forEach(zipCode => {
             const data = zipDataMap[zipCode];
             if (data) {
               const metricValue = getMetricValue(data, selectedMetric);
@@ -333,10 +300,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
               );
             }
           });
-          
           map.triggerRepaint();
-          
-          // Wait for final idle after repaint
           map.once('idle', checkAllReady);
         });
       });
@@ -344,16 +308,12 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       return map;
     };
 
-    // Create maps based on region
     if (regionScope === 'national') {
-      // Use calculated bounds for mainland to prevent cropping
       createMap(mainMapRef.current, 'main', [-98.5, 39.5], 3.8, nationalBounds || undefined, mainlandZips);
       if (alaskaZips.size > 0) createMap(alaskaMapRef.current, 'alaska', [-152, 64], 2.8, undefined, alaskaZips);
       if (hawaiiZips.size > 0) createMap(hawaiiMapRef.current, 'hawaii', [-157, 20.5], 5.5, undefined, hawaiiZips);
     } else {
-      const bounds = regionBounds?.bounds;
-      const center = regionBounds?.center || [-98.5, 39.5];
-      createMap(mainMapRef.current, 'main', center, 5, bounds, validZipSet);
+      createMap(mainMapRef.current, 'main', regionBounds?.center || [-98.5, 39.5], 5, regionBounds?.bounds, validZipSet);
     }
 
     return () => {
@@ -362,55 +322,30 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
         mapsRef.current[key] = null;
       });
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stableKey]);
 
   return (
-    <div 
-      ref={containerRef}
-      className="w-full h-full flex flex-col"
-      style={{ fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#ffffff' }}
-    >
-      {/* Header - Compact with attribution on right */}
+    <div ref={containerRef} className="w-full h-full flex flex-col" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#ffffff' }}>
       <div className="flex items-start justify-between px-6 pt-5 pb-3" style={{ backgroundColor: '#ffffff' }}>
         {includeTitle && (
           <div>
-            <h1 className="text-2xl font-bold leading-tight" style={{ color: '#111827' }}>
-              {getMetricDisplayName(selectedMetric)} by ZIP Code
-            </h1>
-            <p className="text-sm mt-0.5" style={{ color: '#6b7280' }}>
-              {regionName} • {getDate()}
-            </p>
+            <h1 className="text-2xl font-bold leading-tight" style={{ color: '#111827' }}>{getMetricDisplayName(selectedMetric)} by ZIP Code</h1>
+            <p className="text-sm mt-0.5" style={{ color: '#6b7280' }}>{regionName} • {getDate()}</p>
           </div>
         )}
-        <div className="text-right flex-shrink-0">
-          <a 
-            href="https://domapus.com" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-base font-bold"
-            style={{ color: '#2563eb', textDecoration: 'none' }}
-          >
-            Domapus
-          </a>
-          <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>
-            Data: <a 
-              href="https://www.redfin.com/news/data-center/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              style={{ color: '#2563eb', textDecoration: 'none' }}
-            >Redfin</a>
-          </p>
+        <div className="flex items-center gap-1.5 text-[12px] text-[#9ca3af] whitespace-nowrap flex-shrink-0">
+          <span>Built by <a href="https://jasperc2024.github.io/Domapus/" target="_blank" rel="noopener noreferrer" className="text-[13px] hover:underline" style={{ color: '#0c82a5' }}>Domapus</a></span>
+          <span className="opacity-60">•</span>
+          <span>Data: <a href="https://www.redfin.com/news/data-center/" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: '#0c82a5' }}>Redfin</a> & <a href="https://www.zillow.com/research/data/" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: '#0c82a5' }}>Zillow</a></span>
+          <span className="opacity-60">•</span>
+          <span>Map: <a href="https://carto.com/about-carto/" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: '#0c82a5' }}>© CARTO</a> <a href="http://www.openstreetmap.org/about/" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: '#0c82a5' }}>© OpenStreetMap</a> contributors</span>
         </div>
       </div>
 
-      {/* Map Area - Takes remaining space */}
       <div className="flex-1 mx-6 mb-4 relative overflow-hidden" style={{ backgroundColor: '#ffffff' }}>
         {filteredData.length > 0 ? (
           <>
             <div ref={mainMapRef} className="absolute inset-0" />
-            
-            {/* Alaska/Hawaii insets for national view */}
             {regionScope === 'national' && (
               <div className="absolute bottom-4 left-4 flex gap-3 z-10">
                 {alaskaZips.size > 0 && (
@@ -431,20 +366,10 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
                 )}
               </div>
             )}
-
-            {/* Legend - no border, just elements */}
             {includeLegend && (
               <div className="absolute bottom-4 right-4 z-10 p-3" style={{ backgroundColor: '#ffffff' }}>
-                <div className="text-xs font-semibold mb-2" style={{ color: '#111827' }}>
-                  {getMetricDisplayName(selectedMetric)}
-                </div>
-                <div
-                  className="h-3 w-48"
-                  style={{ 
-                    background: `linear-gradient(to right, ${CHOROPLETH_COLORS.join(', ')})`,
-                    borderRadius: '2px'
-                  }}
-                />
+                <div className="text-xs font-semibold mb-2" style={{ color: '#111827' }}>{getMetricDisplayName(selectedMetric)}</div>
+                <div className="h-3 w-48" style={{ background: `linear-gradient(to right, ${CHOROPLETH_COLORS.join(', ')})`, borderRadius: '2px' }} />
                 <div className="mt-1 flex justify-between text-[10px] font-medium w-48" style={{ color: '#6b7280' }}>
                   <span>{legendDisplay.min}</span>
                   <span>{legendDisplay.mid}</span>
@@ -452,8 +377,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
                 </div>
               </div>
             )}
-
-            {/* Loading overlay */}
             {!mapsLoaded && (
               <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.8)' }}>
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: '#2563eb' }} />
@@ -461,9 +384,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
             )}
           </>
         ) : (
-          <div className="flex items-center justify-center h-full text-lg" style={{ color: '#9ca3af' }}>
-            No data to display
-          </div>
+          <div className="flex items-center justify-center h-full text-lg" style={{ color: '#9ca3af' }}>No data to display</div>
         )}
       </div>
     </div>
