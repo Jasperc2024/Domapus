@@ -44,7 +44,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
   const [includeTitle, setIncludeTitle] = useState(true);
   
   const [isExporting, setIsExporting] = useState(false);
-  const [isMapReady, setIsMapReady] = useState(false); // New state to track map readiness
+  const [isMapReady, setIsMapReady] = useState(false);
   
   const printStageRef = useRef<PrintStageRef>(null);
 
@@ -65,7 +65,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Reset map readiness when core data/settings change
+  // Reset map readiness when core settings change
   useEffect(() => {
     setIsMapReady(false);
   }, [regionScope, selectedState, selectedMetro, selectedMetric, includeLegend, includeTitle]);
@@ -89,7 +89,16 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     return { availableStates: Array.from(stateSet).sort(), filteredMetros: filtered };
   }, [allZipData, debouncedMetroSearch]);
 
+  // Only compute filtered data when we have a valid selection
+  const hasValidSelection = useMemo(() => {
+    if (regionScope === 'national') return true;
+    if (regionScope === 'state' && selectedState) return true;
+    if (regionScope === 'metro' && selectedMetro) return true;
+    return false;
+  }, [regionScope, selectedState, selectedMetro]);
+
   const filteredData = useMemo(() => {
+    if (!hasValidSelection) return [];
     if (Object.keys(allZipData).length === 0) return [];
     
     return Object.values(allZipData).filter(zip => {
@@ -97,7 +106,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
       if (regionScope === 'metro' && selectedMetro) return zip.metro === selectedMetro;
       return true;
     });
-  }, [allZipData, regionScope, selectedState, selectedMetro]);
+  }, [allZipData, regionScope, selectedState, selectedMetro, hasValidSelection]);
 
   const regionName = useMemo(() => {
     if (regionScope === 'state') return selectedState || "Select a state";
@@ -107,11 +116,20 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
   const isExportDisabled = () => {
     if (isExporting) return true;
-    if (!isMapReady) return true; // Prevent export if map is loading
-    if (regionScope === "state" && !selectedState) return true;
-    if (regionScope === "metro" && !selectedMetro) return true;
+    if (!isMapReady) return true;
+    if (!hasValidSelection) return true;
     if (filteredData.length === 0) return true;
     return false;
+  };
+
+  const getButtonText = () => {
+    if (isExporting) return "Exporting...";
+    if (!hasValidSelection) {
+      if (regionScope === 'state') return "Select a state";
+      if (regionScope === 'metro') return "Select a metro";
+    }
+    if (!isMapReady && filteredData.length > 0) return "Rendering...";
+    return `Export ${fileFormat.toUpperCase()}`;
   };
 
   const handleExport = useCallback(async () => {
@@ -121,10 +139,10 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     setIsExporting(true);
 
     try {
-      // Small delay to allow UI to update "Exporting..." state
       await new Promise(resolve => requestAnimationFrame(resolve));
+      await new Promise(resolve => setTimeout(resolve, 100)); // Extra delay for map rendering
 
-      const scale = 10
+      const scale = 3; // High resolution
       const canvas = await html2canvas(element, {
         scale,
         useCORS: true,
@@ -139,7 +157,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         link.href = canvas.toDataURL("image/png", 1.0);
         link.click();
       } else {
-        // PDF - Landscape A4
+        // PDF - Landscape A4 with clickable links
         const imgData = canvas.toDataURL("image/png", 1.0);
         const pdf = new jsPDF({ 
           orientation: "landscape", 
@@ -150,7 +168,6 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
         
-        // Calculate aspect ratio
         const imgAspect = canvas.width / canvas.height;
         const pdfAspect = pdfWidth / pdfHeight;
         
@@ -169,6 +186,13 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         }
         
         pdf.addImage(imgData, "PNG", offsetX, offsetY, drawWidth, drawHeight);
+        
+        // Add clickable links
+        // Domapus link (top right area)
+        pdf.link(pdfWidth - 100, 20, 80, 20, { url: 'https://domapus.com' });
+        // Redfin link (below Domapus)
+        pdf.link(pdfWidth - 100, 40, 80, 15, { url: 'https://www.redfin.com/news/data-center/' });
+        
         pdf.save(`domapus-${selectedMetric}-${regionScope}.pdf`);
       }
 
@@ -292,55 +316,52 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         
         <div className="p-4 space-y-2 border-t bg-background">
           <Button onClick={handleExport} disabled={isExportDisabled()} className="w-full" size="default">
-            {isExporting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                Exporting...
-              </>
-            ) : !isMapReady && filteredData.length > 0 ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                Rendering...
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4 mr-2" />
-                Export {fileFormat.toUpperCase()}
-              </>
+            {(isExporting || (!isMapReady && hasValidSelection && filteredData.length > 0)) && (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
             )}
+            {!isExporting && hasValidSelection && filteredData.length > 0 && isMapReady && (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            {getButtonText()}
           </Button>
           <Button onClick={onClose} variant="outline" className="w-full" disabled={isExporting}>Cancel</Button>
         </div>
       </div>
 
       {/* Right Preview Area */}
-      <div className="flex-1 p-6 overflow-hidden flex flex-col bg-gray-100">
+      <div className="flex-1 p-6 overflow-hidden flex flex-col bg-muted/30">
         <div className="mb-3">
-          <h3 className="text-base font-semibold text-gray-700">Preview</h3>
-          <p className="text-xs text-gray-500">
-            {filteredData.length.toLocaleString()} ZIP codes
+          <h3 className="text-base font-semibold text-foreground">Preview</h3>
+          <p className="text-xs text-muted-foreground">
+            {hasValidSelection ? `${filteredData.length.toLocaleString()} ZIP codes` : "Select a region to preview"}
           </p>
         </div>
         
         <div className="flex-1 flex items-center justify-center">
           <div 
-            className="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200"
+            className="bg-white rounded-lg shadow-lg overflow-hidden border border-border"
             style={{ 
               width: '100%', 
               maxWidth: '900px',
               aspectRatio: '4 / 3'
             }}
           >
-            <PrintStage
-              ref={printStageRef}
-              filteredData={filteredData}
-              selectedMetric={selectedMetric}
-              regionScope={regionScope}
-              regionName={regionName}
-              includeLegend={includeLegend}
-              includeTitle={includeTitle}
-              onReady={() => setIsMapReady(true)}
-            />
+            {hasValidSelection ? (
+              <PrintStage
+                ref={printStageRef}
+                filteredData={filteredData}
+                selectedMetric={selectedMetric}
+                regionScope={regionScope}
+                regionName={regionName}
+                includeLegend={includeLegend}
+                includeTitle={includeTitle}
+                onReady={() => setIsMapReady(true)}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                {regionScope === 'state' ? "Select a state to preview" : "Select a metro area to preview"}
+              </div>
+            )}
           </div>
         </div>
       </div>
