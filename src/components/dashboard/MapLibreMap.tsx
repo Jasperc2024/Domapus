@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import maplibregl from "maplibre-gl";
+import maplibregl, { LngLatBoundsLike } from 'maplibre-gl';
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getMetricDisplay } from "./map/utils";
 import { ZipData } from "./map/types";
@@ -79,21 +79,19 @@ export function MapLibreMap({
   useEffect(() => {
     propsRef.current = { zipData, selectedMetric, onZipSelect };
   }, [zipData, selectedMetric, onZipSelect]);
-
-  // Memoize whether we have data to prevent unnecessary effects
   const hasData = useMemo(() => Object.keys(zipData).length > 0, [zipData]);
 
   // 1. Initialize Map with PMTiles (stable, only runs once)
   const createAndInitializeMap = useCallback((container: HTMLDivElement) => {
     addPMTilesProtocol();
-    
+    const bounds: LngLatBoundsLike = [[-124.7844079, 24.7433195],[-66.9513812, 49.3457868]];
     const map = new maplibregl.Map({
       container,
       style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-      center: [-98.57, 39.82],
-      zoom: 3.5,
       minZoom: 3,
       maxZoom: 12,
+      bounds: bounds,
+      fitBoundsOptions: { padding: 100 },
       attributionControl: false,
     });
 

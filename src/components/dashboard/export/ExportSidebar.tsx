@@ -13,12 +13,6 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { toast } from "@/hooks/use-toast";
 
-declare global {
-  interface Window {
-    dataLayer: any[];
-  }
-}
-
 export interface ExportOptions {
   regionScope: "national" | "state" | "metro";
   selectedState?: string;
@@ -249,7 +243,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         pdf.save(`Domapus-${selectedMetric}-${regionScope}.pdf`);
       }
 
-      toast({ title: "Export Complete", description: "Your map has been downloaded.", duration: 30000, });
+      toast({ title: "Export Complete", description: "Your map has been downloaded.", duration: 10000, });
     } catch (error) {
       console.error("Export failed:", error);
       toast({ title: "Export Failed", description: "Something went wrong.", variant: "destructive" });
@@ -394,13 +388,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         
         <div className="flex-1 flex items-center justify-center">
           <div 
-            className="bg-white rounded-lg shadow-lg overflow-hidden border border-border relative"
-            style={{ 
-              width: '100%', 
-              maxWidth: '1200px',
-              aspectRatio: '4 / 3'
-            }}
-          >
+            className="bg-white rounded-lg shadow-lg overflow-hidden border border-border relative w-full max-w-[1200px] aspect-[4/3] max-h-[calc(100vh-4rem)]">
             {hasValidSelection ? (
               <>
                 <PrintStage

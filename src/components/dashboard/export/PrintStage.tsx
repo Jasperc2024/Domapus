@@ -244,7 +244,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
         style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#ffffff' } }] },
         center,
         zoom,
-        pixelRatio: 2, // Fix blurriness for exports
+        pixelRatio: 2,
         interactive: false,
         attributionControl: false,
         canvasContextAttributes: { preserveDrawingBuffer: true },
