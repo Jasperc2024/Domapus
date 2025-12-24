@@ -4,6 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { getMetricDisplay } from "./map/utils";
 import { ZipData } from "./map/types";
 import { addPMTilesProtocol } from "@/lib/pmtiles-protocol";
+import { trackError } from "@/lib/analytics";
 
 const BASE_PATH = import.meta.env.BASE_URL;
 
@@ -99,7 +100,9 @@ export function MapLibreMap({
     map.addControl(new maplibregl.NavigationControl(), "top-right");
 
     map.on("error", (e) => {
+      const errMsg = (e as any)?.error?.message ?? "Map internal error";
       console.error("[Map] Internal error:", (e as any)?.error ?? e);
+      trackError("map_internal_error", errMsg);
       setError("Map internal error. Try refreshing.");
     });
 
@@ -127,8 +130,9 @@ export function MapLibreMap({
         const m = createAndInitializeMap(container);
         mapRef.current = m;
         containerSizeRef.current = { width: container.clientWidth, height: container.clientHeight };
-      } catch (err) {
+      } catch (err: any) {
         console.error("Map init failed", err);
+        trackError("map_init_failed", err?.message || "Map initialization failed");
       }
     };
 
@@ -235,8 +239,9 @@ export function MapLibreMap({
             .setHTML(getMetricDisplay(currentZipData[zipCode], currentMetric))
             .addTo(map);
 
-        } catch (err) {
+        } catch (err: any) {
           console.error("mousemove error", err);
+          trackError("map_mousemove_error", err?.message || "Mousemove error");
         }
       });
     };
@@ -342,8 +347,9 @@ export function MapLibreMap({
 
       setupMapInteractions();
 
-    } catch (err) {
+    } catch (err: any) {
       console.error("Add PMTiles layer failed", err);
+      trackError("pmtiles_layer_failed", err?.message || "Failed to load PMTiles");
       setError("Failed to load map data. Try refreshing.");
     }
   }, [isMapReady, setupMapInteractions]);

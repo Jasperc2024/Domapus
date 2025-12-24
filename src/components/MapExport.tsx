@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ExportSidebar } from "./dashboard/export/ExportSidebar";
 import { ZipData } from "./dashboard/map/types";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { toast } from "@/hooks/use-toast";
 
 interface MapExportProps {
   allZipData: Record<string, ZipData>;
@@ -23,7 +24,19 @@ export function MapExport({ allZipData, selectedMetric, onExportModeChange }: Ma
     setIsExportMode(false);
   };
 
-  if (isExportMode) {
+  const handleExportClick = () => {
+    if (isMobile) {
+      toast({
+        title: "Desktop Only",
+        description: "Export feature is only available on desktop.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsExportMode(true);
+  };
+
+  if (isExportMode && !isMobile) {
     return (
       <ExportSidebar
         allZipData={allZipData}
@@ -34,7 +47,7 @@ export function MapExport({ allZipData, selectedMetric, onExportModeChange }: Ma
   }
 
   return (
-    <Button variant="outline" size="sm" onClick={() => setIsExportMode(true)}>
+    <Button variant="outline" size="sm" onClick={handleExportClick}>
       <Download className="h-4 w-4" />
       {!isMobile && <span>Export</span>}
     </Button>

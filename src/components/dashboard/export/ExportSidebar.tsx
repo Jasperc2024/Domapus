@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { ZipData } from "../map/types";
-import { Download, Settings, Map as MapIcon, FileImage, Search, X, FileDown, Settings2, Microscope } from "lucide-react";
+import { Download, FileImage, Search, X, Settings2, Microscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { toast } from "@/hooks/use-toast";
+import { trackError } from "@/lib/analytics";
 
 export interface ExportOptions {
   regionScope: "national" | "state" | "metro";
@@ -56,6 +57,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
   const [fileFormat, setFileFormat] = useState<"png" | "pdf">("png");
   const [includeLegend, setIncludeLegend] = useState(true);
   const [includeTitle, setIncludeTitle] = useState(true);
+  const [showCities, setShowCities] = useState(false);
   
   const [isExporting, setIsExporting] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
@@ -82,7 +84,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
   // Reset map readiness when core settings change
   useEffect(() => {
     setIsMapReady(false);
-  }, [regionScope, selectedState, selectedMetro, selectedMetric, includeLegend, includeTitle]);
+  }, [regionScope, selectedState, selectedMetro, selectedMetric, includeLegend, includeTitle, showCities]);
 
   const { availableStates, filteredMetros } = useMemo(() => {
     if (Object.keys(allZipData).length === 0) return { availableStates: [], filteredMetros: [] };
@@ -244,8 +246,9 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
       }
 
       toast({ title: "Export Complete", description: "Your map has been downloaded.", duration: 10000, });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Export failed:", error);
+      trackError("export_failed", error?.message || "Unknown export error");
       toast({ title: "Export Failed", description: "Something went wrong.", variant: "destructive" });
     } finally {
       setIsExporting(false);
@@ -359,6 +362,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
             <div className="space-y-2">
               <div className="flex items-center space-x-2"><Checkbox id="c-title" checked={includeTitle} onCheckedChange={(c) => setIncludeTitle(c === true)} /><Label htmlFor="c-title" className="text-sm">Include Title</Label></div>
               <div className="flex items-center space-x-2"><Checkbox id="c-legend" checked={includeLegend} onCheckedChange={(c) => setIncludeLegend(c === true)} /><Label htmlFor="c-legend" className="text-sm">Include Legend</Label></div>
+              <div className="flex items-center space-x-2"><Checkbox id="c-cities" checked={showCities} onCheckedChange={(c) => setShowCities(c === true)} /><Label htmlFor="c-cities" className="text-sm">Show Cities</Label></div>
             </div>
           </div>
         </div>
@@ -399,11 +403,12 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
                   regionName={regionName}
                   includeLegend={includeLegend}
                   includeTitle={includeTitle}
+                  showCities={showCities}
                   onReady={() => setIsMapReady(true)}
                 />
                 <div 
                   className="absolute inset-0 z-[5] bg-transparent" 
-                  onContextMenu={(e) => {
+                  onContextMenu={() => {
                   }}
                 />
               </>
