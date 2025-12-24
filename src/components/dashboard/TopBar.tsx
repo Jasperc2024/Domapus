@@ -96,6 +96,7 @@ export function TopBar({
             <div className="flex items-center gap-2 ml-1">
             
             {/* Last Updated */}
+            {!isMobile && (
             <div className="flex items-center text-dashboard-text-secondary gap-2 mr-2">
               <Calendar className="h-4 w-4 opacity-80" />
               <div className="flex flex-col">
@@ -104,7 +105,8 @@ export function TopBar({
                   {formatDate(lastUpdated)}
                 </span>
               </div>
-            </div>
+            </div>)}
+
               {/* Export */}
               {children}
               
@@ -147,15 +149,10 @@ export function TopBar({
       </header>
 
       {/* === Mobile Bottom Bar === */}
-      {isMobile && (
+      {isMobile && !hideMobileControls && (
         <div className="fixed bottom-4 left-4 right-4 z-[1001] bg-dashboard-panel border border-dashboard-border rounded-lg p-3 shadow-lg">
           <div className="space-y-2.5">
-            {!hideMobileControls && (
-              <MetricSelector
-                selectedMetric={selectedMetric}
-                onMetricChange={onMetricChange}
-              />
-            )}
+            <MetricSelector selectedMetric={selectedMetric} onMetricChange={onMetricChange}/>
             <SearchBox onSearch={onSearch} />
           </div>
         </div>

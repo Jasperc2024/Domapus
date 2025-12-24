@@ -166,41 +166,58 @@ def main():
             'off_market_in_two_weeks', 'off_market_in_two_weeks_mom', 'off_market_in_two_weeks_yoy'
         ]
 
-        for zip_code, redfin_dict in latest_records.items():
-            raw_data = {col_map.get(k, k): v for k, v in redfin_dict.items()}
+        # Iterate over the mapping (master list) instead of Redfin records
+        for zip_code, zm in zip_mapping.items():
+            raw_data = {
+                'city': zm.get('city'), 
+                'county': zm.get('county'), 
+                'state': zm.get('state'), 
+                'metro': zm.get('metro'), 
+                'lat': zm.get('lat'), 
+                'lng': zm.get('lng')
+            }
             
-            if zip_code in zip_mapping:
-                zm = zip_mapping[zip_code]
-                raw_data.update({
-                    'city': zm.get('city'), 'county': zm.get('county'), 'state': zm.get('state'), 
-                    'metro': zm.get('metro'), 'lat': zm.get('lat'), 'lng': zm.get('lng')
-                })
+            redfin_dict = latest_records.get(zip_code, {})
+            if redfin_dict:
+                # Map Redfin internal names to our output names
+                redfin_mapped = {col_map.get(k, k): v for k, v in redfin_dict.items()}
+                raw_data.update(redfin_mapped)
             
+            # Layer in Zillow data if it exists
             if zip_code in zillow_data:
                 raw_data.update(zillow_data[zip_code])
             
+            # Final formatting and rounding logic
             ordered_data = {}
             for key in key_order:
                 val = raw_data.get(key)
-                if pd.isna(val) or val == "": 
+                
+                # Handle nulls/missing data for any field
+                if val is None or pd.isna(val) or val == "": 
                     ordered_data[key] = None
-                elif key == 'period_end':
-                    ordered_data[key] = val.strftime('%Y-%m-%d') if hasattr(val, 'strftime') else str(val)[:10]
-                elif key in ['lat', 'lng']:
-                    ordered_data[key] = round(float(val), 5)
-                elif key == 'median_ppsf':
-                    ordered_data[key] = round(float(val), 2)
-                elif key == 'avg_sale_to_list_ratio':
-                    ordered_data[key] = round(float(val) * 100, 1)
-                elif any(x in key for x in ['_mom', '_yoy', 'sold_above_list', 'off_market_in_two_weeks']):
-                    if 'dom' in key:
-                        ordered_data[key] = round(float(val), 1)
-                    else:
+                    continue
+
+                try:
+                    if key == 'period_end':
+                        ordered_data[key] = val.strftime('%Y-%m-%d') if hasattr(val, 'strftime') else str(val)[:10]
+                    elif key in ['lat', 'lng']:
+                        ordered_data[key] = round(float(val), 5)
+                    elif key == 'median_ppsf':
+                        ordered_data[key] = round(float(val), 2)
+                    elif key == 'avg_sale_to_list_ratio':
                         ordered_data[key] = round(float(val) * 100, 1)
-                elif any(c in key for c in ['price', 'sold', 'inventory', 'dom', 'listings', 'pending', 'zhvi']):
-                    ordered_data[key] = int(float(val))
-                else:
-                    ordered_data[key] = val
+                    elif any(x in key for x in ['_mom', '_yoy', 'sold_above_list', 'off_market_in_two_weeks']):
+                        # For DOM (Days on Market) comparisons, we don't multiply by 100
+                        if 'dom' in key:
+                            ordered_data[key] = round(float(val), 1)
+                        else:
+                            ordered_data[key] = round(float(val) * 100, 1)
+                    elif any(c in key for c in ['price', 'sold', 'inventory', 'dom', 'listings', 'pending', 'zhvi']):
+                        ordered_data[key] = int(float(val))
+                    else:
+                        ordered_data[key] = val
+                except (ValueError, TypeError):
+                    ordered_data[key] = None
             
             output_data[zip_code] = ordered_data
 

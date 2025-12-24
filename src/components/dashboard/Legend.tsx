@@ -4,7 +4,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 interface LegendProps {
   selectedMetric: string;
   metricValues: number[];
-  isExport?: boolean; // Optional prop to remove interactive hints for PDF
+  isExport?: boolean;
 }
 
 // Number formatting helper
@@ -89,27 +89,6 @@ export function Legend({ selectedMetric, metricValues, isExport = false }: Legen
             <span>{legendDisplay.mid}</span>
             <span>{legendDisplay.min}</span>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Export: elements only (no card/border)
-  if (isExport) {
-    return (
-      <div className="bg-transparent p-0">
-        <div className="text-xs font-semibold text-foreground mb-2">
-          {getMetricDisplayName(selectedMetric)}
-        </div>
-        <div
-          className="h-3 rounded-sm border border-border"
-          style={{ background: gradient }}
-          aria-hidden="true"
-        />
-        <div className="mt-1 flex justify-between text-[11px] font-medium text-muted-foreground">
-          <span>{legendDisplay.min}</span>
-          <span>{legendDisplay.mid}</span>
-          <span>{legendDisplay.max}</span>
         </div>
       </div>
     );

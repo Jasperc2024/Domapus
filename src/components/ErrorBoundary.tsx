@@ -1,5 +1,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { trackError } from "@/lib/analytics";
 
 type ErrorBoundaryProps = { children: React.ReactNode };
 type ErrorBoundaryState = { hasError: boolean };
@@ -14,12 +15,13 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     return { hasError: true };
   }
 
-  componentDidCatch(error: any, errorInfo: any) {
-    console.error("Error Boundary Caught:", error, errorInfo);
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("React Crash:", error, errorInfo);
+    trackError("react_boundary_crash", error.message);
   }
 
   handleTryAgain = () => {
-    this.setState({ hasError: false });
+    window.location.reload();
   };
 
   render() {

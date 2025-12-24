@@ -12,7 +12,6 @@ export function getMetricValue(data: ZipData, metric: string): number {
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const { id, type, data } = e.data;
-  console.log(`[Worker] Received message: ${type}`, { id, data });
 
   // Cancel previous operation
   if (currentAbortController) {

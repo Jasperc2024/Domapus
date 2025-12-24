@@ -28,7 +28,6 @@ export function HousingDashboard() {
   const [zipData, setZipData] = useState<Record<string, ZipData>>({});
   const [dataBounds, setDataBounds] = useState<{ min: number; max: number } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed] = useState(false);
   const [showSponsorBanner, setShowSponsorBanner] = useState(false);
   const [isExportMode, setIsExportMode] = useState(false);
   
@@ -107,7 +106,6 @@ export function HousingDashboard() {
         {sidebarOpen && (
           <Sidebar 
             isOpen={sidebarOpen} 
-            isCollapsed={sidebarCollapsed} 
             zipData={selectedZip} 
             allZipData={zipData} 
             onClose={() => setSidebarOpen(false)} 
