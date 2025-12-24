@@ -18,6 +18,7 @@ export interface PrintStageProps {
   regionName: string;
   includeLegend: boolean;
   includeTitle: boolean;
+  showCities?: boolean;
   onReady?: () => void;
 }
 
@@ -72,7 +73,7 @@ function computeQuantiles(values: number[], percentiles: number[]) {
 }
 
 export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
-  filteredData, selectedMetric, regionScope, regionName, includeLegend, includeTitle, onReady
+  filteredData, selectedMetric, regionScope, regionName, includeLegend, includeTitle, showCities = false, onReady
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mainMapRef = useRef<HTMLDivElement>(null);
@@ -160,9 +161,15 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
     const createMap = (container: HTMLDivElement | null, key: string, bounds?: [[number, number], [number, number]], validZips?: Set<string>) => {
       if (!container) return;
+      
+      // Use carto positron if showCities is enabled, otherwise plain white background
+      const mapStyle = showCities 
+        ? "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+        : { version: 8 as const, sources: {}, layers: [{ id: 'bg', type: 'background' as const, paint: { 'background-color': '#ffffff' } }] };
+      
       const map = new maplibregl.Map({ 
         container, 
-        style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#ffffff' } }] }, 
+        style: mapStyle, 
         pixelRatio: 2, 
         interactive: false, 
         attributionControl: false,
@@ -170,10 +177,24 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       });
       mapsRef.current[key] = map;
       
+      
       map.on('load', () => {
         // Use fitBounds with a maxZoom to prevent zooming into a void if data is sparse
         if (bounds) {
           map.fitBounds(bounds, { padding: 15, animate: false, maxZoom: key === 'main' ? 10 : 6 });
+        }
+        
+        // If showCities is enabled, hide all layers except place_city labels
+        if (showCities) {
+          const styleLayers = map.getStyle().layers;
+          styleLayers.forEach((layer) => {
+            // Keep only city labels (place_city) visible
+            if (layer.id.includes('place_city')) {
+              map.setLayoutProperty(layer.id, 'visibility', 'visible');
+            } else if (layer.id !== 'bg' && layer.id !== 'zips-fill' && layer.id !== 'zips-border') {
+              map.setLayoutProperty(layer.id, 'visibility', 'none');
+            }
+          });
         }
         
         map.addSource("zips", { type: "vector", url: `pmtiles://${pmtilesUrl}`, promoteId: "ZCTA5CE20" });

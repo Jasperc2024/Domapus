@@ -4,6 +4,7 @@ import { ZipData } from "./map/types";
 import { MapExport } from "@/components/MapExport";
 import { buildSpatialIndex } from "@/lib/spatial-index";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { trackError } from "@/lib/analytics";
 import { TopBar } from "./TopBar";
 import { MapLibreMap } from "./MapLibreMap";
 import { Legend } from "./Legend";
@@ -62,8 +63,9 @@ export function HousingDashboard() {
             buildSpatialIndex(result.zip_codes);
           }, 100);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("[HousingDashboard] Failed to load initial data:", error);
+        trackError("dashboard_data_load_failed", error?.message || "Failed to load initial data");
       }
     };
     loadInitialData();
@@ -125,7 +127,7 @@ export function HousingDashboard() {
             />
           </div>
           {!isExportMode && !(isMobile && sidebarOpen) && (
-            <div className="absolute bottom-4 right-4 w-64 z-[1000] pointer-events-auto">
+            <div className={`absolute ${isMobile ? 'top-4 right-4' : 'bottom-4 right-4'} ${isMobile ? 'w-auto' : 'w-64'} z-[1000] pointer-events-auto`}>
               <Legend
                 selectedMetric={selectedMetric}
                 metricValues={Object.values(zipData)

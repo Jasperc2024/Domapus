@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import DataProcessorWorker from '@/workers/data-processor.ts?worker';
+import { trackError } from "@/lib/analytics";
 
 interface ProgressState {
   phase: string;
@@ -41,6 +42,7 @@ export function useDataWorker() {
 
         case 'ERROR': {
           console.error('[useDataWorker] Worker error:', error);
+          trackError("worker_error", error || "Unknown worker error");
           setIsLoading(false);
           const pending = requestsRef.current.get(id);
           if (pending) {
@@ -65,6 +67,7 @@ export function useDataWorker() {
 
     worker.onerror = (err) => {
       console.error("[useDataWorker] Unhandled worker error:", err);
+      trackError("worker_unhandled_error", err?.message || "Unhandled worker error");
       setIsLoading(false);
       requestsRef.current.forEach(request => request.reject(err));
       requestsRef.current.clear();
@@ -84,6 +87,7 @@ export function useDataWorker() {
     const worker = workerRef.current;
     if (!worker || !isInitializedRef.current) {
       console.error("[useDataWorker] Worker not available");
+      trackError("worker_not_available", "Worker is not initialized");
       return Promise.reject(new Error("Worker is not initialized"));
     }
 

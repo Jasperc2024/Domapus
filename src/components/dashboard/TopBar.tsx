@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { trackError } from "@/lib/analytics";
 const BASE_PATH = import.meta.env.BASE_URL;
 
 interface TopBarProps {
@@ -32,8 +33,9 @@ export function TopBar({
         if (!res.ok) throw new Error("Failed to fetch last_updated.json");
         const data = await res.json();
         setLastUpdated(data.last_updated_utc);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching last_updated.json:", err);
+        trackError("last_updated_fetch_failed", err?.message || "Failed to fetch last updated");
       }
     };
     fetchLastUpdated();
