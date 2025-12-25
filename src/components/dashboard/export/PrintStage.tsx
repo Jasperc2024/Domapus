@@ -117,7 +117,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
       if (isAk) { 
         ak.add(zip.zipCode); 
-        // ALASKA FIX: Normalize Aleutian islands to stay on the left side of the map (-180 to -190)
         const normLng = lng > 0 ? lng - 360 : lng;
         akPts.push(point([normLng, lat])); 
       }
@@ -147,6 +146,30 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
   useImperativeHandle(ref, () => ({ getElement: () => containerRef.current }));
 
+  // EFFECT: Handle city visibility toggle instantly
+  useEffect(() => {
+    const maps = Object.values(mapsRef.current).filter(Boolean) as maplibregl.Map[];
+    if (maps.length === 0) return;
+
+    let loadedCount = 0;
+    const totalMaps = maps.length;
+
+    maps.forEach(map => {
+      if (map.getLayer('place_city_r5')) {
+        map.setLayoutProperty('place_city_r5', 'visibility', showCities ? 'visible' : 'none');
+      }
+
+      const checkIdle = () => {
+        loadedCount++;
+        if (loadedCount >= totalMaps) {
+          onReady?.();
+        }
+      };
+
+      map.once('idle', checkIdle);
+    });
+  }, [showCities, onReady]);
+
   useEffect(() => {
     addPMTilesProtocol();
     setMapsLoaded(false);
@@ -162,55 +185,49 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     const createMap = (container: HTMLDivElement | null, key: string, bounds?: [[number, number], [number, number]], validZips?: Set<string>) => {
       if (!container) return;
       
-      // Use carto positron if showCities is enabled, otherwise plain white background
-      const mapStyle = showCities 
-        ? "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
-        : { version: 8 as const, sources: {}, layers: [{ id: 'bg', type: 'background' as const, paint: { 'background-color': '#ffffff' } }] };
-      
       const map = new maplibregl.Map({ 
         container, 
-        style: mapStyle, 
+        style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json", 
         pixelRatio: 2, 
         interactive: false, 
         attributionControl: false,
-        canvasContextAttributes: { preserveDrawingBuffer: true }
+        canvasContextAttributes: { preserveDrawingBuffer: true },
       });
       mapsRef.current[key] = map;
       
-      
       map.on('load', () => {
-        // Use fitBounds with a maxZoom to prevent zooming into a void if data is sparse
         if (bounds) {
-          map.fitBounds(bounds, { padding: 15, animate: false, maxZoom: key === 'main' ? 10 : 6 });
+          map.fitBounds(bounds, { padding: 25, animate: false, maxZoom: key === 'main' ? 10 : 6 });
         }
         
-        // If showCities is enabled, hide all layers except place_city labels
-        if (showCities) {
-          const styleLayers = map.getStyle().layers;
-          styleLayers.forEach((layer) => {
-            // Keep only city labels (place_city) visible
-            if (layer.id.includes('place_city')) {
-              map.setLayoutProperty(layer.id, 'visibility', 'visible');
-            } else if (layer.id !== 'bg' && layer.id !== 'zips-fill' && layer.id !== 'zips-border') {
-              map.setLayoutProperty(layer.id, 'visibility', 'none');
-            }
-          });
-        }
-        
+        // 1. Set EVERYTHING to visibility: none from the style JSON
+        const layers = map.getStyle().layers;
+        layers.forEach((layer) => {
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+        });
+
+        // 2. Prepare the ZIP data source
         map.addSource("zips", { type: "vector", url: `pmtiles://${pmtilesUrl}`, promoteId: "ZCTA5CE20" });
         const filterExpression = validZips ? ["in", ["get", "ZCTA5CE20"], ["literal", Array.from(validZips)]] : ["has", "ZCTA5CE20"];
 
+        // 3. Add ZIP layers on top of the hidden style, but BELOW place_city_r5 
+        // So that when place_city_r5 is made visible, it is on top.
         map.addLayer({ 
           id: "zips-fill", type: "fill", source: "zips", "source-layer": "us_zip_codes", 
           filter: filterExpression as any, 
           paint: { "fill-color": stepExpression, "fill-opacity": 0.9 } 
-        });
+        }, 'place_city_r5');
 
         map.addLayer({ 
           id: "zips-border", type: "line", source: "zips", "source-layer": "us_zip_codes", 
           filter: filterExpression as any, 
           paint: { "line-color": "rgba(0,0,0,0.1)", "line-width": 0.5 } 
-        });
+        }, 'place_city_r5');
+
+        // 4. If showCities is true initially, turn that one specific layer back on
+        if (showCities) {
+          map.setLayoutProperty('place_city_r5', 'visibility', 'visible');
+        }
 
         map.once('idle', () => {
           (validZips || new Set(filteredData.map(z => z.zipCode))).forEach(zipCode => {

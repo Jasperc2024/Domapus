@@ -28,7 +28,7 @@ export function MapExport({ allZipData, selectedMetric, onExportModeChange }: Ma
     if (isMobile) {
       toast({
         title: "Desktop Only",
-        description: "Export feature is only available on desktop.",
+        description: "Sorry, the Export feature is only available on desktop.",
         variant: "destructive",
       });
       return;

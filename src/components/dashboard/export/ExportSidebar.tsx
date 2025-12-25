@@ -70,7 +70,6 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     return () => clearTimeout(timer);
   }, [metroSearch]);
 
-  // Click outside to close metro list
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (metroContainerRef.current && !metroContainerRef.current.contains(event.target as Node)) {
@@ -84,7 +83,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
   // Reset map readiness when core settings change
   useEffect(() => {
     setIsMapReady(false);
-  }, [regionScope, selectedState, selectedMetro, selectedMetric, includeLegend, includeTitle, showCities]);
+  }, [regionScope, selectedState, selectedMetro, selectedMetric, showCities]);
 
   const { availableStates, filteredMetros } = useMemo(() => {
     if (Object.keys(allZipData).length === 0) return { availableStates: [], filteredMetros: [] };
@@ -93,8 +92,13 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     const metroSet = new Set<string>();
     
     for (const zip of Object.values(allZipData)) {
-      if (zip.state) stateSet.add(zip.state);
-      if (zip.metro) metroSet.add(zip.metro);
+      const metricValue = zip[selectedMetric as keyof ZipData];
+      const hasData = metricValue !== null && metricValue !== undefined;
+
+      if (hasData) {
+        if (zip.state) stateSet.add(zip.state);
+        if (zip.metro) metroSet.add(zip.metro);
+      }
     }
 
     const states = Array.from(stateSet)
@@ -104,13 +108,32 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
     
-    const metros = Array.from(metroSet).sort();
-    const filtered = debouncedMetroSearch 
-      ? metros.filter(m => m.toLowerCase().includes(debouncedMetroSearch.toLowerCase()))
-      : metros;
+    const metros = Array.from(metroSet);
+    
+    let filtered = metros;
+    if (debouncedMetroSearch) {
+      const query = debouncedMetroSearch.toLowerCase();
+
+      filtered = metros.filter(m => m.toLowerCase().includes(query));
+
+      filtered.sort((a, b) => {
+        const aLower = a.toLowerCase();
+        const bLower = b.toLowerCase();
+        const indexA = aLower.indexOf(query);
+        const indexB = bLower.indexOf(query);
+
+        if (indexA !== indexB) {
+          return indexA - indexB; 
+        }
+
+        return a.localeCompare(b);
+      });
+    } else {
+      filtered.sort((a, b) => a.localeCompare(b));
+    }
       
     return { availableStates: states, filteredMetros: filtered };
-  }, [allZipData, debouncedMetroSearch]);
+  }, [allZipData, selectedMetric, debouncedMetroSearch]);
 
   // Only compute filtered data when we have a valid selection
   const hasValidSelection = useMemo(() => {
@@ -186,7 +209,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
-        allowTaint: true,
+        allowTaint: false,
       });
 
       if (fileFormat === "png") {
@@ -307,7 +330,10 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
                       setIsMetroListOpen(true);
                       if (selectedMetro && e.target.value !== selectedMetro) setSelectedMetro("");
                     }}
-                    onFocus={() => setIsMetroListOpen(true)}
+                    onFocus={(e) => {setIsMetroListOpen(true);
+                      const target = e.currentTarget;
+                      setTimeout(() => target.select(), 0);
+                    }}
                     className="pl-8 h-9 pr-8"
                   />
                   {metroSearch && (

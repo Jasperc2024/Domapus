@@ -127,7 +127,7 @@ export function HousingDashboard() {
             />
           </div>
           {!isExportMode && !(isMobile && sidebarOpen) && (
-            <div className={`absolute ${isMobile ? 'top-4 right-4' : 'bottom-4 right-4'} ${isMobile ? 'w-auto' : 'w-64'} z-[1000] pointer-events-auto`}>
+            <div className={`absolute ${isMobile ? 'top-4 left-4' : 'bottom-4 right-4'} ${isMobile ? 'w-auto' : 'w-64'} z-[10] pointer-events-auto`}>
               <Legend
                 selectedMetric={selectedMetric}
                 metricValues={Object.values(zipData)
