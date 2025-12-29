@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
-import { Download } from "lucide-react";
+import { useState, useEffect, lazy, Suspense } from "react";
+import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ExportSidebar } from "./dashboard/export/ExportSidebar";
 import { ZipData } from "./dashboard/map/types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "@/hooks/use-toast";
+
+const ExportSidebar = lazy(() => import("./dashboard/export/ExportSidebar").then(m => ({ default: m.ExportSidebar })));
 
 interface MapExportProps {
   allZipData: Record<string, ZipData>;
@@ -38,11 +39,17 @@ export function MapExport({ allZipData, selectedMetric, onExportModeChange }: Ma
 
   if (isExportMode && !isMobile) {
     return (
-      <ExportSidebar
-        allZipData={allZipData}
-        selectedMetric={selectedMetric}
-        onClose={handleClose}
-      />
+      <Suspense fallback={
+        <div className="absolute right-0 top-0 h-full w-80 bg-dashboard-panel border-l border-dashboard-border flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      }>
+        <ExportSidebar
+          allZipData={allZipData}
+          selectedMetric={selectedMetric}
+          onClose={handleClose}
+        />
+      </Suspense>
     );
   }
 

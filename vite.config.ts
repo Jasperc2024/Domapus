@@ -16,6 +16,17 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'maplibre': ['maplibre-gl'],
+          'charts': ['recharts'],
+          'pdf-export': ['jspdf', 'html2canvas'],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     mode === 'development' && componentTagger(),
