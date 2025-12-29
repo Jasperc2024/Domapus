@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import maplibregl, { LngLatBoundsLike } from 'maplibre-gl';
+import maplibregl, { LngLatBoundsLike, MapMouseEvent, ExpressionSpecification } from 'maplibre-gl';
 import "maplibre-gl/dist/maplibre-gl.css";
-import { getMetricDisplay } from "./map/utils";
+import { getMetricDisplay, getMetricValue, computeQuantileBuckets } from "./map/utils";
 import { ZipData } from "./map/types";
 import { addPMTilesProtocol } from "@/lib/pmtiles-protocol";
 import { trackError } from "@/lib/analytics";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { LoadDataRequest, DataProcessedResponse } from "@/workers/worker-types";
 
 const BASE_PATH = import.meta.env.BASE_URL;
 
@@ -13,45 +14,15 @@ interface MapProps {
   selectedMetric: string;
   onZipSelect: (zipData: ZipData) => void;
   searchZip?: string;
-  searchTrigger?: number; // Increment this to force a new search even with same zip
+  searchTrigger?: number;
   zipData: Record<string, ZipData>;
   colorScaleDomain: [number, number] | null;
   isLoading: boolean;
-  processData: (message: { type: string; data?: any }) => Promise<any>;
+  processData: (message: { type: string; data?: LoadDataRequest }) => Promise<DataProcessedResponse>;
 }
 
 // Color palette for choropleth (light yellow to deep purple)
 const CHOROPLETH_COLORS = ["#FFF9B0", "#FFEB84", "#FFD166", "#FF9A56", "#E84C61", "#C13584", "#7B2E8D", "#2E0B59"];
-
-function getMetricValue(data: ZipData | undefined, metric: string): number {
-  if (!data) return 0;
-  const value = data[metric as keyof ZipData];
-  return typeof value === "number" && isFinite(value) ? value : 0;
-}
-
-function computeQuantileBuckets(values: number[], numBuckets = 8): number[] {
-  const sorted = [...values].filter(v => v > 0).sort((a, b) => a - b);
-  if (sorted.length === 0) return [];
-  
-  const minVal = sorted[0];
-  const maxVal = sorted[sorted.length - 1];
-  if (minVal === maxVal) return [minVal];
-  
-  const thresholds: number[] = [];
-  const epsilon = (maxVal - minVal) * 1e-6 || 1e-6;
-  
-  const q = (p: number) => sorted[Math.floor(p * (sorted.length - 1))];
-  
-  for (let i = 1; i < numBuckets; i++) {
-    let val = q(i / numBuckets);
-    if (thresholds.length && val <= thresholds[thresholds.length - 1]) {
-      val = thresholds[thresholds.length - 1] + epsilon;
-    }
-    thresholds.push(val);
-  }
-  
-  return thresholds;
-}
 
 export function MapLibreMap({
   selectedMetric,
@@ -68,7 +39,7 @@ export function MapLibreMap({
   const interactionsSetup = useRef(false);
   const [pmtilesLoaded, setPmtilesLoaded] = useState(false);
   const mousemoveRafRef = useRef<number | null>(null);
-  const lastMouseEventRef = useRef<any>(null);
+  const lastMouseEventRef = useRef<MapMouseEvent | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const lastProcessedMetric = useRef<string>("");
   const lastProcessedDataKeys = useRef<string>("");
@@ -76,6 +47,7 @@ export function MapLibreMap({
   const containerSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMobile = useIsMobile(); 
+
   const getDynamicPadding = (container: HTMLDivElement) => {
     const minDim = Math.min(container.clientWidth, container.clientHeight);
     return Math.min(minDim * 0.12, 100);
@@ -107,8 +79,9 @@ export function MapLibreMap({
     map.addControl(new maplibregl.NavigationControl(), "top-right");
 
     map.on("error", (e) => {
-      const errMsg = (e as any)?.error?.message ?? "Map internal error";
-      console.error("[Map] Internal error:", (e as any)?.error ?? e);
+      const mapError = e as { error?: { message?: string } };
+      const errMsg = mapError?.error?.message ?? "Map internal error";
+      console.error("[Map] Internal error:", mapError?.error ?? e);
       trackError("map_internal_error", errMsg);
       setError("Map internal error. Try refreshing.");
     });
@@ -137,9 +110,10 @@ export function MapLibreMap({
         const m = createAndInitializeMap(container);
         mapRef.current = m;
         containerSizeRef.current = { width: container.clientWidth, height: container.clientHeight };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : "Map initialization failed";
         console.error("Map init failed", err);
-        trackError("map_init_failed", err?.message || "Map initialization failed");
+        trackError("map_init_failed", errMsg);
       }
     };
 
@@ -164,7 +138,7 @@ export function MapLibreMap({
             containerSizeRef.current = { width: newWidth, height: newHeight };
             mapRef.current.resize();
           }
-        }, 150); // Debounce resize by 150ms
+        }, 150);
       }
     };
 
@@ -206,13 +180,14 @@ export function MapLibreMap({
 
     const layerId = "zips-fill";
 
-    const mousemoveHandler = (e: any) => {
+    const mousemoveHandler = (e: MapMouseEvent) => {
       lastMouseEventRef.current = e;
       if (mousemoveRafRef.current) return;
 
       mousemoveRafRef.current = requestAnimationFrame(() => {
         const ev = lastMouseEventRef.current;
         mousemoveRafRef.current = null;
+        if (!ev) return;
         
         try {
           const features = map.queryRenderedFeatures(ev.point, { layers: [layerId] });
@@ -226,7 +201,7 @@ export function MapLibreMap({
           }
 
           const props = features[0].properties ?? {};
-          const zipCode = props.ZCTA5CE20 || props.zipCode || props.id;
+          const zipCode = (props.ZCTA5CE20 || props.zipCode || props.id) as string;
           
           const { zipData: currentZipData, selectedMetric: currentMetric } = propsRef.current;
 
@@ -246,20 +221,21 @@ export function MapLibreMap({
             .setHTML(getMetricDisplay(currentZipData[zipCode], currentMetric))
             .addTo(map);
 
-        } catch (err: any) {
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : "Mousemove error";
           console.error("mousemove error", err);
-          trackError("map_mousemove_error", err?.message || "Mousemove error");
+          trackError("map_mousemove_error", errMsg);
         }
       });
     };
 
-    const clickHandler = (e: any) => {
+    const clickHandler = (e: MapMouseEvent) => {
       const features = map.queryRenderedFeatures(e.point, { layers: [layerId] });
       
       if (!features.length) return;
 
       const props = features[0].properties ?? {};
-      const zipCode = props.ZCTA5CE20 || props.zipCode || props.id;
+      const zipCode = (props.ZCTA5CE20 || props.zipCode || props.id) as string;
       
       const { zipData: currentZipData, onZipSelect: currentOnSelect } = propsRef.current;
 
@@ -347,19 +323,20 @@ export function MapLibreMap({
         }
       }, beforeId);
 
+      // ZIP labels layer - visible on mobile at high zoom, hidden on desktop
       map.addLayer({
         id: "zips-labels",
         type: "symbol",
         source: "zips",
         "source-layer": "us_zip_codes",
-        minzoom: 8,
+        minzoom: 9,
         layout: {
           "visibility": isMobile ? "visible" : "none",
           "text-field": ["get", "ZCTA5CE20"],
-          "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+          "text-font": ["Noto Sans Regular"],
           "text-size": [
             "interpolate", ["linear"], ["zoom"],
-            8, 9,
+            9, 10,
             12, 14
           ],
           "text-allow-overlap": false, 
@@ -367,8 +344,8 @@ export function MapLibreMap({
           "symbol-placement": "point"
         },
         paint: {
-          "text-color": "#333333",
-          "text-halo-color": "rgba(255,255,255,0.8)",
+          "text-color": "#1E40AF",
+          "text-halo-color": "rgba(255,255,255,0.9)",
           "text-halo-width": 2
         }
       });
@@ -381,18 +358,19 @@ export function MapLibreMap({
 
       setupMapInteractions();
 
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : "Failed to load PMTiles";
       console.error("Add PMTiles layer failed", err);
-      trackError("pmtiles_layer_failed", err?.message || "Failed to load PMTiles");
+      trackError("pmtiles_layer_failed", errMsg);
       setError("Failed to load map data. Try refreshing.");
     }
-  }, [isMapReady, setupMapInteractions]);
+  }, [isMapReady, setupMapInteractions, isMobile]);
 
   // 5. Update Choropleth Colors using setFeatureState
   useEffect(() => {
     if (!isMapReady || !mapRef.current || !pmtilesLoaded || !hasData) return;
     const map = mapRef.current;
-    const src = map.getSource("zips") as any;
+    const src = map.getSource("zips") as maplibregl.VectorTileSource & { _loaded?: boolean };
     if (!src || !src._loaded) return;
     if (!map.getLayer("zips-fill")) return;
       
@@ -411,14 +389,14 @@ export function MapLibreMap({
       return;
     }
 
-    const stepExpression: any[] = [
+    const stepExpression: ExpressionSpecification = [
       "step",
       ["coalesce", ["feature-state", "metricValue"], 0],
       "transparent",
       0.001,
       CHOROPLETH_COLORS[0],
       ...buckets.flatMap((threshold, i) => [threshold, CHOROPLETH_COLORS[Math.min(i + 1, CHOROPLETH_COLORS.length - 1)]])
-    ];
+    ] as ExpressionSpecification;
 
     for (const [zipCode, data] of Object.entries(zipData)) {
       const metricValue = getMetricValue(data, selectedMetric);

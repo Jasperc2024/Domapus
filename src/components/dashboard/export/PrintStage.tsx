@@ -3,6 +3,7 @@ import maplibregl, { ExpressionSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { ZipData } from "../map/types";
 import { addPMTilesProtocol } from "@/lib/pmtiles-protocol";
+import { trackError } from "@/lib/analytics";
 import bbox from "@turf/bbox";
 import { featureCollection, point } from "@turf/helpers";
 
@@ -111,7 +112,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
   const { alaskaZips, hawaiiZips, mainlandZips, alaskaBounds, hawaiiBounds, mainlandBounds } = useMemo(() => {
     const ak = new Set<string>(), hi = new Set<string>(), ml = new Set<string>();
-    const akPts: any[] = [], hiPts: any[] = [], mlPts: any[] = [];
+    const akPts: ReturnType<typeof point>[] = [], hiPts: ReturnType<typeof point>[] = [], mlPts: ReturnType<typeof point>[] = [];
     
     filteredData.forEach(zip => {
       const st = (zip.state ?? '').toString().toLowerCase();
@@ -136,7 +137,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       }
     });
 
-    const getSmartBbox = (pts: any[], regionLabel: string) => {
+    const getSmartBbox = (pts: ReturnType<typeof point>[]) => {
       if (pts.length === 0) return null;
       const b = bbox(featureCollection(pts));
       let [minX, minY, maxX, maxY] = b;
@@ -147,9 +148,9 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
     return { 
       alaskaZips: ak, hawaiiZips: hi, mainlandZips: ml, 
-      alaskaBounds: getSmartBbox(akPts, 'Alaska'), 
-      hawaiiBounds: getSmartBbox(hiPts, 'Hawaii'), 
-      mainlandBounds: getSmartBbox(mlPts, 'Mainland') 
+      alaskaBounds: getSmartBbox(akPts), 
+      hawaiiBounds: getSmartBbox(hiPts), 
+      mainlandBounds: getSmartBbox(mlPts) 
     };
   }, [filteredData]);
 
@@ -265,8 +266,10 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
             }
           }, 5000);
 
-        } catch (error) {
+        } catch (error: unknown) {
+          const errMsg = error instanceof Error ? error.message : "Unknown export map error";
           console.error(`[Export] Error initializing map ${key}:`, error);
+          trackError("export_map_init_error", errMsg);
           loadedCount++;
           markReady();
         }

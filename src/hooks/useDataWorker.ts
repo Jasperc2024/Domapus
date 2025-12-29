@@ -1,22 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import DataProcessorWorker from '@/workers/data-processor.ts?worker';
 import { trackError } from "@/lib/analytics";
-
-interface ProgressState {
-  phase: string;
-  processed?: number;
-  total?: number;
-}
+import { LoadDataRequest, DataProcessedResponse, ProgressData } from "@/workers/worker-types";
 
 interface PendingRequest {
-  resolve: (value: any) => void;
-  reject: (reason?: any) => void;
+  resolve: (value: DataProcessedResponse) => void;
+  reject: (reason?: Error) => void;
 }
 
 export function useDataWorker() {
   const workerRef = useRef<Worker | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [progress, setProgress] = useState<ProgressState>({ phase: '' });
+  const [progress, setProgress] = useState<ProgressData>({ phase: '' });
   const requestsRef = useRef<Map<string, PendingRequest>>(new Map());
   const isInitializedRef = useRef(false);
 
@@ -33,7 +28,7 @@ export function useDataWorker() {
 
       switch (type) {
         case 'PROGRESS':
-          setProgress(data);
+          setProgress(data as ProgressData);
           break;
 
         case 'ERROR': {
@@ -53,7 +48,7 @@ export function useDataWorker() {
           setIsLoading(false);
           const pending = requestsRef.current.get(id);
           if (pending) {
-            pending.resolve(data); 
+            pending.resolve(data as DataProcessedResponse); 
             requestsRef.current.delete(id);
           }
           break;
@@ -61,11 +56,11 @@ export function useDataWorker() {
       }
     };
 
-    worker.onerror = (err) => {
+    worker.onerror = (err: ErrorEvent) => {
       console.error("[useDataWorker] Unhandled worker error:", err);
       trackError("worker_unhandled_error", err?.message || "Unhandled worker error");
       setIsLoading(false);
-      requestsRef.current.forEach(request => request.reject(err));
+      requestsRef.current.forEach(request => request.reject(new Error(err.message)));
       requestsRef.current.clear();
     };
 
@@ -78,7 +73,7 @@ export function useDataWorker() {
     };
   }, []);
 
-  const processData = useCallback((message: { type: string; data?: any }) => {
+  const processData = useCallback((message: { type: string; data?: LoadDataRequest }): Promise<DataProcessedResponse> => {
     const worker = workerRef.current;
     if (!worker || !isInitializedRef.current) {
       console.error("[useDataWorker] Worker not available");
