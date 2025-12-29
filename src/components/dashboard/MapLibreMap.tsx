@@ -5,7 +5,6 @@ import { getMetricDisplay, getMetricValue, computeQuantileBuckets } from "./map/
 import { ZipData } from "./map/types";
 import { addPMTilesProtocol } from "@/lib/pmtiles-protocol";
 import { trackError } from "@/lib/analytics";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { LoadDataRequest, DataProcessedResponse } from "@/workers/worker-types";
 
 const BASE_PATH = import.meta.env.BASE_URL;
@@ -46,7 +45,6 @@ export function MapLibreMap({
   const highlightedZipRef = useRef<string | null>(null);
   const containerSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isMobile = useIsMobile(); 
 
   const getDynamicPadding = (container: HTMLDivElement) => {
     const minDim = Math.min(container.clientWidth, container.clientHeight);
@@ -323,7 +321,7 @@ export function MapLibreMap({
         }
       }, beforeId);
 
-      // ZIP labels layer - visible on mobile at high zoom, hidden on desktop
+      // ZIP labels layer - visible at high zoom
       map.addLayer({
         id: "zips-labels",
         type: "symbol",
@@ -331,22 +329,22 @@ export function MapLibreMap({
         "source-layer": "us_zip_codes",
         minzoom: 9,
         layout: {
-          "visibility": isMobile ? "visible" : "none",
+          "visibility": "visible",
           "text-field": ["get", "ZCTA5CE20"],
-          "text-font": ["Noto Sans Regular"],
+          "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
           "text-size": [
             "interpolate", ["linear"], ["zoom"],
             9, 10,
             12, 14
           ],
           "text-allow-overlap": false, 
-          "text-padding": 10, 
+          "text-padding": 5, 
           "symbol-placement": "point"
         },
         paint: {
           "text-color": "#1E40AF",
-          "text-halo-color": "rgba(255,255,255,0.9)",
-          "text-halo-width": 2
+          "text-halo-color": "rgba(255,255,255,0.95)",
+          "text-halo-width": 1.5
         }
       });
 
@@ -364,7 +362,7 @@ export function MapLibreMap({
       trackError("pmtiles_layer_failed", errMsg);
       setError("Failed to load map data. Try refreshing.");
     }
-  }, [isMapReady, setupMapInteractions, isMobile]);
+  }, [isMapReady, setupMapInteractions]);
 
   // 5. Update Choropleth Colors using setFeatureState
   useEffect(() => {
