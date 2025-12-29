@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { X, TrendingUp, TrendingDown, BarChart3, MapPin, Building } from "lucide-react";
+import { useState, lazy, Suspense } from "react";
+import { X, TrendingUp, TrendingDown, BarChart3, MapPin, Building, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ZipComparison } from "./ZipComparison";
 import { ZipData } from "./map/types";
 import { formatMetricValue, formatChange, METRIC_DEFINITIONS, FormatType } from "./map/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+
+const ZipComparison = lazy(() => import("./ZipComparison").then(m => ({ default: m.ZipComparison })));
 
 interface SidebarProps {
   isOpen: boolean;
@@ -53,7 +54,13 @@ export function Sidebar({ isOpen, zipData, allZipData, onClose }: SidebarProps) 
       <div className="flex flex-col flex-1 overflow-hidden min-h-0">
         {showComparison ? (
           <div className="p-4 flex-1 overflow-y-auto">
-            <ZipComparison currentZip={zipData} allZipData={allZipData} onClose={() => setShowComparison(false)} />
+            <Suspense fallback={
+              <div className="flex items-center justify-center h-32">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            }>
+              <ZipComparison currentZip={zipData} allZipData={allZipData} onClose={() => setShowComparison(false)} />
+            </Suspense>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
