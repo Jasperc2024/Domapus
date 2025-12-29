@@ -5,6 +5,7 @@ import { getMetricDisplay } from "./map/utils";
 import { ZipData } from "./map/types";
 import { addPMTilesProtocol } from "@/lib/pmtiles-protocol";
 import { trackError } from "@/lib/analytics";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const BASE_PATH = import.meta.env.BASE_URL;
 
@@ -74,6 +75,11 @@ export function MapLibreMap({
   const highlightedZipRef = useRef<string | null>(null);
   const containerSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMobile = useIsMobile(); 
+  const getDynamicPadding = (container: HTMLDivElement) => {
+    const minDim = Math.min(container.clientWidth, container.clientHeight);
+    return Math.min(minDim * 0.12, 100);
+  };
 
   // Refs for current data to avoid stale closures
   const propsRef = useRef({ zipData, selectedMetric, onZipSelect });
@@ -86,13 +92,14 @@ export function MapLibreMap({
   const createAndInitializeMap = useCallback((container: HTMLDivElement) => {
     addPMTilesProtocol();
     const bounds: LngLatBoundsLike = [[-124.7844079, 24.7433195],[-66.9513812, 49.3457868]];
+    const dynamicPadding = getDynamicPadding(container);
     const map = new maplibregl.Map({
       container,
       style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
       minZoom: 3,
       maxZoom: 12,
       bounds: bounds,
-      fitBoundsOptions: { padding: 100 },
+      fitBoundsOptions: { padding: dynamicPadding },
       attributionControl: false,
     });
 
@@ -107,7 +114,7 @@ export function MapLibreMap({
     });
 
     map.once("load", () => {
-      console.log("[Map] style/load fired — map is ready");
+      console.log("[Map] Map initialized");
       setIsMapReady(true);
     });
 
@@ -317,7 +324,7 @@ export function MapLibreMap({
         }
       }, beforeId);
 
-      // Border layer with zoom-dependent width
+      // Border layer
       map.addLayer({
         id: "zips-border",
         type: "line",
@@ -327,7 +334,7 @@ export function MapLibreMap({
           "line-color": [
             "case",
             ["boolean", ["feature-state", "highlighted"], false],
-            "#ff6b35", // Highlight color for searched ZIP
+            "#ff6b35",
             "rgba(0,0,0,0.15)"
           ],
           "line-width": [
@@ -340,8 +347,35 @@ export function MapLibreMap({
         }
       }, beforeId);
 
+      map.addLayer({
+        id: "zips-labels",
+        type: "symbol",
+        source: "zips",
+        "source-layer": "us_zip_codes",
+        minzoom: 8,
+        layout: {
+          "visibility": isMobile ? "visible" : "none",
+          "text-field": ["get", "ZCTA5CE20"],
+          "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+          "text-size": [
+            "interpolate", ["linear"], ["zoom"],
+            8, 9,
+            12, 14
+          ],
+          "text-allow-overlap": false, 
+          "text-padding": 10, 
+          "symbol-placement": "point"
+        },
+        paint: {
+          "text-color": "#333333",
+          "text-halo-color": "rgba(255,255,255,0.8)",
+          "text-halo-width": 2
+        }
+      });
+
+
       map.once("idle", () => {
-        console.log("[MapLibreMap] PMTiles layer loaded");
+        console.log("[MapLibreMap] Map loaded");
         setPmtilesLoaded(true);
       });
 
@@ -369,9 +403,6 @@ export function MapLibreMap({
 
     lastProcessedMetric.current = selectedMetric;
     lastProcessedDataKeys.current = currentDataKeys;
-
-    console.log("[MapLibreMap] Updating choropleth colors...");
-    
     const values = Object.values(zipData).map(d => getMetricValue(d, selectedMetric));
     const buckets = computeQuantileBuckets(values);
     
@@ -398,8 +429,6 @@ export function MapLibreMap({
     }
 
     map.setPaintProperty("zips-fill", "fill-color", stepExpression);
-    
-    console.log(`[MapLibreMap] Choropleth updated for ${Object.keys(zipData).length} ZIPs`);
   }, [isMapReady, pmtilesLoaded, zipData, selectedMetric, hasData]);
 
   // 6. Fly to Search and Highlight ZIP - ALWAYS responsive to searchTrigger
@@ -430,6 +459,12 @@ export function MapLibreMap({
       map.flyTo({ center: [longitude, latitude], zoom: 10, duration: 1500 });
     }
   }, [isMapReady, pmtilesLoaded, searchZip, searchTrigger, zipData]);
+
+  useEffect(() => {
+    if (!mapRef.current || !mapContainer.current) return;
+    const padding = getDynamicPadding(mapContainer.current);
+    mapRef.current.setPadding({ top: padding, bottom: padding, left: padding, right: padding });
+  }, [containerSizeRef.current]);
 
   return (
     <div className="absolute inset-0 w-full h-full min-h-[400px]">

@@ -58,9 +58,9 @@ export function TopBar({
   return (
     <>
       {/* === Desktop / Main Header === */}
-      <header className="flex items-center justify-between px-4 sm:px-6 py-2 bg-dashboard-panel border-b border-dashboard-border h-14 sm:h-16">
+      <header className="flex items-center justify-between px-4 sm:px-6 py-2 bg-dashboard-panel border-b border-dashboard-border h-14 sm:h-16 gap-4">
         {/* Left Section - Logo + Metric Selector */}
-        <div className="flex items-center gap-4 sm:gap-6 flex-1 min-w-0">
+        <div className="flex items-center gap-4 sm:gap-6 flex-shrink-0">
           <div
             className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
             onClick={() => window.location.reload()}
@@ -83,7 +83,6 @@ export function TopBar({
             </div>
           </div>
 
-          {/* We hide the desktop MetricSelector only when on mobile */}
           {!isMobile && (
             <MetricSelector
               selectedMetric={selectedMetric}
@@ -92,73 +91,78 @@ export function TopBar({
           )}
         </div>
 
-        {/* Right Section - Actions */}
-        <div className="flex items-center gap-4 flex-shrink-0">
-            {!isMobile && <SearchBox onSearch={onSearch} />}
-            <div className="flex items-center gap-2 ml-1">
-            
+        {/* Right Section - Controlled Fluid Search + Actions */}
+        <div className="flex items-center justify-end flex-1 min-w-0 gap-4">
+          {!isMobile && (
+            <div className="w-full max-w-[300px] min-w-[140px] flex-shrink">
+              <SearchBox onSearch={onSearch} />
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Last Updated */}
             {!isMobile && (
-            <div className="flex items-center text-dashboard-text-secondary gap-2 mr-2">
-              <Calendar className="h-4 w-4 opacity-80" />
-              <div className="flex flex-col">
-                <span className="text-xs font-medium">Data Updated:</span>
-                <span className="text-xs font-medium whitespace-nowrap">
-                  {formatDate(lastUpdated)}
-                </span>
+              <div className="flex items-center text-dashboard-text-secondary gap-2 mr-2">
+                <Calendar className="h-4 w-4 opacity-80" />
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium">Data Updated:</span>
+                  <span className="text-xs font-medium whitespace-nowrap">
+                    {formatDate(lastUpdated)}
+                  </span>
+                </div>
               </div>
-            </div>)}
+            )}
 
-              {/* Export */}
-              {children}
-              
-              {/* GitHub button */}
-              <Button
-                variant="outline"
-                size="sm"
-                asChild
+            {/* Export */}
+            {children}
+            
+            {/* GitHub button */}
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+            >
+              <a
+                href="https://github.com/Jasperc2024/Domapus"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="GitHub"
               >
-                <a
-                  href="https://github.com/Jasperc2024/Domapus"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="GitHub"
-                >
-                  <Github className="h-4 w-4" />
-                  {!isMobile && <span>GitHub</span>} {/* Hide this span on mobile */}
-                </a>
-              </Button>
+                <Github className="h-4 w-4" />
+                {!isMobile && <span>GitHub</span>}
+              </a>
+            </Button>
 
-              {/* Sponsor button */}
-              <Button
-                variant="outline"
-                size="sm"
-                asChild
-                className="bg-pink-600 hover:bg-pink-700 text-white"
+            {/* Sponsor button */}
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="bg-pink-600 hover:bg-pink-700 text-white"
+            >
+              <a
+                href="https://buymeacoffee.com/JasperC"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Sponsor"
               >
-                <a
-                  href="https://buymeacoffee.com/JasperC"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Sponsor"
-                >
-                  <Heart className="h-4 w-4" />
-                  {!isMobile && <span>Sponsor</span>} {/* Hide this span on mobile */}
-                </a>
-              </Button>
-            </div>
-          </div>
-      </header>
-
-      {/* === Mobile Bottom Bar === */}
-      {isMobile && !hideMobileControls && (
-        <div className="fixed bottom-4 left-4 right-4 z-[1001] bg-dashboard-panel border border-dashboard-border rounded-lg p-3 shadow-lg">
-          <div className="space-y-2.5">
-            <MetricSelector selectedMetric={selectedMetric} onMetricChange={onMetricChange}/>
-            <SearchBox onSearch={onSearch} />
+                <Heart className="h-4 w-4" />
+                {!isMobile && <span>Sponsor</span>}
+              </a>
+            </Button>
           </div>
         </div>
-      )}
-    </>
-  );
-}
+      </header>
+
+        {/* === Mobile Bottom Bar === */}
+        {isMobile && !hideMobileControls && (
+          <div className="fixed bottom-4 left-4 right-4 z-[1001] bg-dashboard-panel border border-dashboard-border rounded-lg p-3 shadow-lg">
+            <div className="space-y-2.5">
+              <MetricSelector selectedMetric={selectedMetric} onMetricChange={onMetricChange}/>
+              <SearchBox onSearch={onSearch} />
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }

@@ -13,10 +13,8 @@ export function getMetricValue(data: ZipData, metric: string): number {
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const { id, type, data } = e.data;
 
-  // Cancel previous operation
   if (currentAbortController) {
     currentAbortController.abort();
-    console.log('[Worker] Aborted previous operation');
   }
   currentAbortController = new AbortController();
   const signal = currentAbortController.signal;
@@ -25,22 +23,16 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     switch (type) {
       case "LOAD_AND_PROCESS_DATA": {
         const { url, selectedMetric } = data as LoadDataRequest;
-        console.log(`[Worker] Loading data from: ${url}, metric: ${selectedMetric}`);
         self.postMessage({ type: "PROGRESS", data: { phase: "Fetching market data..." } });
-
         const response = await fetch(url, { signal });
         if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-        console.log(`[Worker] Fetch successful, status: ${response.status}`);
-        
         const buffer = await response.arrayBuffer();
-        console.log(`[Worker] Received buffer size: ${buffer.byteLength} bytes`);
 
         let fullPayload;
 
         try {
           const jsonText = new TextDecoder().decode(buffer);
           fullPayload = JSON.parse(jsonText);
-          console.log('[Worker] JSON parsed successfully');
         } catch (err) {
           console.error('[Worker] JSON parse failed:', err);
           throw new Error("Failed to parse JSON: " + (err as Error).message);
@@ -48,8 +40,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
         const { last_updated_utc, zip_codes: rawZipData } = fullPayload;
         if (!rawZipData) throw new Error("Missing zip_codes data");
-        console.log(`[Worker] Found ${Object.keys(rawZipData).length} ZIP codes, last updated: ${last_updated_utc}`);
-
         self.postMessage({ type: "PROGRESS", data: { phase: "Indexing ZIP codes..." } });
 
         const zipData: Record<string, ZipData> = {};
@@ -64,7 +54,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           const normalized: ZipData = {
             ...(raw as ZipData),
             zipCode,
-            // Support both old (latitude/longitude) and new (lat/lng) field names
             latitude: (raw.latitude ?? raw.lat ?? null) as any,
             longitude: (raw.longitude ?? raw.lng ?? null) as any,
           };

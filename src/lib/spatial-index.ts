@@ -43,8 +43,6 @@ export function buildSpatialIndex(zipData: Record<string, ZipData>): RBush<ZipBB
   
   spatialIndex.load(items);
   indexedZipCodes = new Set(items.map(i => i.zipCode));
-  
-  console.log(`[SpatialIndex] Built index with ${items.length} ZIP codes`);
   return spatialIndex;
 }
 

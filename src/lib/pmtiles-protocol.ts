@@ -10,12 +10,10 @@ export function addPMTilesProtocol() {
   const protocol = new Protocol();
   maplibregl.addProtocol('pmtiles', protocol.tile);
   protocolAdded = true;
-  console.log('[PMTiles] Protocol registered');
 }
 
 export function removePMTilesProtocol() {
   if (!protocolAdded) return;
   maplibregl.removeProtocol('pmtiles');
   protocolAdded = false;
-  console.log('[PMTiles] Protocol removed');
 }

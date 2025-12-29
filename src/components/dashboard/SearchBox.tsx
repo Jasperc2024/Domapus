@@ -27,8 +27,8 @@ export function SearchBox({ onSearch }: SearchBoxProps) {
   }, [searchValue, searchTrigger, onSearch]);
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2 w-full min-w-0">
-      <div className="relative flex-1 min-w-[9rem] max-w-[24rem]">
+    <form id="ZIP code" onSubmit={handleSubmit} className="flex items-center gap-2 w-full min-w-0 group">
+      <div className="relative flex-1 min-w-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dashboard-text-secondary" />
         <Input
           type="text"
@@ -42,7 +42,7 @@ export function SearchBox({ onSearch }: SearchBoxProps) {
           aria-label="Search for ZIP code"
         />
       </div>
-      <Button type="submit" variant="outline" size="sm" aria-label="Search">
+      <Button type="submit" variant="outline" size="sm" className="flex-shrink-0" aria-label="Search">
         Search
       </Button>
     </form>

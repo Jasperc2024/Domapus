@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { PrintStage, PrintStageRef } from "./PrintStage";
 import { cn } from "@/lib/utils";
 import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+import { jsPDF, jsPDFOptions } from "jspdf";
 import { toast } from "@/hooks/use-toast";
 import { trackError } from "@/lib/analytics";
 
@@ -135,7 +135,6 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     return { availableStates: states, filteredMetros: filtered };
   }, [allZipData, selectedMetric, debouncedMetroSearch]);
 
-  // Only compute filtered data when we have a valid selection
   const hasValidSelection = useMemo(() => {
     if (regionScope === 'national') return true;
     if (regionScope === 'state' && selectedState) return true;
@@ -201,7 +200,8 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
     try {
       await new Promise(resolve => requestAnimationFrame(resolve));
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Give maplibre a moment to ensure tiles are painted
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const scale = 5; 
       const canvas = await html2canvas(element, {
@@ -209,7 +209,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
-        allowTaint: false,
+        allowTaint: true,
       });
 
       if (fileFormat === "png") {
@@ -219,10 +219,17 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         link.click();
       } else {
         const imgData = canvas.toDataURL("image/png", 1.0);
-        const pdf = new jsPDF({ 
-          orientation: "landscape", 
-          unit: "pt", 
-          format: "a4" 
+        const options: jsPDFOptions = {
+          orientation: "l",
+          unit: "mm",
+          format: "a4",
+        };
+        const pdf = new jsPDF(options);
+
+        pdf.setProperties({
+          title: `Domapus Export - ${selectedMetric}`,
+          subject: `Real Estate Data for ${regionName}`,
+          creator: 'Domapus (https://jasperc2024.github.io/Domapus/)',
         });
         
         const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -246,7 +253,6 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         }
         
         pdf.addImage(imgData, "PNG", offsetX, offsetY, drawWidth, drawHeight);
-        
         const stageRect = element.getBoundingClientRect();
         const links = element.querySelectorAll('a');
 
@@ -264,7 +270,6 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
           pdf.link(pdfX, pdfY, pdfW, pdfH, { url: link.href });
         });
-        
         pdf.save(`Domapus-${selectedMetric}-${regionScope}.pdf`);
       }
 
@@ -276,7 +281,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     } finally {
       setIsExporting(false);
     }
-  }, [fileFormat, selectedMetric, regionScope]);
+  }, [fileFormat, selectedMetric, regionScope, regionName, includeLegend, includeTitle]);
 
   const selectMetro = (metroName: string) => {
     setSelectedMetro(metroName);
@@ -294,6 +299,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
   return (
     <div className="fixed inset-0 bg-background z-50 flex">
       <div className="w-80 bg-background border-r h-full shadow-xl flex flex-col">
+        {/* Sidebar Content */}
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
           <div className="flex items-center gap-2 pb-2 border-b">
             <Download className="h-4 w-4 text-primary" />
@@ -375,8 +381,8 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
               <span>File Format</span>
             </div>
             <RadioGroup value={fileFormat} onValueChange={(v) => setFileFormat(v as any)} className="space-y-2">
-              <div className="flex items-center space-x-2"><RadioGroupItem value="png" id="r-png" /><Label htmlFor="r-png" className="text-sm">PNG (Image)</Label></div>
-              <div className="flex items-center space-x-2"><RadioGroupItem value="pdf" id="r-pdf" /><Label htmlFor="r-pdf" className="text-sm">PDF (Document)</Label></div>
+              <div className="flex items-center space-x-2"><RadioGroupItem value="png" id="r-png" /><Label htmlFor="r-png" className="text-sm">PNG</Label></div>
+              <div className="flex items-center space-x-2"><RadioGroupItem value="pdf" id="r-pdf" /><Label htmlFor="r-pdf" className="text-sm">PDF</Label></div>
             </RadioGroup>
           </div>
           
@@ -409,41 +415,32 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
       {/* Right Preview Area */}
       <div className="flex-1 p-6 overflow-hidden flex flex-col bg-muted/30">
-        <div className="mb-3">
+        <div className="mb-3 flex-shrink-0">
           <h3 className="text-base font-semibold text-foreground">Preview</h3>
           <p className="text-xs text-muted-foreground">
             {hasValidSelection ? `${filteredData.length.toLocaleString()} ZIP codes` : "Select a region to preview"}
           </p>
         </div>
         
-        <div className="flex-1 flex items-center justify-center">
-          <div 
-            className="bg-white rounded-lg shadow-lg overflow-hidden border border-border relative w-full max-w-[1200px] aspect-[4/3] max-h-[calc(100vh-4rem)]">
-            {hasValidSelection ? (
-              <>
-                <PrintStage
-                  ref={printStageRef}
-                  filteredData={filteredData}
-                  selectedMetric={selectedMetric}
-                  regionScope={regionScope}
-                  regionName={regionName}
-                  includeLegend={includeLegend}
-                  includeTitle={includeTitle}
-                  showCities={showCities}
-                  onReady={() => setIsMapReady(true)}
-                />
-                <div 
-                  className="absolute inset-0 z-[5] bg-transparent" 
-                  onContextMenu={() => {
-                  }}
-                />
-              </>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                {regionScope === 'state' ? "Select a state to preview" : "Select a metro area to preview"}
-              </div>
-            )}
-          </div>
+        {/* Container for the PrintStage - Flex centered */}
+        <div className="flex-1 flex items-center justify-center min-h-0 w-full">
+          {hasValidSelection ? (
+            <PrintStage
+              ref={printStageRef}
+              filteredData={filteredData}
+              selectedMetric={selectedMetric}
+              regionScope={regionScope}
+              regionName={regionName}
+              includeLegend={includeLegend}
+              includeTitle={includeTitle}
+              showCities={showCities}
+              onReady={() => setIsMapReady(true)}
+            />
+          ) : (
+            <div className="bg-white/50 border border-dashed rounded-lg w-full h-full flex items-center justify-center text-muted-foreground">
+              {regionScope === 'state' ? "Select a state to preview" : "Select a metro area to preview"}
+            </div>
+          )}
         </div>
       </div>
     </div>

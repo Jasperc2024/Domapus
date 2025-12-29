@@ -41,8 +41,6 @@ export function HousingDashboard() {
     const loadInitialData = async () => {
       if (hasRun) return;
       hasRun = true;
-      console.log('[HousingDashboard] Starting initial data load');
-      
       const dataUrl = new URL(`${BASE_PATH}data/zip-data.json`, window.location.origin).href;
 
       try {
@@ -54,7 +52,6 @@ export function HousingDashboard() {
         if (!isMounted) return;
         
         if (result) {
-          console.log(`[HousingDashboard] ZIP data loaded: ${Object.keys(result.zip_codes).length} ZIPs`);
           setZipData(result.zip_codes);
           setDataBounds(result.bounds);
           
@@ -69,11 +66,11 @@ export function HousingDashboard() {
       }
     };
     loadInitialData();
-    const timer = setTimeout(() => setShowSponsorBanner(true), 30000);
+    ///const timer = setTimeout(() => setShowSponsorBanner(true), 30000);
     
     return () => {
       isMounted = false;
-      clearTimeout(timer);
+      ///clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

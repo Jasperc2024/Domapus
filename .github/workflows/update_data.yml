@@ -6,8 +6,8 @@ permissions:
 
 on:
   schedule:
-    - cron: '0 0 26 * *' # Runs at 00:00 UTC on the 1st of every month
-  workflow_dispatch: # Allows manual triggering
+    - cron: '0 0 26 * *' # Runs at 00:00 UTC on the 26st of every month
+  workflow_dispatch:
 
 jobs:
   update-data:
@@ -69,7 +69,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Create issue if failed
-      if: failure() # Only run if any previous step failed
+      if: failure()
       uses: actions/github-script@v6
       with:
         script: |

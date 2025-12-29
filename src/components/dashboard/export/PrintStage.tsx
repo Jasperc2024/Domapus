@@ -10,6 +10,7 @@ const BASE_PATH = import.meta.env.BASE_URL;
 const CHOROPLETH_COLORS = ["#FFF9B0", "#FFEB84", "#FFD166", "#FF9A56", "#E84C61", "#C13584", "#7B2E8D", "#2E0B59"];
 const BASE_WIDTH = 1200;
 const BASE_HEIGHT = 900;
+const BOUNDS_BUFFER = 0.15; 
 
 export interface PrintStageProps {
   filteredData: ZipData[];
@@ -85,14 +86,20 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
   useEffect(() => {
     const handleResize = () => {
-      if (containerRef.current) {
-        setScale(containerRef.current.offsetWidth / BASE_WIDTH);
+      if (containerRef.current && containerRef.current.parentElement) {
+        const parent = containerRef.current.parentElement;
+        const availWidth = parent.clientWidth;
+        const availHeight = parent.clientHeight;
+        const scaleW = availWidth / BASE_WIDTH;
+        const scaleH = availHeight / BASE_HEIGHT;
+        const newScale = Math.min(scaleW, scaleH);
+        setScale(newScale);
         Object.values(mapsRef.current).forEach(map => map?.resize());
       }
     };
-    const observer = new ResizeObserver(handleResize);
-    if (containerRef.current) observer.observe(containerRef.current);
     handleResize();
+    const observer = new ResizeObserver(handleResize);
+    if (containerRef.current?.parentElement) observer.observe(containerRef.current.parentElement);
     return () => observer.disconnect();
   }, []);
 
@@ -117,22 +124,32 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
       if (isAk) { 
         ak.add(zip.zipCode); 
-        const normLng = lng > 0 ? lng - 360 : lng;
-        akPts.push(point([normLng, lat])); 
+        akPts.push(point([lng, lat])); 
       }
-      else if (isHi) { hi.add(zip.zipCode); hiPts.push(point([lng, lat])); }
-      else { ml.add(zip.zipCode); mlPts.push(point([lng, lat])); }
+      else if (isHi) { 
+        hi.add(zip.zipCode); 
+        hiPts.push(point([lng, lat])); 
+      }
+      else { 
+        ml.add(zip.zipCode); 
+        mlPts.push(point([lng, lat])); 
+      }
     });
 
-    const getBbox = (pts: any[]) => {
+    const getSmartBbox = (pts: any[], regionLabel: string) => {
       if (pts.length === 0) return null;
       const b = bbox(featureCollection(pts));
-      return [[b[0], b[1]], [b[2], b[3]]] as [[number, number], [number, number]];
+      let [minX, minY, maxX, maxY] = b;
+      minX -= BOUNDS_BUFFER; minY -= BOUNDS_BUFFER;
+      maxX += BOUNDS_BUFFER; maxY += BOUNDS_BUFFER;
+      return [[minX, minY], [maxX, maxY]] as [[number, number], [number, number]];
     };
 
     return { 
       alaskaZips: ak, hawaiiZips: hi, mainlandZips: ml, 
-      alaskaBounds: getBbox(akPts), hawaiiBounds: getBbox(hiPts), mainlandBounds: getBbox(mlPts) 
+      alaskaBounds: getSmartBbox(akPts, 'Alaska'), 
+      hawaiiBounds: getSmartBbox(hiPts, 'Hawaii'), 
+      mainlandBounds: getSmartBbox(mlPts, 'Mainland') 
     };
   }, [filteredData]);
 
@@ -146,97 +163,113 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
   useImperativeHandle(ref, () => ({ getElement: () => containerRef.current }));
 
-  // EFFECT: Handle city visibility toggle instantly
-  useEffect(() => {
-    const maps = Object.values(mapsRef.current).filter(Boolean) as maplibregl.Map[];
-    if (maps.length === 0) return;
-
-    let loadedCount = 0;
-    const totalMaps = maps.length;
-
-    maps.forEach(map => {
-      if (map.getLayer('place_city_r5')) {
-        map.setLayoutProperty('place_city_r5', 'visibility', showCities ? 'visible' : 'none');
-      }
-
-      const checkIdle = () => {
-        loadedCount++;
-        if (loadedCount >= totalMaps) {
-          onReady?.();
-        }
-      };
-
-      map.once('idle', checkIdle);
-    });
-  }, [showCities, onReady]);
-
   useEffect(() => {
     addPMTilesProtocol();
     setMapsLoaded(false);
+    
     Object.keys(mapsRef.current).forEach(key => { mapsRef.current[key]?.remove(); mapsRef.current[key] = null; });
     if (filteredData.length === 0) { onReady?.(); return; }
 
     const pmtilesUrl = new URL(`${BASE_PATH}data/us_zip_codes.pmtiles`, window.location.origin).href;
     const stepExpression: ExpressionSpecification = ["step", ["coalesce", ["feature-state", "metricValue"], 0], "#efefef", 0.000001, CHOROPLETH_COLORS[0], ...buckets.flatMap((threshold, i) => [threshold, CHOROPLETH_COLORS[Math.min(i + 1, CHOROPLETH_COLORS.length - 1)]])] as ExpressionSpecification;
-
     let loadedCount = 0;
     const requiredMaps = regionScope === 'national' ? 1 + (alaskaZips.size > 0 ? 1 : 0) + (hawaiiZips.size > 0 ? 1 : 0) : 1;
+    let isReadyTriggered = false;
+    const markReady = () => {
+      if (loadedCount >= requiredMaps && !isReadyTriggered) {
+        isReadyTriggered = true;
+        setMapsLoaded(true);
+        onReady?.();
+      }
+    };
 
     const createMap = (container: HTMLDivElement | null, key: string, bounds?: [[number, number], [number, number]], validZips?: Set<string>) => {
       if (!container) return;
       
       const map = new maplibregl.Map({ 
         container, 
-        style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json", 
+        style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
         pixelRatio: 2, 
         interactive: false, 
         attributionControl: false,
-        canvasContextAttributes: { preserveDrawingBuffer: true },
+        fadeDuration: 0,
+        renderWorldCopies: true,
       });
       mapsRef.current[key] = map;
       
       map.on('load', () => {
-        if (bounds) {
-          map.fitBounds(bounds, { padding: 25, animate: false, maxZoom: key === 'main' ? 10 : 6 });
-        }
-        
-        // 1. Set EVERYTHING to visibility: none from the style JSON
-        const layers = map.getStyle().layers;
-        layers.forEach((layer) => {
-          map.setLayoutProperty(layer.id, 'visibility', 'none');
-        });
+        try {
+          map.resize();
 
-        // 2. Prepare the ZIP data source
-        map.addSource("zips", { type: "vector", url: `pmtiles://${pmtilesUrl}`, promoteId: "ZCTA5CE20" });
-        const filterExpression = validZips ? ["in", ["get", "ZCTA5CE20"], ["literal", Array.from(validZips)]] : ["has", "ZCTA5CE20"];
+          if (bounds) {
+            const padding = (key === 'alaska' || key === 'hawaii') ? 5 : 40;
+            map.fitBounds(bounds, { padding, animate: false, maxZoom: key === 'main' ? 12 : 6 });
+          }
+          
+          const style = map.getStyle();
+          let firstCityLayerId: string | undefined;
+            if (style && style.layers) {
+              style.layers.forEach((layer: any) => {
+                const id = layer.id;
+                const sourceLayer = layer['source-layer']; 
+                const isCity = id.includes('place_city');
+                const isWater = sourceLayer === 'water';
+                const isBoundary = id.includes('boundary_country') || id.includes('boundary_state');
 
-        // 3. Add ZIP layers on top of the hidden style, but BELOW place_city_r5 
-        // So that when place_city_r5 is made visible, it is on top.
-        map.addLayer({ 
-          id: "zips-fill", type: "fill", source: "zips", "source-layer": "us_zip_codes", 
-          filter: filterExpression as any, 
-          paint: { "fill-color": stepExpression, "fill-opacity": 0.9 } 
-        }, 'place_city_r5');
+                if (isCity) {
+                  if (!firstCityLayerId) firstCityLayerId = id;
+                  map.setLayoutProperty(id, 'visibility', showCities ? 'visible' : 'none');
+                } else if (isWater || isBoundary) {
+                  map.setLayoutProperty(id, 'visibility', 'visible');
+                } else {
+                  map.setLayoutProperty(id, 'visibility', 'none');
+                }
+              });
+            }
+          
+          map.addSource("zips", { type: "vector", url: `pmtiles://${pmtilesUrl}`, promoteId: "ZCTA5CE20" });
+          const filterExpression = validZips ? ["in", ["get", "ZCTA5CE20"], ["literal", Array.from(validZips)]] : ["has", "ZCTA5CE20"];
 
-        map.addLayer({ 
-          id: "zips-border", type: "line", source: "zips", "source-layer": "us_zip_codes", 
-          filter: filterExpression as any, 
-          paint: { "line-color": "rgba(0,0,0,0.1)", "line-width": 0.5 } 
-        }, 'place_city_r5');
+          map.addLayer({ 
+            id: "zips-fill", type: "fill", source: "zips", "source-layer": "us_zip_codes", 
+            filter: filterExpression as any, 
+            paint: { "fill-color": stepExpression, "fill-opacity": 0.9 } 
+          }, firstCityLayerId);
 
-        // 4. If showCities is true initially, turn that one specific layer back on
-        if (showCities) {
-          map.setLayoutProperty('place_city_r5', 'visibility', 'visible');
-        }
+          map.addLayer({ 
+            id: "zips-border", type: "line", source: "zips", "source-layer": "us_zip_codes", 
+            filter: filterExpression as any, 
+            paint: { "line-color": "rgba(0,0,0,0.1)", "line-width": 0.5 } 
+          }, firstCityLayerId);
 
-        map.once('idle', () => {
           (validZips || new Set(filteredData.map(z => z.zipCode))).forEach(zipCode => {
             const data = zipDataMap[zipCode];
             if (data) map.setFeatureState({ source: "zips", sourceLayer: "us_zip_codes", id: zipCode }, { metricValue: getMetricValue(data, selectedMetric) });
           });
+
           map.triggerRepaint();
-          map.once('idle', () => { loadedCount++; if (loadedCount >= requiredMaps) { setMapsLoaded(true); onReady?.(); } });
-        });
+
+          const checkInterval = setInterval(() => {
+            if (map.loaded() && map.isStyleLoaded()) {
+              clearInterval(checkInterval);
+              loadedCount++; 
+              markReady();
+            }
+          }, 250);
+
+          setTimeout(() => {
+            if (!isReadyTriggered) {
+              clearInterval(checkInterval);
+              loadedCount++;
+              markReady();
+            }
+          }, 5000);
+
+        } catch (error) {
+          console.error(`[Export] Error initializing map ${key}:`, error);
+          loadedCount++;
+          markReady();
+        }
       });
     };
 
@@ -246,57 +279,89 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       if (hawaiiZips.size > 0) createMap(hawaiiMapRef.current, 'hawaii', hawaiiBounds || undefined, hawaiiZips);
     } else {
       const allBounds = mainlandBounds || alaskaBounds || hawaiiBounds;
-      createMap(mainMapRef.current, 'main', allBounds || undefined);
+      const allZips = new Set(filteredData.map(z => z.zipCode));
+      createMap(mainMapRef.current, 'main', allBounds || undefined, allZips);
     }
-    return () => Object.keys(mapsRef.current).forEach(key => { mapsRef.current[key]?.remove(); mapsRef.current[key] = null; });
-  }, [regionScope, regionName, selectedMetric, filteredData.length, alaskaZips, hawaiiZips, mainlandZips, alaskaBounds, hawaiiBounds, mainlandBounds]);
+
+    return () => { 
+      Object.keys(mapsRef.current).forEach(key => { 
+        mapsRef.current[key]?.remove(); 
+        mapsRef.current[key] = null; 
+      }); 
+    };
+  }, [regionScope, regionName, selectedMetric, filteredData, alaskaZips, hawaiiZips, mainlandZips, alaskaBounds, hawaiiBounds, mainlandBounds, showCities]);
 
   return (
-    <div ref={containerRef} className="w-full relative overflow-hidden bg-white rounded-lg shadow-lg border border-border" style={{ aspectRatio: '4/3', maxHeight: 'calc(100vh - 4rem)' }}>
-      <div style={{ width: `${BASE_WIDTH}px`, height: `${BASE_HEIGHT}px`, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0, backgroundColor: '#ffffff' }} className="flex flex-col">
-        <div className="flex items-start justify-between px-6 pt-5 pb-3">
+    <div 
+      className="w-full h-full flex items-center justify-center overflow-hidden bg-muted/10 select-none"
+    >
+      <div 
+        ref={containerRef}
+        style={{ 
+          width: `${BASE_WIDTH}px`, 
+          height: `${BASE_HEIGHT}px`, 
+          transform: `scale(${scale})`,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          backgroundColor: '#ffffff'
+        }} 
+        className="flex flex-col flex-shrink-0 origin-center rounded-md"
+        onContextMenu={(e) => { e.preventDefault(); return false; }}
+      >
+        <div className="flex items-start justify-between px-8 pt-6 pb-4">
           {includeTitle && (
             <div>
-              <h1 className="text-2xl font-bold leading-tight" style={{ color: '#111827' }}>{getMetricDisplayName(selectedMetric)} by ZIP Code</h1>
-              <p className="text-sm mt-0.5" style={{ color: '#6b7280' }}>{regionName} • {getDate()}</p>
+              <h1 className="text-3xl font-bold leading-tight text-gray-900">{getMetricDisplayName(selectedMetric)} by ZIP Code</h1>
+              <p className="text-base mt-1 text-gray-500">{regionName} • {getDate()}</p>
             </div>
           )}
-          <div className="flex items-center gap-1.5 text-[12px] text-[#9ca3af] whitespace-nowrap flex-shrink-0">
-            <span>Built by <a href="https://jasperc2024.github.io/Domapus/" target="_blank" rel="noopener noreferrer" className="text-[13px] hover:underline" style={{ color: '#0c82a5' }}>Domapus</a></span>
+          <div className="flex items-center gap-2 text-xs text-gray-400 whitespace-nowrap flex-shrink-0 ml-auto mt-1">
+            <span>Built by <a href="https://jasperc2024.github.io/Domapus/" target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline">Domapus</a></span>
             <span className="opacity-60">•</span>
             <span>Data: <a href="https://www.redfin.com/news/data-center/" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: '#0c82a5' }}>Redfin</a> & <a href="https://www.zillow.com/research/data/" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: '#0c82a5' }}>Zillow</a></span>
           </div>
         </div>
 
-        <div className="flex-1 mx-6 mb-4 relative overflow-hidden">
+        <div className="flex-1 mx-8 mb-6 relative bg-slate-50">
           <div ref={mainMapRef} className="absolute inset-0" />
+          
           {regionScope === 'national' && (
-            <div className="absolute bottom-4 left-4 flex gap-3 z-10">
+            <div className="absolute bottom-4 left-4 flex gap-4 z-10">
               {alaskaZips.size > 0 && (
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-medium mb-1 text-gray-500">Alaska</span>
-                  <div className="w-40 h-28 border bg-white overflow-hidden border-gray-300">
-                    <div ref={alaskaMapRef} className="w-full h-full" />
+                <div className="flex flex-col bg-white border border-gray-200">
+                  <span className="text-[10px] uppercase tracking-wider font-semibold py-0.5 px-2 bg-slate-50 text-slate-500 border-b">Alaska</span>
+                  <div className="w-48 h-32 relative">
+                    <div ref={alaskaMapRef} className="absolute inset-0" />
                   </div>
                 </div>
               )}
               {hawaiiZips.size > 0 && (
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-medium mb-1 text-gray-500">Hawaii</span>
-                  <div className="w-48 h-32 border bg-white overflow-hidden border-gray-300"><div ref={hawaiiMapRef} className="w-full h-full" /></div>
+                <div className="flex flex-col bg-white border border-gray-200">
+                   <span className="text-[10px] uppercase tracking-wider font-semibold py-0.5 px-2 bg-slate-50 text-slate-500 border-b">Hawaii</span>
+                  <div className="w-48 h-32 relative">
+                    <div ref={hawaiiMapRef} className="absolute inset-0" />
+                  </div>
                 </div>
               )}
             </div>
           )}
+
           {includeLegend && (
-            <div className="absolute bottom-4 right-4 z-10 p-3 bg-white">
-              <div className="h-3 w-48" style={{ background: `linear-gradient(to right, ${CHOROPLETH_COLORS.join(', ')})`, borderRadius: '2px' }} />
-              <div className="mt-1 flex justify-between text-[10px] font-medium w-48 text-gray-500">
+            <div className="absolute bottom-4 right-4 z-10 p-4 bg-white/95 backdrop-blur rounded-md">
+              <div className="h-4 w-56" style={{ background: `linear-gradient(to right, ${CHOROPLETH_COLORS.join(', ')})`, borderRadius: '4px' }} />
+              <div className="mt-2 flex justify-between text-xs font-semibold w-56 text-gray-600">
                 <span>{legendDisplay.min}</span><span>{legendDisplay.mid}</span><span>{legendDisplay.max}</span>
               </div>
             </div>
           )}
-          {!mapsLoaded && <div className="absolute inset-0 flex items-center justify-center bg-white/80"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}
+
+          {!mapsLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-50 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-3">
+                    <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-cyan-600" />
+                    <span className="text-sm font-medium text-slate-500">Rendering map...</span>
+                </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

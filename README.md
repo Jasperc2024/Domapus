@@ -1,35 +1,55 @@
-<p align="center" style="margin: 0;">
-    <img src="https://github.com/Jasperc2024/Domapus/blob/main/public/Banner.svg" width=400>
+<p align="center">
+    <img src="public/Banner.svg" width="400" alt="Domapus Banner">
 </p>
 
-[![Live Website](https://img.shields.io/badge/Live-Website-2596BE)](https://jasperc2024.github.io/Domapus/)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white&style=flat)
-[![License](https://img.shields.io/badge/License-MIT-green)](https://github.com/Jasperc2024/Domapus/blob/main/LICENSE.md)
-[![Deploy to GitHub Pages](https://github.com/Jasperc2024/Domapus/actions/workflows/deploy.yml/badge.svg)](https://github.com/Jasperc2024/Domapus/actions/workflows/deploy.yml)
-![GitHub Stars](https://img.shields.io/github/stars/Jasperc2024/Domapus?style=flat)
-[![](https://data.jsdelivr.com/v1/package/gh/Jasperc2024/Domapus/badge)](https://www.jsdelivr.com/package/gh/Jasperc2024/Domapus)
+<p align="center">
+  <a href="https://jasperc2024.github.io/Domapus/">
+    <img src="https://img.shields.io/badge/Live_Website-Open_App-1E40AF?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Live Website">
+  </a>
+</p>
 
-**Domapus** visualizes U.S. housing market data at the ZIP-code level.  
-Built with **React**, **TypeScript**, and **MapLibre GL JS**, it makes nationwide housing trends interactive and accessible.
+<p align="center">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+  <img src="https://img.shields.io/github/stars/Jasperc2024/Domapus?style=flat" alt="Stars">
+</p>
 
-![Preview](https://jasperc2024.github.io/Domapus/preview.png)
-
----
-
-## ✨ Features
-
-### 🗺️ Map & Data Visualization
-- Interactive **ZIP-level map** updated monthly  
-- Metrics: *median price, inventory, DOM, listings, sales, and more*  
-- **Hover tooltips**, and **ZIP search**
-
-### 📊 Analytics & Export
-- Quintile-based legend for data distribution  
-- **Export maps** to PNG or PDF with title and legend options  
+**Domapus** is a website that visualizes U.S. housing market data at the ZIP-code level.  
 
 ---
 
-## 🚀 Quick Start
+## Features
+
+### Main Dashboard
+<p align="center">
+Visualize median price, inventory, and sales trends nationwide. Hover over a ZIP code to show value.
+<img src="public/readme/dashboard.png" width="80%" alt="Main Dashboard">
+</p>
+<br>
+
+### Granular ZIP Details
+<p align="center">
+Click on a ZIP code to access detailed market data.
+<img src="public/readme/detail.png" width="80%" alt="Sidebar Details">
+</p>
+<br>
+
+### Comparative Analysis
+<p align="center">
+Compare two ZIP codes side-by-side to evaluate relative market performance across all available metrics.
+<img src="public/readme/compare.png" width="80%" alt="Comparison Mode">
+</p>
+<br>
+
+### Export
+<p align="center">
+Generate report-ready maps with customizations.
+<img src="public/readme/export.png" width="80%" alt="Export Feature">
+</p>
+
+---
+
+## Quick Start
 
 1. **Clone the repository**
 
@@ -51,7 +71,7 @@ Built with **React**, **TypeScript**, and **MapLibre GL JS**, it makes nationwid
    ```
 
 4. **Open your browser**
-   Navigate to `http://localhost:8080/Domapus/`
+   Navigate to `http://localhost:3677/Domapus/`
 
 ### Build for Production
 
@@ -61,85 +81,59 @@ npm run build && npm run preview
 
 ---
 
-## 🏗️ Project Structure
+## Tech Stack
+**Frontend:** React 18, TypeScript, Vite
 
-see [tree.txt](tree.txt)
+**UI:** Tailwind CSS, Radix UI, Lucide React, Shadcn
 
----
+**Map:** MapLibre GL JS, Pmtiles, Bbox, RBush
 
-## 📈 Metrics Overview
+**Export:** html2canvas, jsPDF
 
-| Metric                         | Description                             |
-| ------------------------------ | --------------------------------------- |
-| **Median Sale Price***         | Typical price of sold homes             |
-| **Median List Price**          | Typical asking price                    |
-| **Median Price per Sq Ft***    | Cost per square foot                    |
-| **Homes Sold**                 | Closed transactions                     |
-| **Pending Sales**              | Homes under contract                    |
-| **New Listings**               | Homes newly added                       |
-| **Inventory**                  | Homes available for sale                |
-| **Months of Supply**           | Time to sell all inventory at current rate |
-| **Median Days on Market***     | Time from listing to pending            |
-| **Sale-to-List Ratio***        | Sale price ÷ asking price               |
-| **% Sold Above List**          | % of homes sold above asking price      |
-| **% Price Drops**              | % of listings that reduced price        |
-| **% Off Market in 2 Weeks**    | % of homes selling within 14 days       |
-
-*\* Available as choropleth metric*
+**Deployment:** Github Pages
 
 ---
 
-## 🧠 Tech Stack
-**Frontend:** React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui
+## Project Structure
 
-**Visualization:** MapLibre GL JS
-
-**Data:** Redfin (market), U.S. Census (ZCTA)
-
-**Data Processing:** Github Action, Python
-
-**Export Tools:** html2canvas, jsPDF
+See [tree.txt](tree.txt)
 
 ---
 
-## 🔧 Configuration
+## Metrics Overview
 
-### Environment Variables
-
-```bash
-# Base URL for the application (set in vite.config.ts)
-VITE_BASE_URL=/Domapus/
-
-# Data source URLs (configured in components)
-VITE_DATA_CDN=https://cdn.jsdelivr.net/gh/Jasperc2024/Domapus@main/public/data/zip-data.json
-```
-
-### Build Configuration
-
-The project uses Vite with custom configuration for:
-
-- Base path configuration for GitHub Pages
-- Asset optimization and chunking
-- TypeScript compilation with strict mode
-- Tailwind CSS with custom design system
+| Metric | Choropleth Support |
+| :--- | :---: |
+| **Zillow Housing Value Index** | Yes |
+| **Median Sale Price** | Yes |
+| **Median Price per Sq Ft** | Yes |
+| **Median Days on Market** | Yes |
+| **Sale-to-List Ratio** | Yes |
+| **Median List Price** | No |
+| **Homes Sold** | No |
+| **Pending Sales** | No |
+| **New Listings** | No |
+| **Inventory** | No |
+| **% Sold Above List** | No |
+| **% Off Market in 2 Weeks** | No |
 
 ---
 
-## 🌐 Data Sources
+## Data Sources
 
--  Redfin real estate market data (Update monthly)
--  U.S. Census ZIP Code Tabulation Areas (ZCTA)
-
----
-
-## 🔒 Privacy & Security
-
-* 100% client-side processing
-* All assets served securely over HTTPS
+-  [Redfin Data Center](https://www.redfin.com/news/data-center/)
+-  [Zillow Research](https://www.zillow.com/research/data/)
 
 ---
 
-## 🤝 Contributing
+## Limitations
+
+1.  **Data Coverage:** Redfin tracks only ZIP codes with active market. Rural ZIP codes with low transaction volume may report "N/A".
+2.  **Update Frequency:** Data is aggregated on a monthly basis. This is not a real-time MLS feed.
+
+---
+
+## Contributing
 
 ### Development Workflow
 
@@ -152,31 +146,22 @@ The project uses Vite with custom configuration for:
 7. Push to your branch: `git push origin feature/amazing-feature`
 8. Open a Pull Request
 
-### Code Standards
+---
 
-- TypeScript strict mode enabled
-- ESLint configuration with React and accessibility rules
-- Prettier code formatting
-- Component-based architecture with clear separation of concerns
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
 
 ---
 
-## 📝 License
+## Issues
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙋 Support
-
-- **Documentation**: Available in this README and inline code comments
 - **Issues**: Report bugs and request features via [GitHub Issues](https://github.com/Jasperc2024/Domapus/issues)
-- **Discussions**: Join the conversation in [GitHub Discussions](https://github.com/Jasperc2024/Domapus/discussions)
-- **Email**: Contact the maintainer at [jasperc.wk@gmail.com](mailto:jasperc.wk@gmail.com)
+- **Email**: You can contact the maintainer at [jasperc.wk@gmail.com](mailto:jasperc.wk@gmail.com)
 
 ---
 
-## ☕ Support the Project
+## Support the Project
 
 If you find Domapus useful, consider supporting its development:
 
@@ -184,18 +169,7 @@ If you find Domapus useful, consider supporting its development:
 
 ---
 
-## 🏆 Acknowledgments
-
-- **Redfin** for providing comprehensive real estate data
-- **U.S. Census Bureau** for ZIP code boundary data
-- **MapLibre GL JS Community** for the excellent mapping library
-- **React & Vite Teams** for the modern development experience
-- **shadcn** for the beautiful component library
-
----
-
 <div align="center">
-  <strong>Built with ❤️ by <a href="https://github.com/Jasperc2024">Jasper Chen</a></strong>
-  <br>
-  <sub>Making housing data accessible and actionable for everyone</sub>
+  <strong>Built by <a href="https://github.com/Jasperc2024">Jasper Chen</a></strong>
+   <br><small>Distributed under the MIT License</small>
 </div>
