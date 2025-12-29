@@ -3,13 +3,13 @@ import { ZipData } from "../components/dashboard/map/types";
 export interface WorkerMessage {
   id: string;
   type: "LOAD_AND_PROCESS_DATA";
-  data: any;
+  data: LoadDataRequest;
 }
 
 export interface WorkerResponse {
   id?: string;
   type: "PROGRESS" | "ERROR" | "DATA_PROCESSED";
-  data?: any;
+  data?: DataProcessedResponse | ProgressData;
   error?: string;
 }
 

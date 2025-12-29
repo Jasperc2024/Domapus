@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ZipComparison } from "./ZipComparison";
 import { ZipData } from "./map/types";
+import { formatMetricValue, formatChange, METRIC_DEFINITIONS, FormatType } from "./map/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SidebarProps {
@@ -18,46 +19,13 @@ export function Sidebar({ isOpen, zipData, allZipData, onClose }: SidebarProps) 
   const isMobile = useIsMobile();
   if (!isOpen || !zipData) return null;
 
-  // Helper functions for formatting data
-  const formatValue = (value: any, type: string): string => {
-    if (value === null || value === undefined) return "N/A";
-    const numValue = Number(value);
-    if (isNaN(numValue)) return "N/A";
-    switch (type) {
-      case "price": return `$${numValue.toLocaleString()}`;
-      case "days": return `${numValue} days`;
-      case "percentage": return `${numValue.toFixed(1)}%`;
-      case "ratio": return `${numValue.toFixed(1)}%`;
-      default: return numValue.toLocaleString();
-    }
-  };
-
-  const formatChange = (value: any): { formatted: string; isPositive: boolean; isZero: boolean } => {
-    if (value === null || value === undefined) return { formatted: "N/A", isPositive: false, isZero: true };
-    const numValue = Number(value);
-    if (isNaN(numValue)) return { formatted: "N/A", isPositive: false, isZero: true };
-    const isPositive = numValue > 0;
-    const isZero = numValue === 0;
-    return { formatted: `${isPositive ? "+" : ""}${numValue.toFixed(1)}%`, isPositive, isZero };
-  };
-
   // The list of all metrics to display for a single ZIP code
-  const allMetrics = [
-    { key: "zhvi", label: "Zillow Home Value Index", type: "price", momKey: "zhvi_mom", yoyKey: "zhvi_yoy" },
-    { key: "median_sale_price", label: "Median Sale Price", type: "price", momKey: "median_sale_price_mom", yoyKey: "median_sale_price_yoy" },
-    { key: "median_list_price", label: "Median List Price", type: "price", momKey: "median_list_price_mom", yoyKey: "median_list_price_yoy" },
-    { key: "median_ppsf", label: "Median Price per Sq Ft", type: "price", momKey: "median_ppsf_mom", yoyKey: "median_ppsf_yoy" },
-    { key: "homes_sold", label: "Homes Sold", type: "number", momKey: "homes_sold_mom", yoyKey: "homes_sold_yoy" },
-    { key: "pending_sales", label: "Pending Sales", type: "number", momKey: "pending_sales_mom", yoyKey: "pending_sales_yoy" },
-    { key: "new_listings", label: "New Listings", type: "number", momKey: "new_listings_mom", yoyKey: "new_listings_yoy" },
-    { key: "inventory", label: "Inventory", type: "number", momKey: "inventory_mom", yoyKey: "inventory_yoy" },
-    { key: "median_dom", label: "Median Days on Market", type: "days", momKey: "median_dom_mom", yoyKey: "median_dom_yoy" },
-    { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", type: "ratio", momKey: "avg_sale_to_list_ratio_mom", yoyKey: "avg_sale_to_list_ratio_yoy" },
-    { key: "sold_above_list", label: "% Sold Above List", type: "percentage", momKey: "sold_above_list_mom", yoyKey: "sold_above_list_yoy" },
-    { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", type: "percentage", momKey: "off_market_in_two_weeks_mom", yoyKey: "off_market_in_two_weeks_yoy" }
-]
-  .map(metric => ({ ...metric, value: zipData[metric.key as keyof ZipData] }))
-  .filter(metric => metric.value !== null && metric.value !== undefined);
+  const allMetrics = Object.values(METRIC_DEFINITIONS)
+    .map(metric => ({ 
+      ...metric, 
+      value: zipData[metric.key] as number | null 
+    }))
+    .filter(metric => metric.value !== null && metric.value !== undefined);
 
   return (
     <div className={`absolute left-0 bg-dashboard-panel border-r border-dashboard-border shadow-lg z-40 h-full flex flex-col ${isMobile ? "w-full" : "w-96"}`}>
@@ -97,12 +65,12 @@ export function Sidebar({ isOpen, zipData, allZipData, onClose }: SidebarProps) 
             <h3 className="text-sm font-medium pt-2 flex items-center"><Building className="h-4 w-4 mr-2" />Market Data</h3>
             <div className="space-y-3">
               {allMetrics.map((metric, index) => {
-                const momChange = metric.momKey ? formatChange(zipData[metric.momKey as keyof ZipData]) : null;
-                const yoyChange = metric.yoyKey ? formatChange(zipData[metric.yoyKey as keyof ZipData]) : null;
+                const momChange = metric.momKey ? formatChange(zipData[metric.momKey] as number | null) : null;
+                const yoyChange = metric.yoyKey ? formatChange(zipData[metric.yoyKey] as number | null) : null;
                 return (
                   <Card key={index}><CardContent className="p-4"><div className="space-y-2">
                     <p className="text-sm font-medium text-muted-foreground">{metric.label}</p>
-                    <p className="text-xl font-bold">{formatValue(metric.value, metric.type)}</p>
+                    <p className="text-xl font-bold">{formatMetricValue(metric.value, metric.format as FormatType)}</p>
                     <div className="flex flex-wrap gap-2 text-xs">
                       {momChange && !momChange.isZero && (<span className={`flex items-center ${momChange.isPositive ? "text-green-600" : "text-red-600"}`}>{momChange.isPositive ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}{momChange.formatted} vs last month</span>)}
                       {yoyChange && !yoyChange.isZero && (<span className={`flex items-center ${yoyChange.isPositive ? "text-green-600" : "text-red-600"}`}>{yoyChange.isPositive ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}{yoyChange.formatted} vs last year</span>)}

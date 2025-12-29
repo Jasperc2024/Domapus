@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => ({
   base: '/Domapus/',
   server: {
     host: "::",
-    port: 3677,
+    port: 8080,
     proxy: {
       '/api': {
         target: 'http://localhost:3677',

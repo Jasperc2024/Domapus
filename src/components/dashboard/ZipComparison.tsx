@@ -5,8 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Search, X } from 'lucide-react';
 import { ZipData } from './map/types';
+import { formatMetricValue, getComparison, METRIC_DEFINITIONS, FormatType } from './map/utils';
 
-// Define the props this component now accepts from its parent (Sidebar)
 interface ZipComparisonProps {
   currentZip: ZipData;
   allZipData: Record<string, ZipData>;
@@ -14,7 +14,6 @@ interface ZipComparisonProps {
 }
 
 export function ZipComparison({ currentZip, allZipData, onClose }: ZipComparisonProps) {
-  // Local UI state for the search input and results
   const [searchZip, setSearchZip] = useState('');
   const [compareZip, setCompareZip] = useState<ZipData | null>(null);
   const [error, setError] = useState('');
@@ -33,46 +32,12 @@ export function ZipComparison({ currentZip, allZipData, onClose }: ZipComparison
     }
   };
 
-  // Helper function to format display values
-  const formatValue = (value: any, type: string): string => {
-    if (value === null || value === undefined) return 'N/A';
-    const numValue = Number(value);
-    if (isNaN(numValue)) return 'N/A';
-    switch (type) {
-      case 'price': return `$${numValue.toLocaleString()}`;
-      case 'days': return `${numValue} days`;
-      case 'percentage': return `${numValue.toFixed(1)}%`;
-      case 'ratio': return `${numValue.toFixed(1)}%`;
-      default: return numValue.toLocaleString();
-    }
-  };
-
-  // Helper function to determine which value is higher or lower
-  const getComparison = (current: any, compare: any): 'higher' | 'lower' | 'same' => {
-    const currentNum = Number(current);
-    const compareNum = Number(compare);
-    if (isNaN(currentNum) || isNaN(compareNum)) return 'same';
-
-    const diff = currentNum - compareNum;
-    if (Math.abs(diff) < 0.01) return 'same'; // Treat very small differences as the same
-    return diff > 0 ? 'higher' : 'lower';
-  };
-
-  // The list of metrics to compare
-  const metrics = [
-    { key: "zhvi", label: "Zillow Home Value Index", type: "price" },
-    { key: "median_sale_price", label: "Median Sale Price", type: "price" },
-    { key: "median_list_price", label: "Median List Price", type: "price" },
-    { key: "median_ppsf", label: "Median Price per Sq Ft", type: "price" },
-    { key: "homes_sold", label: "Homes Sold", type: "number" },
-    { key: "pending_sales", label: "Pending Sales", type: "number" },
-    { key: "new_listings", label: "New Listings", type: "number" },
-    { key: "inventory", label: "Inventory", type: "number" },
-    { key: "median_dom", label: "Median Days on Market", type: "days" },
-    { key: "avg_sale_to_list_ratio", label: "Sale-to-List Ratio", type: "ratio" },
-    { key: "sold_above_list", label: "% Sold Above List", type: "percentage" },
-    { key: "off_market_in_two_weeks", label: "% Off Market in 2 Weeks", type: "percentage" },
-  ];
+  // The list of metrics to compare (using shared definitions)
+  const metrics = Object.values(METRIC_DEFINITIONS).map(m => ({
+    key: m.key,
+    label: m.label,
+    format: m.format
+  }));
 
   return (
     <div className="space-y-4">
@@ -112,18 +77,18 @@ export function ZipComparison({ currentZip, allZipData, onClose }: ZipComparison
 
           <div className="space-y-2">
             {metrics.map((metric) => {
-              const currentValue = currentZip[metric.key as keyof ZipData];
-              const compareValue = compareZip[metric.key as keyof ZipData];
+              const currentValue = currentZip[metric.key] as number | null;
+              const compareValue = compareZip[metric.key] as number | null;
               const comparison = getComparison(currentValue, compareValue);
-              const isGoodHigher = !metric.key.includes('dom'); // Higher is better for most metrics, except Days on Market
+              const isGoodHigher = metric.key !== 'median_dom'; // Higher is better for most metrics, except Days on Market
 
               return (
                 <Card key={metric.key}>
                   <CardContent className="p-3">
                     <div className="text-center mb-2 text-xs font-medium text-muted-foreground">{metric.label}</div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className={`text-center font-bold text-sm ${comparison === 'higher' ? (isGoodHigher ? 'text-green-600' : 'text-red-600') : comparison === 'lower' ? (isGoodHigher ? 'text-red-600' : 'text-green-600') : ''}`}>{formatValue(currentValue, metric.type)}</div>
-                      <div className={`text-center font-bold text-sm ${comparison === 'lower' ? (isGoodHigher ? 'text-green-600' : 'text-red-600') : comparison === 'higher' ? (isGoodHigher ? 'text-red-600' : 'text-green-600') : ''}`}>{formatValue(compareValue, metric.type)}</div>
+                      <div className={`text-center font-bold text-sm ${comparison === 'higher' ? (isGoodHigher ? 'text-green-600' : 'text-red-600') : comparison === 'lower' ? (isGoodHigher ? 'text-red-600' : 'text-green-600') : ''}`}>{formatMetricValue(currentValue, metric.format as FormatType)}</div>
+                      <div className={`text-center font-bold text-sm ${comparison === 'lower' ? (isGoodHigher ? 'text-green-600' : 'text-red-600') : comparison === 'higher' ? (isGoodHigher ? 'text-red-600' : 'text-green-600') : ''}`}>{formatMetricValue(compareValue, metric.format as FormatType)}</div>
                     </div>
                   </CardContent>
                 </Card>
