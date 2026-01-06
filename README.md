@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="public/Banner.svg" width="400" alt="Domapus Banner">
+    <img src="Banner.svg" width="400" alt="Domapus Banner">
 </p>
 
 <p align="center">
@@ -23,28 +23,28 @@
 ### Main Dashboard
 <p align="center">
 Visualize median price, inventory, and sales trends nationwide. Hover over a ZIP code to show value.
-<img src="public/readme/dashboard.png" width="80%" alt="Main Dashboard">
+<img src="readme/dashboard.png" width="80%" alt="Main Dashboard">
 </p>
 <br>
 
 ### Granular ZIP Details
 <p align="center">
 Click on a ZIP code to access detailed market data.
-<img src="public/readme/detail.png" width="80%" alt="Sidebar Details">
+<img src="readme/detail.png" width="80%" alt="Sidebar Details">
 </p>
 <br>
 
 ### Comparative Analysis
 <p align="center">
 Compare two ZIP codes side-by-side to evaluate relative market performance across all available metrics.
-<img src="public/readme/compare.png" width="80%" alt="Comparison Mode">
+<img src="readme/compare.png" width="80%" alt="Comparison Mode">
 </p>
 <br>
 
 ### Export
 <p align="center">
 Generate report-ready maps with customizations.
-<img src="public/readme/export.png" width="80%" alt="Export Feature">
+<img src="readme/export.png" width="80%" alt="Export Feature">
 </p>
 
 ---
@@ -96,7 +96,7 @@ npm run build && npm run preview
 
 ## Project Structure
 
-See [tree.txt](tree.txt)
+See [tree.txt](https://github.com/Jasperc2024/Domapus/blob/main/tree.txt)
 
 ---
 
@@ -150,7 +150,7 @@ See [tree.txt](tree.txt)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
+This project is licensed under the MIT License - see the [LICENSE.md](https://github.com/Jasperc2024/Domapus/blob/main/LICENSE.md) file for details.
 
 ---
 
