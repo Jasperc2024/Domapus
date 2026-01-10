@@ -150,6 +150,8 @@ def main():
 
         # 3. Final Assembly
         output_data = {}
+        max_period_end = None  # To track the latest date found in the data
+
         key_order = [
             'city', 'county', 'state', 'metro', 'lat', 'lng', 'period_end',
             'zhvi', 'zhvi_mom', 'zhvi_yoy',
@@ -166,7 +168,6 @@ def main():
             'off_market_in_two_weeks', 'off_market_in_two_weeks_mom', 'off_market_in_two_weeks_yoy'
         ]
 
-        # Iterate over the mapping (master list) instead of Redfin records
         for zip_code, zm in zip_mapping.items():
             raw_data = {
                 'city': zm.get('city'), 
@@ -179,27 +180,28 @@ def main():
             
             redfin_dict = latest_records.get(zip_code, {})
             if redfin_dict:
-                # Map Redfin internal names to our output names
                 redfin_mapped = {col_map.get(k, k): v for k, v in redfin_dict.items()}
                 raw_data.update(redfin_mapped)
             
-            # Layer in Zillow data if it exists
             if zip_code in zillow_data:
                 raw_data.update(zillow_data[zip_code])
             
-            # Final formatting and rounding logic
             ordered_data = {}
             for key in key_order:
                 val = raw_data.get(key)
                 
-                # Handle nulls/missing data for any field
                 if val is None or pd.isna(val) or val == "": 
                     ordered_data[key] = None
                     continue
 
                 try:
                     if key == 'period_end':
-                        ordered_data[key] = val.strftime('%Y-%m-%d') if hasattr(val, 'strftime') else str(val)[:10]
+                        formatted_date = val.strftime('%Y-%m-%d') if hasattr(val, 'strftime') else str(val)[:10]
+                        ordered_data[key] = formatted_date
+                        # Track the overall latest period_end
+                        if max_period_end is None or formatted_date > max_period_end:
+                            max_period_end = formatted_date
+                            
                     elif key in ['lat', 'lng']:
                         ordered_data[key] = round(float(val), 5)
                     elif key == 'median_ppsf':
@@ -207,7 +209,6 @@ def main():
                     elif key == 'avg_sale_to_list_ratio':
                         ordered_data[key] = round(float(val) * 100, 1)
                     elif any(x in key for x in ['_mom', '_yoy', 'sold_above_list', 'off_market_in_two_weeks']):
-                        # For DOM (Days on Market) comparisons, we don't multiply by 100
                         if 'dom' in key:
                             ordered_data[key] = round(float(val), 1)
                         else:
@@ -226,7 +227,6 @@ def main():
         zip_codes_changed = 0
         data_points_changed = 0
 
-        # Verification Print
         if output_data:
             random_zip = random.choice(list(output_data.keys()))
             logging.info(f"VERIFICATION - Random ZIP Data ({random_zip}): {json.dumps(output_data[random_zip], indent=2)}")
@@ -244,40 +244,17 @@ def main():
             except Exception as e:
                 logging.warning(f"Comparison failed: {e}")
 
-        # 5. Archive monthly snapshot
-        archive_dir = DATA_DIR / "archive"
-        archive_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Get period_end from the data to determine the month
-        sample_zip = next(iter(output_data.values()), {})
-        period_end = sample_zip.get('period_end', '')
-        
-        if period_end:
-            # Extract YYYY-MM from period_end (e.g., "2025-11-30" -> "2025-11")
-            archive_month = period_end[:7]
-            archive_filename = f"zip-data-{archive_month}.json"
-            archive_path = archive_dir / archive_filename
-            
-            # Save archive (overwrite if same month is run multiple times)
-            with open(archive_path, 'w', encoding='utf-8') as f:
-                json.dump({"zip_codes": output_data, "period_end": period_end}, f, separators=(",", ":"))
-            logging.info(f"Archived monthly snapshot: {archive_filename}")
-        else:
-            logging.warning("No period_end found, skipping archive.")
-
-        # Save current/latest data
         with open(zip_data_path, 'w', encoding='utf-8') as f:
             json.dump({"zip_codes": output_data}, f, separators=(",", ":"))
 
-        # Update last_updated.json with archive info
+        # Updated to include period_end field
         with open(DATA_DIR / "last_updated.json", 'w') as f:
             json.dump({
                 "last_updated_utc": datetime.now(timezone.utc).isoformat(),
-                "period_end": period_end,
+                "period_end": max_period_end,
                 "total_zip_codes": len(output_data),
                 "zip_codes_changed": zip_codes_changed,
-                "data_points_changed": data_points_changed,
-                "archive_file": f"zip-data-{period_end[:7]}.json" if period_end else None
+                "data_points_changed": data_points_changed
             }, f, indent=2)
 
         logging.info(f"Run completed. Processed {len(output_data)} ZIP codes.")

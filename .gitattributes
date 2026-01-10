@@ -1,1 +1,2 @@
 public/data/zip-data.json filter=lfs diff=lfs merge=lfs -text
+public/data/archive/** filter=lfs diff=lfs merge=lfs -text
