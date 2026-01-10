@@ -244,15 +244,40 @@ def main():
             except Exception as e:
                 logging.warning(f"Comparison failed: {e}")
 
+        # 5. Archive monthly snapshot
+        archive_dir = DATA_DIR / "archive"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Get period_end from the data to determine the month
+        sample_zip = next(iter(output_data.values()), {})
+        period_end = sample_zip.get('period_end', '')
+        
+        if period_end:
+            # Extract YYYY-MM from period_end (e.g., "2025-11-30" -> "2025-11")
+            archive_month = period_end[:7]
+            archive_filename = f"zip-data-{archive_month}.json"
+            archive_path = archive_dir / archive_filename
+            
+            # Save archive (overwrite if same month is run multiple times)
+            with open(archive_path, 'w', encoding='utf-8') as f:
+                json.dump({"zip_codes": output_data, "period_end": period_end}, f, separators=(",", ":"))
+            logging.info(f"Archived monthly snapshot: {archive_filename}")
+        else:
+            logging.warning("No period_end found, skipping archive.")
+
+        # Save current/latest data
         with open(zip_data_path, 'w', encoding='utf-8') as f:
             json.dump({"zip_codes": output_data}, f, separators=(",", ":"))
 
+        # Update last_updated.json with archive info
         with open(DATA_DIR / "last_updated.json", 'w') as f:
             json.dump({
                 "last_updated_utc": datetime.now(timezone.utc).isoformat(),
+                "period_end": period_end,
                 "total_zip_codes": len(output_data),
                 "zip_codes_changed": zip_codes_changed,
-                "data_points_changed": data_points_changed
+                "data_points_changed": data_points_changed,
+                "archive_file": f"zip-data-{period_end[:7]}.json" if period_end else None
             }, f, indent=2)
 
         logging.info(f"Run completed. Processed {len(output_data)} ZIP codes.")
