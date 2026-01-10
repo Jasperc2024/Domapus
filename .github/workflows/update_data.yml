@@ -62,7 +62,7 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add public/data/zip-data.json public/data/last_updated.json
+        git add public/data/zip-data.json public/data/last_updated.json public/data/archive/
         git commit -m "Update Redfin ZIP data - $(date +'%Y-%m-%d %H:%M:%S' --utc)"
         git push
       env:
