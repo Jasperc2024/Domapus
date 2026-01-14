@@ -77,14 +77,31 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
         const buffer = await response.arrayBuffer();
 
-        let fullPayload: { last_updated_utc: string; zip_codes: Record<string, RawZipData> };
+        let fullPayload: { last_updated_utc?: string; zip_codes: Record<string, RawZipData> };
 
         try {
           const jsonText = new TextDecoder().decode(buffer);
+          
+          // Check if this looks like a Git LFS pointer file instead of actual JSON
+          if (jsonText.startsWith('version https://git-lfs.github.com')) {
+            console.error('[Worker] Received Git LFS pointer instead of actual data file');
+            throw new Error("Data file not available. The server returned a placeholder instead of actual data. Please try refreshing or contact support.");
+          }
+          
           fullPayload = JSON.parse(jsonText);
+          
+          // Validate the payload structure
+          if (!fullPayload || typeof fullPayload !== 'object') {
+            throw new Error("Invalid data format: expected object");
+          }
         } catch (err) {
           console.error('[Worker] JSON parse failed:', err);
-          throw new Error("Failed to parse JSON: " + (err instanceof Error ? err.message : "Unknown error"));
+          const errMessage = err instanceof Error ? err.message : "Unknown error";
+          // Provide more helpful error message
+          if (errMessage.includes('Unexpected token') || errMessage.includes('JSON')) {
+            throw new Error("Decoding failed: The data file appears to be corrupted or incomplete. Please try refreshing the page.");
+          }
+          throw new Error("Failed to load data: " + errMessage);
         }
 
         const { last_updated_utc, zip_codes: rawZipData } = fullPayload;
