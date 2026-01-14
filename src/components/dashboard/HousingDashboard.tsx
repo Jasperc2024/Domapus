@@ -31,6 +31,7 @@ export function HousingDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showSponsorBanner, setShowSponsorBanner] = useState(false);
   const [isExportMode, setIsExportMode] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   const { processData, isLoading } = useDataWorker();
 
@@ -44,6 +45,7 @@ export function HousingDashboard() {
       const dataUrl = new URL(`${BASE_PATH}data/zip-data.json`, window.location.origin).href;
 
       try {
+        setLoadError(null);
         const result = await processData({
           type: 'LOAD_AND_PROCESS_DATA',
           data: { url: dataUrl, selectedMetric: 'zhvi' }
@@ -62,7 +64,9 @@ export function HousingDashboard() {
         }
       } catch (error: any) {
         console.error("[HousingDashboard] Failed to load initial data:", error);
-        trackError("dashboard_data_load_failed", error?.message || "Failed to load initial data");
+        const errorMessage = error?.message || "Failed to load data";
+        setLoadError(errorMessage);
+        trackError("dashboard_data_load_failed", errorMessage);
       }
     };
     loadInitialData();
@@ -86,6 +90,25 @@ export function HousingDashboard() {
     setSidebarOpen(true); 
   }, []);
   
+  // Show error state if data failed to load
+  if (loadError) {
+    return (
+      <div className="w-full h-screen bg-dashboard-bg flex items-center justify-center">
+        <div className="bg-card p-8 rounded-lg shadow-lg max-w-md text-center">
+          <div className="text-destructive text-6xl mb-4">⚠️</div>
+          <h2 className="text-xl font-bold text-foreground mb-2">Unable to Load Data</h2>
+          <p className="text-muted-foreground mb-4">{loadError}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-screen bg-dashboard-bg overflow-hidden flex flex-col">
       {showSponsorBanner && <SponsorBanner onClose={() => setShowSponsorBanner(false)} />}
