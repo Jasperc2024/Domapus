@@ -58,7 +58,7 @@ export function MapLibreMap({
   }, [zipData, selectedMetric, onZipSelect]);
   const hasData = useMemo(() => Object.keys(zipData).length > 0, [zipData]);
 
-  // 1. Initialize Map with PMTiles (stable, only runs once)
+  // 1. Initialize Map with PMTiles
   const createAndInitializeMap = useCallback((container: HTMLDivElement) => {
     addPMTilesProtocol();
     const bounds: LngLatBoundsLike = [[-124.7844079, 24.7433195],[-66.9513812, 49.3457868]];
@@ -92,7 +92,7 @@ export function MapLibreMap({
     return map;
   }, []);
 
-  // 2. Setup Map Instance (stable, with debounced resize)
+  // 2. Setup Map Instance
   useEffect(() => {
     if (!mapContainer.current) return;
     if (mapRef.current) return;
@@ -115,14 +115,10 @@ export function MapLibreMap({
       }
     };
 
-    // Debounced resize handler to prevent constant re-renders
     const handleResize = () => {
       if (!mapRef.current || didUnmount) return;
-      
       const newWidth = container.clientWidth;
       const newHeight = container.clientHeight;
-      
-      // Only resize if dimensions actually changed significantly (> 5px)
       const widthDiff = Math.abs(newWidth - containerSizeRef.current.width);
       const heightDiff = Math.abs(newHeight - containerSizeRef.current.height);
       
@@ -171,7 +167,7 @@ export function MapLibreMap({
     };
   }, [createAndInitializeMap]);
 
-  // 3. Setup Interactions (Global Listeners)
+  // 3. Setup Interactions
   const setupMapInteractions = useCallback(() => {
     const map = mapRef.current;
     if (!map || interactionsSetup.current) return;
@@ -181,7 +177,6 @@ export function MapLibreMap({
     const mousemoveHandler = (e: MapMouseEvent) => {
       lastMouseEventRef.current = e;
       if (mousemoveRafRef.current) return;
-
       mousemoveRafRef.current = requestAnimationFrame(() => {
         const ev = lastMouseEventRef.current;
         mousemoveRafRef.current = null;
@@ -190,7 +185,6 @@ export function MapLibreMap({
         try {
           const features = map.queryRenderedFeatures(ev.point, { layers: [layerId] });
           const isHovering = features.length > 0;
-
           map.getCanvas().style.cursor = isHovering ? "pointer" : "";
 
           if (!isHovering) {
@@ -200,7 +194,6 @@ export function MapLibreMap({
 
           const props = features[0].properties ?? {};
           const zipCode = (props.ZCTA5CE20 || props.zipCode || props.id) as string;
-          
           const { zipData: currentZipData, selectedMetric: currentMetric } = propsRef.current;
 
           if (!zipCode || !currentZipData[zipCode]) {
@@ -234,7 +227,6 @@ export function MapLibreMap({
 
       const props = features[0].properties ?? {};
       const zipCode = (props.ZCTA5CE20 || props.zipCode || props.id) as string;
-      
       const { zipData: currentZipData, onZipSelect: currentOnSelect } = propsRef.current;
 
       if (zipCode && currentZipData[zipCode]) {
@@ -254,7 +246,7 @@ export function MapLibreMap({
     interactionsSetup.current = true;
   }, []);
 
-  // 4. Add PMTiles Source & Layer with zoom-dependent border width
+  // 4. Add PMTiles Source & Layer
   useEffect(() => {
     if (!isMapReady || !mapRef.current) return;
     const map = mapRef.current;
@@ -327,7 +319,7 @@ export function MapLibreMap({
         type: "symbol",
         source: "zips",
         "source-layer": "us_zip_codes",
-        minzoom: 9,
+        minzoom: 9.5,
         layout: {
           "visibility": "visible",
           "text-field": ["get", "ZCTA5CE20"],
@@ -364,7 +356,7 @@ export function MapLibreMap({
     }
   }, [isMapReady, setupMapInteractions]);
 
-  // 5. Update Choropleth Colors using setFeatureState
+  // 5. Update Choropleth Colors
   useEffect(() => {
     if (!isMapReady || !mapRef.current || !pmtilesLoaded || !hasData) return;
     const map = mapRef.current;
@@ -407,7 +399,7 @@ export function MapLibreMap({
     map.setPaintProperty("zips-fill", "fill-color", stepExpression);
   }, [isMapReady, pmtilesLoaded, zipData, selectedMetric, hasData]);
 
-  // 6. Fly to Search and Highlight ZIP - ALWAYS responsive to searchTrigger
+  // 6. Fly to Search and Highlight ZIP
   useEffect(() => {
     if (!isMapReady || !mapRef.current || !pmtilesLoaded) return;
     if (!searchZip || !zipData[searchZip]) return;
@@ -430,7 +422,6 @@ export function MapLibreMap({
     );
     highlightedZipRef.current = searchZip;
     
-    // Always fly to the location when searchTrigger changes
     if (longitude && latitude) {
       map.flyTo({ center: [longitude, latitude], zoom: 10, duration: 1500 });
     }
