@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useDataWorker } from "@/hooks/useDataWorker";
 import { ZipData } from "./map/types";
 import { MapExport } from "@/components/MapExport";
-import { buildSpatialIndex } from "@/lib/spatial-index";
+import { buildSpatialIndex, queryZipsInBounds } from "@/lib/spatial-index";
+import { computeQuantileBuckets, getMetricValue } from "./map/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { trackError } from "@/lib/analytics";
 import { TopBar } from "./TopBar";
@@ -12,7 +13,8 @@ import { SponsorBanner } from "./SponsorBanner";
 import { Sidebar } from "./Sidebar";
 import { MetricType } from "./MetricSelector";
 
-interface DataPayload { 
+
+interface DataPayload {
   last_updated_utc: string;
   zip_codes: Record<string, ZipData>;
   bounds: { min: number; max: number; };
@@ -32,13 +34,18 @@ export function HousingDashboard() {
   const [showSponsorBanner, setShowSponsorBanner] = useState(false);
   const [isExportMode, setIsExportMode] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  
+  const [visibleZipCodes, setVisibleZipCodes] = useState<string[] | null>(null);
+  const [customBuckets, setCustomBuckets] = useState<number[] | null>(null);
+  const [autoScale, setAutoScale] = useState(false);
+  const [isIndexReady, setIsIndexReady] = useState(false);
+  const lastBoundsRef = useRef<any>(null);
+
   const { processData, isLoading } = useDataWorker();
 
   useEffect(() => {
     let isMounted = true;
     let hasRun = false;
-    
+
     const loadInitialData = async () => {
       if (hasRun) return;
       hasRun = true;
@@ -52,14 +59,15 @@ export function HousingDashboard() {
         }) as DataPayload;
 
         if (!isMounted) return;
-        
+
         if (result) {
           setZipData(result.zip_codes);
           setDataBounds(result.bounds);
-          
+
           // Build spatial index for efficient lookups
           setTimeout(() => {
             buildSpatialIndex(result.zip_codes);
+            setIsIndexReady(true);
           }, 100);
         }
       } catch (error: any) {
@@ -71,7 +79,7 @@ export function HousingDashboard() {
     };
     loadInitialData();
     ///const timer = setTimeout(() => setShowSponsorBanner(true), 30000);
-    
+
     return () => {
       isMounted = false;
       ///clearTimeout(timer);
@@ -79,17 +87,98 @@ export function HousingDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Stable search handler that updates both zip and trigger
+  // Search handler
   const handleSearch = useCallback((zip: string, trigger: number) => {
     setSearchZip(zip);
     setSearchTrigger(trigger);
   }, []);
-  
-  const handleZipSelect = useCallback((zip: ZipData) => { 
-    setSelectedZip(zip); 
-    setSidebarOpen(true); 
+
+  const handleZipSelect = useCallback((zip: ZipData) => {
+    setSelectedZip(zip);
+    setSidebarOpen(true);
   }, []);
-  
+
+  // Use ref to always access latest autoScale state in callbacks
+  const autoScaleRef = useRef(autoScale);
+  useEffect(() => {
+    autoScaleRef.current = autoScale;
+  }, [autoScale]);
+
+  const updateColors = useCallback((bounds: any) => {
+    if (!autoScaleRef.current) {
+      setCustomBuckets(null);
+      setVisibleZipCodes(null);
+      return;
+    }
+
+    if (!bounds) return;
+
+    const west = bounds[0][0];
+    const south = bounds[0][1];
+    const east = bounds[1][0];
+    const north = bounds[1][1];
+
+    const visibleZips = queryZipsInBounds({ west, south, east, north });
+    setVisibleZipCodes(visibleZips);
+
+    const values = visibleZips
+      .map(zip => zipData[zip])
+      .filter(Boolean)
+      .map(d => getMetricValue(d, selectedMetric))
+      .filter(v => v > 0);
+
+    const buckets = computeQuantileBuckets(values, 12);
+    setCustomBuckets(buckets.length > 0 ? buckets : null);
+  }, [zipData, selectedMetric]);
+
+  const handleMapMove = useCallback((bounds: any) => {
+    lastBoundsRef.current = bounds;
+    if (autoScaleRef.current) {
+      updateColors(bounds);
+    }
+  }, [updateColors]);
+
+  useEffect(() => {
+    if (autoScale && lastBoundsRef.current && isIndexReady) {
+      updateColors(lastBoundsRef.current);
+    } else if (!autoScale) {
+      setCustomBuckets(null);
+      setVisibleZipCodes(null);
+    }
+  }, [autoScale, isIndexReady, updateColors]);
+
+  useEffect(() => {
+    setCustomBuckets(null);
+    setVisibleZipCodes(null);
+
+    if (autoScale && lastBoundsRef.current) {
+      const timer = setTimeout(() => {
+        updateColors(lastBoundsRef.current);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedMetric, searchZip, autoScale, updateColors]);
+
+  useEffect(() => {
+    if (isIndexReady && autoScale && lastBoundsRef.current) {
+      updateColors(lastBoundsRef.current);
+    }
+  }, [isIndexReady, autoScale, updateColors]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible' && autoScale && lastBoundsRef.current) {
+        updateColors(lastBoundsRef.current);
+      }
+    };
+    document.addEventListener('visibilitychange', handleFocus);
+    return () => document.removeEventListener('visibilitychange', handleFocus);
+  }, [autoScale, updateColors]);
+
+  const legendValues = (visibleZipCodes && visibleZipCodes.length > 0)
+    ? visibleZipCodes.map(zip => zipData[zip]).filter(Boolean).map(d => getMetricValue(d, selectedMetric)).filter(v => v > 0)
+    : Object.values(zipData).map(d => getMetricValue(d, selectedMetric)).filter(v => v > 0);
+
   // Show error state if data failed to load
   if (loadError) {
     return (
@@ -98,8 +187,8 @@ export function HousingDashboard() {
           <div className="text-destructive text-6xl mb-4">⚠️</div>
           <h2 className="text-xl font-bold text-foreground mb-2">Unable to Load Data</h2>
           <p className="text-muted-foreground mb-4">{loadError}</p>
-          <button 
-            onClick={() => window.location.reload()} 
+          <button
+            onClick={() => window.location.reload()}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
           >
             Try Again
@@ -118,21 +207,29 @@ export function HousingDashboard() {
         onSearch={handleSearch}
         hideMobileControls={isMobile && sidebarOpen}
       >
-        <MapExport 
-          allZipData={zipData} 
+        <MapExport
+          allZipData={zipData}
           selectedMetric={selectedMetric}
           onExportModeChange={setIsExportMode}
         />
       </TopBar>
       <div className="flex flex-1 relative h-full min-h-[400px]">
-        {sidebarOpen && (
-          <Sidebar 
-            isOpen={sidebarOpen} 
-            zipData={selectedZip} 
-            allZipData={zipData} 
-            onClose={() => setSidebarOpen(false)} 
+        {isMobile && sidebarOpen && (
+          <Sidebar
+            isOpen={sidebarOpen}
+            zipData={selectedZip}
+            allZipData={zipData}
+            onClose={() => setSidebarOpen(false)}
           />
         )}
+        <div className="hidden md:flex absolute top-4 left-4 z-10 flex-col gap-2">
+          <Sidebar
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            zipData={selectedZip}
+            allZipData={zipData}
+          />
+        </div>
         <div className="flex-1 relative">
           <div className="absolute inset-0 min-h-[400px]">
             <MapLibreMap
@@ -144,15 +241,17 @@ export function HousingDashboard() {
               colorScaleDomain={dataBounds ? [dataBounds.min, dataBounds.max] : null}
               isLoading={isLoading}
               processData={processData}
+              customBuckets={customBuckets}
+              onMapMove={handleMapMove}
             />
           </div>
           {!isExportMode && !(isMobile && sidebarOpen) && (
             <div className={`absolute ${isMobile ? 'top-4 left-4' : 'bottom-4 right-4'} ${isMobile ? 'w-auto' : 'w-64'} z-[10] pointer-events-auto`}>
               <Legend
                 selectedMetric={selectedMetric}
-                metricValues={Object.values(zipData)
-                  .map(d => d[selectedMetric] ?? 0)
-                  .filter(v => v > 0)}
+                metricValues={legendValues}
+                autoScale={autoScale}
+                onAutoScaleChange={setAutoScale}
               />
             </div>
           )}

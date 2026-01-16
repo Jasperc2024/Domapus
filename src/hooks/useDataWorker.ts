@@ -48,7 +48,7 @@ export function useDataWorker() {
           setIsLoading(false);
           const pending = requestsRef.current.get(id);
           if (pending) {
-            pending.resolve(data as DataProcessedResponse); 
+            pending.resolve(data as DataProcessedResponse);
             requestsRef.current.delete(id);
           }
           break;
@@ -73,20 +73,59 @@ export function useDataWorker() {
     };
   }, []);
 
-  const processData = useCallback((message: { type: string; data?: LoadDataRequest }): Promise<DataProcessedResponse> => {
+  const processData = useCallback((message: { type: string; data?: LoadDataRequest }, options: { timeout?: number; retries?: number } = {}): Promise<DataProcessedResponse> => {
+    const { timeout = 30000, retries = 2 } = options;
     const worker = workerRef.current;
+
     if (!worker || !isInitializedRef.current) {
       console.error("[useDataWorker] Worker not available");
       trackError("worker_not_available", "Worker is not initialized");
       return Promise.reject(new Error("Worker is not initialized"));
     }
 
-    return new Promise((resolve, reject) => {
-      const id = `${Date.now()}-${Math.random()}`;
-      requestsRef.current.set(id, { resolve, reject });
-      setIsLoading(true);
-      worker.postMessage({ id, ...message });
-    });
+    const attemptRequest = async (attempt: number): Promise<DataProcessedResponse> => {
+      return new Promise((resolve, reject) => {
+        const id = `${Date.now()}-${Math.random()}`;
+
+        const timeoutId = setTimeout(() => {
+          if (requestsRef.current.has(id)) {
+            requestsRef.current.delete(id);
+            reject(new Error("Request timed out"));
+            trackError("worker_timeout", `Request ${message.type} timed out`);
+          }
+        }, timeout);
+
+        requestsRef.current.set(id, {
+          resolve: (data) => {
+            clearTimeout(timeoutId);
+            resolve(data);
+          },
+          reject: async (err) => {
+            clearTimeout(timeoutId);
+            if (attempt < retries && (err?.message?.includes("fetch") || err?.message?.includes("network"))) {
+              console.warn(`[useDataWorker] Retry ${attempt + 1}/${retries} for ${message.type}`);
+              try {
+                // Exponential backoff
+                await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+                const result = await attemptRequest(attempt + 1);
+                resolve(result);
+              } catch (retryErr) {
+                const retryErrMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+                trackError("worker_retry_failed", `Retry ${attempt + 1}/${retries} failed for ${message.type}: ${retryErrMsg}`);
+                reject(retryErr instanceof Error ? retryErr : new Error(String(retryErr)));
+              }
+            } else {
+              reject(err);
+            }
+          }
+        });
+
+        setIsLoading(true);
+        worker.postMessage({ id, ...message });
+      });
+    };
+
+    return attemptRequest(0);
   }, []);
 
   return { processData, isLoading, progress };

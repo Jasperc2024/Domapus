@@ -74,8 +74,27 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         const { url, selectedMetric } = data as LoadDataRequest;
         self.postMessage({ type: "PROGRESS", data: { phase: "Fetching market data..." } });
         const response = await fetch(url, { signal });
-        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error("Data file not found. Please try refreshing the page.");
+          } else if (response.status >= 500) {
+            throw new Error("Server error. Please try again later.");
+          }
+          throw new Error(`Failed to load data (${response.status}). Please try refreshing.`);
+        }
+        
+        // Validate response size - empty or too small responses are likely errors
+        const contentLength = response.headers.get('content-length');
+        if (contentLength && parseInt(contentLength) < 100) {
+          throw new Error("Data file appears to be empty or incomplete. Please try refreshing.");
+        }
+        
         const buffer = await response.arrayBuffer();
+        
+        // Validate we received actual data
+        if (buffer.byteLength < 100) {
+          throw new Error("Received incomplete data. Please check your connection and try again.");
+        }
 
         let fullPayload: { last_updated_utc?: string; zip_codes: Record<string, RawZipData> };
 
@@ -97,11 +116,10 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         } catch (err) {
           console.error('[Worker] JSON parse failed:', err);
           const errMessage = err instanceof Error ? err.message : "Unknown error";
-          // Provide more helpful error message
-          if (errMessage.includes('Unexpected token') || errMessage.includes('JSON')) {
-            throw new Error("Decoding failed: The data file appears to be corrupted or incomplete. Please try refreshing the page.");
-          }
-          throw new Error("Failed to load data: " + errMessage);
+          const detailedError = errMessage.includes('Unexpected token') || errMessage.includes('JSON')
+            ? `JSON parse error: Data file appears corrupted or incomplete (${errMessage})`
+            : `JSON parse error: ${errMessage}`;
+          throw new Error(detailedError);
         }
 
         const { last_updated_utc, zip_codes: rawZipData } = fullPayload;
@@ -201,8 +219,15 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
   } catch (err) {
     if (!signal.aborted) {
+      const errMessage = err instanceof Error ? err.message : "Unknown error";
+      const errorType = type || "UNKNOWN";
       console.error("[Worker] Error:", err);
-      self.postMessage({ type: "ERROR", id, error: err instanceof Error ? err.message : "Unknown error" });
+      // Send detailed error to main thread for tracking
+      self.postMessage({ 
+        type: "ERROR", 
+        id, 
+        error: `Worker ${errorType} error: ${errMessage}` 
+      });
     }
   }
 };

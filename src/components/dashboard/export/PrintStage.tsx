@@ -11,7 +11,7 @@ const BASE_PATH = import.meta.env.BASE_URL;
 const CHOROPLETH_COLORS = ["#FFF9B0", "#FFEB84", "#FFD166", "#FF9A56", "#E84C61", "#C13584", "#7B2E8D", "#2E0B59"];
 const BASE_WIDTH = 1200;
 const BASE_HEIGHT = 900;
-const BOUNDS_BUFFER = 0.15; 
+const BOUNDS_BUFFER = 0.15;
 
 export interface PrintStageProps {
   filteredData: ZipData[];
@@ -113,7 +113,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
   const { alaskaZips, hawaiiZips, mainlandZips, alaskaBounds, hawaiiBounds, mainlandBounds } = useMemo(() => {
     const ak = new Set<string>(), hi = new Set<string>(), ml = new Set<string>();
     const akPts: ReturnType<typeof point>[] = [], hiPts: ReturnType<typeof point>[] = [], mlPts: ReturnType<typeof point>[] = [];
-    
+
     filteredData.forEach(zip => {
       const st = (zip.state ?? '').toString().toLowerCase();
       const isAk = st === 'ak' || st === 'alaska';
@@ -123,17 +123,17 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
       if (!lat || !lng) return;
 
-      if (isAk) { 
-        ak.add(zip.zipCode); 
-        akPts.push(point([lng, lat])); 
+      if (isAk) {
+        ak.add(zip.zipCode);
+        if (lng < 0) akPts.push(point([lng, lat]));
       }
-      else if (isHi) { 
-        hi.add(zip.zipCode); 
-        hiPts.push(point([lng, lat])); 
+      else if (isHi) {
+        hi.add(zip.zipCode);
+        hiPts.push(point([lng, lat]));
       }
-      else { 
-        ml.add(zip.zipCode); 
-        mlPts.push(point([lng, lat])); 
+      else {
+        ml.add(zip.zipCode);
+        mlPts.push(point([lng, lat]));
       }
     });
 
@@ -146,11 +146,11 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       return [[minX, minY], [maxX, maxY]] as [[number, number], [number, number]];
     };
 
-    return { 
-      alaskaZips: ak, hawaiiZips: hi, mainlandZips: ml, 
-      alaskaBounds: getSmartBbox(akPts), 
-      hawaiiBounds: getSmartBbox(hiPts), 
-      mainlandBounds: getSmartBbox(mlPts) 
+    return {
+      alaskaZips: ak, hawaiiZips: hi, mainlandZips: ml,
+      alaskaBounds: getSmartBbox(akPts),
+      hawaiiBounds: getSmartBbox(hiPts),
+      mainlandBounds: getSmartBbox(mlPts)
     };
   }, [filteredData]);
 
@@ -167,7 +167,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
   useEffect(() => {
     addPMTilesProtocol();
     setMapsLoaded(false);
-    
+
     Object.keys(mapsRef.current).forEach(key => { mapsRef.current[key]?.remove(); mapsRef.current[key] = null; });
     if (filteredData.length === 0) { onReady?.(); return; }
 
@@ -186,61 +186,64 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
     const createMap = (container: HTMLDivElement | null, key: string, bounds?: [[number, number], [number, number]], validZips?: Set<string>) => {
       if (!container) return;
-      
-      const map = new maplibregl.Map({ 
-        container, 
+
+      const map = new maplibregl.Map({
+        container,
         style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-        pixelRatio: 2, 
-        interactive: false, 
+        pixelRatio: 2,
+        interactive: false,
         attributionControl: false,
         fadeDuration: 0,
         renderWorldCopies: true,
       });
       mapsRef.current[key] = map;
-      
+
       map.on('load', () => {
         try {
           map.resize();
 
           if (bounds) {
-            const padding = (key === 'alaska' || key === 'hawaii') ? 5 : 40;
-            map.fitBounds(bounds, { padding, animate: false, maxZoom: key === 'main' ? 12 : 6 });
+            const padding = (key === 'alaska' || key === 'hawaii') ? 20 : 40;
+            const isValid = bounds.flat().every(n => Number.isFinite(n));
+            if (isValid) {
+              map.fitBounds(bounds, { padding, animate: false, maxZoom: key === 'main' ? 12 : 6 });
+            }
           }
-          
+
           const style = map.getStyle();
           let firstCityLayerId: string | undefined;
-            if (style && style.layers) {
-              style.layers.forEach((layer: any) => {
-                const id = layer.id;
-                const sourceLayer = layer['source-layer']; 
-                const isCity = id.includes('place_city');
-                const isWater = sourceLayer === 'water';
-                const isBoundary = id.includes('boundary_country') || id.includes('boundary_state');
+          if (style && style.layers) {
+            style.layers.forEach((layer: any) => {
+              const id = layer.id;
+              const sourceLayer = layer['source-layer'];
+              const isCity = id.includes('place_city');
+              const isWater = sourceLayer === 'water';
+              const isBoundary = id.includes('boundary_country') || id.includes('boundary_state');
 
-                if (isCity) {
-                  if (!firstCityLayerId) firstCityLayerId = id;
-                  map.setLayoutProperty(id, 'visibility', showCities ? 'visible' : 'none');
-                } else if (isWater || isBoundary) {
-                  map.setLayoutProperty(id, 'visibility', 'visible');
-                } else {
-                  map.setLayoutProperty(id, 'visibility', 'none');
-                }
-              });
-            }
-          
+              if (isCity) {
+                if (!firstCityLayerId) firstCityLayerId = id;
+                map.setLayoutProperty(id, 'visibility', showCities ? 'visible' : 'none');
+              } else if (isWater || isBoundary) {
+                map.setLayoutProperty(id, 'visibility', 'visible');
+              } else {
+                map.setLayoutProperty(id, 'visibility', 'none');
+              }
+            });
+          }
+
           map.addSource("zips", { type: "vector", url: `pmtiles://${pmtilesUrl}`, promoteId: "ZCTA5CE20" });
           const filterExpression = validZips ? ["in", ["get", "ZCTA5CE20"], ["literal", Array.from(validZips)]] : ["has", "ZCTA5CE20"];
 
-          map.addLayer({ 
-            id: "zips-fill", type: "fill", source: "zips", "source-layer": "us_zip_codes", 
-            filter: filterExpression as any, 
-            paint: { "fill-color": stepExpression, "fill-opacity": 0.9 } 
+          map.addLayer({
+            id: "zips-fill", type: "fill", source: "zips", "source-layer": "us_zip_codes",
+            filter: filterExpression as any,
+            paint: { "fill-color": stepExpression, "fill-opacity": 0.9 }
           }, firstCityLayerId);
 
-          map.addLayer({ 
-            id: "zips-border", type: "line", source: "zips", "source-layer": "us_zip_codes", 
-            filter: filterExpression as any, 
-            paint: { "line-color": "rgba(0,0,0,0.1)", "line-width": 0.5 } 
+          map.addLayer({
+            id: "zips-border", type: "line", source: "zips", "source-layer": "us_zip_codes",
+            filter: filterExpression as any,
+            paint: { "line-color": "rgba(0,0,0,0.1)", "line-width": 0.5 }
           }, firstCityLayerId);
 
           (validZips || new Set(filteredData.map(z => z.zipCode))).forEach(zipCode => {
@@ -253,7 +256,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
           const checkInterval = setInterval(() => {
             if (map.loaded() && map.isStyleLoaded()) {
               clearInterval(checkInterval);
-              loadedCount++; 
+              loadedCount++;
               markReady();
             }
           }, 250);
@@ -286,27 +289,27 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       createMap(mainMapRef.current, 'main', allBounds || undefined, allZips);
     }
 
-    return () => { 
-      Object.keys(mapsRef.current).forEach(key => { 
-        mapsRef.current[key]?.remove(); 
-        mapsRef.current[key] = null; 
-      }); 
+    return () => {
+      Object.keys(mapsRef.current).forEach(key => {
+        mapsRef.current[key]?.remove();
+        mapsRef.current[key] = null;
+      });
     };
   }, [regionScope, regionName, selectedMetric, filteredData, alaskaZips, hawaiiZips, mainlandZips, alaskaBounds, hawaiiBounds, mainlandBounds, showCities]);
 
   return (
-    <div 
+    <div
       className="w-full h-full flex items-center justify-center overflow-hidden bg-muted/10 select-none"
     >
-      <div 
+      <div
         ref={containerRef}
-        style={{ 
-          width: `${BASE_WIDTH}px`, 
-          height: `${BASE_HEIGHT}px`, 
+        style={{
+          width: `${BASE_WIDTH}px`,
+          height: `${BASE_HEIGHT}px`,
           transform: `scale(${scale})`,
           boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
           backgroundColor: '#ffffff'
-        }} 
+        }}
         className="flex flex-col flex-shrink-0 origin-center rounded-md"
         onContextMenu={(e) => { e.preventDefault(); return false; }}
       >
@@ -326,7 +329,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
         <div className="flex-1 mx-8 mb-6 relative bg-slate-50">
           <div ref={mainMapRef} className="absolute inset-0" />
-          
+
           {regionScope === 'national' && (
             <div className="absolute bottom-4 left-4 flex gap-4 z-10">
               {alaskaZips.size > 0 && (
@@ -339,7 +342,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
               )}
               {hawaiiZips.size > 0 && (
                 <div className="flex flex-col bg-white border border-gray-200">
-                   <span className="text-[10px] uppercase tracking-wider font-semibold py-0.5 px-2 bg-slate-50 text-slate-500 border-b">Hawaii</span>
+                  <span className="text-[10px] uppercase tracking-wider font-semibold py-0.5 px-2 bg-slate-50 text-slate-500 border-b">Hawaii</span>
                   <div className="w-48 h-32 relative">
                     <div ref={hawaiiMapRef} className="absolute inset-0" />
                   </div>
@@ -359,10 +362,10 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
           {!mapsLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-50 backdrop-blur-sm">
-                <div className="flex flex-col items-center gap-3">
-                    <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-cyan-600" />
-                    <span className="text-sm font-medium text-slate-500">Rendering map...</span>
-                </div>
+              <div className="flex flex-col items-center gap-3">
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-cyan-600" />
+                <span className="text-sm font-medium text-slate-500">Rendering map...</span>
+              </div>
             </div>
           )}
         </div>

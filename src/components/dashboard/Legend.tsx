@@ -1,10 +1,15 @@
 import { useMemo } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Checkbox } from "@/components/ui/checkbox";
+import { HelpCircle } from "lucide-react";
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip";
 
 interface LegendProps {
   selectedMetric: string;
   metricValues: number[];
   isExport?: boolean;
+  autoScale?: boolean;
+  onAutoScaleChange?: (value: boolean) => void;
 }
 
 // Number formatting helper
@@ -16,7 +21,6 @@ function formatLegendValue(value: number, metric: string): string {
   return value.toLocaleString();
 }
 
-// Compute arbitrary percentiles
 function computeQuantiles(values: number[], percentiles: number[]) {
   if (!values || values.length === 0) return percentiles.map(() => 0);
   const sorted = [...values].sort((a, b) => a - b);
@@ -29,7 +33,7 @@ function computeQuantiles(values: number[], percentiles: number[]) {
   });
 }
 
-export function Legend({ selectedMetric, metricValues, isExport = false }: LegendProps) {
+export function Legend({ selectedMetric, metricValues, isExport = false, autoScale, onAutoScaleChange }: LegendProps) {
   const isMobile = useIsMobile();
 
   const legendDisplay = useMemo(() => {
@@ -100,6 +104,35 @@ export function Legend({ selectedMetric, metricValues, isExport = false }: Legen
       <h3 className="text-sm font-semibold mb-3 text-foreground">
         {getMetricDisplayName(selectedMetric)}
       </h3>
+
+      {onAutoScaleChange && (
+        <div className="flex items-center gap-2 mb-3 px-1">
+          <Checkbox
+            id="legend-auto-scale"
+            checked={autoScale}
+            onCheckedChange={(c) => onAutoScaleChange(c === true)}
+            className="h-3.5 w-3.5"
+          />
+          <label
+            htmlFor="legend-auto-scale"
+            className="text-[10px] font-medium leading-none cursor-pointer select-none text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Adjust contrast to view
+          </label>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="h-3 w-3 text-muted-foreground/70 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="w-[180px] text-xs">
+                  When enabled, the color scale automatically adjusts to the range of values currently visible on the map.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
 
       <div className="space-y-2">
         <div
