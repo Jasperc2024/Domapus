@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Checkbox } from "@/components/ui/checkbox";
 import { HelpCircle } from "lucide-react";
-import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface LegendProps {
   selectedMetric: string;
@@ -148,11 +148,6 @@ export function Legend({ selectedMetric, metricValues, isExport = false, autoSca
         </div>
       </div>
 
-      <div className="mt-2 pt-2 border-t border-border/60">
-        <p className="text-[10px] text-muted-foreground text-center">
-          Click ZIP code to view details
-        </p>
-      </div>
     </div>
   );
 }

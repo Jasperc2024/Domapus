@@ -213,16 +213,18 @@ export function HousingDashboard() {
           onExportModeChange={setIsExportMode}
         />
       </TopBar>
-      <div className="flex flex-1 relative h-full min-h-[400px]">
+      <div className="flex flex-1 relative min-h-[400px] overflow-hidden">
         {isMobile && sidebarOpen && (
-          <Sidebar
-            isOpen={sidebarOpen}
-            zipData={selectedZip}
-            allZipData={zipData}
-            onClose={() => setSidebarOpen(false)}
-          />
+          <div className="absolute inset-0 z-50">
+            <Sidebar
+              isOpen={sidebarOpen}
+              zipData={selectedZip}
+              allZipData={zipData}
+              onClose={() => setSidebarOpen(false)}
+            />
+          </div>
         )}
-        <div className="hidden md:flex absolute top-4 left-4 z-10 flex-col gap-2">
+        <div className="hidden md:flex absolute top-0 bottom-0 left-0 z-20 flex-col">
           <Sidebar
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}

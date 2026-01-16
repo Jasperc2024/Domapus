@@ -1,4 +1,4 @@
-import { ZipData } from "./types"; 
+import { ZipData } from "./types";
 
 // Type for format options used in formatting functions
 export type FormatType = 'currency' | 'number' | 'percent' | 'ratio' | 'price' | 'days' | 'percentage';
@@ -38,7 +38,7 @@ export function getMetricValue(data: ZipData | undefined, metric: string): numbe
 // Format any numeric value based on format type
 export function formatMetricValue(value: number | null | undefined, format: FormatType): string {
   if (value === null || value === undefined || isNaN(value)) return "N/A";
-  
+
   switch (format) {
     case 'currency':
     case 'price':
@@ -71,7 +71,7 @@ export function getComparison(current: number | null | undefined, compare: numbe
   const currentNum = Number(current);
   const compareNum = Number(compare);
   if (isNaN(currentNum) || isNaN(compareNum)) return 'same';
-  
+
   const diff = currentNum - compareNum;
   if (Math.abs(diff) < 0.01) return 'same';
   return diff > 0 ? 'higher' : 'lower';
@@ -81,16 +81,16 @@ export function getComparison(current: number | null | undefined, compare: numbe
 export function computeQuantileBuckets(values: number[], numBuckets = 8): number[] {
   const sorted = [...values].filter(v => v > 0).sort((a, b) => a - b);
   if (sorted.length === 0) return [];
-  
+
   const minVal = sorted[0];
   const maxVal = sorted[sorted.length - 1];
   if (minVal === maxVal) return [minVal];
-  
+
   const thresholds: number[] = [];
   const epsilon = (maxVal - minVal) * 1e-6 || 1e-6;
-  
+
   const q = (p: number) => sorted[Math.floor(p * (sorted.length - 1))];
-  
+
   for (let i = 1; i < numBuckets; i++) {
     let val = q(i / numBuckets);
     if (thresholds.length && val <= thresholds[thresholds.length - 1]) {
@@ -98,7 +98,7 @@ export function computeQuantileBuckets(values: number[], numBuckets = 8): number
     }
     thresholds.push(val);
   }
-  
+
   return thresholds;
 }
 
@@ -109,7 +109,7 @@ export function getMetricDisplay(data: ZipData, selectedMetric: string): string 
 
   const metricInfo = METRIC_DEFINITIONS[selectedMetric];
   const value = metricInfo ? data[metricInfo.key] : null;
-  const formattedValue = typeof value === 'number' && isFinite(value) 
+  const formattedValue = typeof value === 'number' && isFinite(value)
     ? formatMetricValue(value, metricInfo?.format || 'number')
     : "N/A";
 
@@ -119,6 +119,8 @@ export function getMetricDisplay(data: ZipData, selectedMetric: string): string 
       <div class="text-sm mt-2">
         <span class="font-semibold">${metricInfo?.label || selectedMetric}:</span>
         <span class="font-normal"> ${formattedValue}</span>
+      <div class="text-[10px] text-gray-400 mt-1 flex items-center">
+        Click to view details
       </div>
   `;
 }
