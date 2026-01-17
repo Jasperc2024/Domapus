@@ -29,25 +29,13 @@ interface ExportSidebarProps {
   onClose: () => void;
 }
 
-const STATE_MAP: Record<string, string> = {
-  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
-  CO: "Colorado", CT: "Connecticut", DE: "Delaware", DC: "District of Columbia",
-  FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois",
-  IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana",
-  ME: "Maine", MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota",
-  MS: "Mississippi", MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada",
-  NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico", NY: "New York",
-  NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon",
-  PA: "Pennsylvania", PR: "Puerto Rico", RI: "Rhode Island", SC: "South Carolina",
-  SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont",
-  VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming"
-};
+import { getStateName } from "../map/utils";
 
 export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSidebarProps) {
   const [regionScope, setRegionScope] = useState<"national" | "state" | "metro">("national");
   const [selectedState, setSelectedState] = useState<string>("");
   const [selectedMetro, setSelectedMetro] = useState<string>("");
-  
+
   // Metro Search States
   const [metroSearch, setMetroSearch] = useState<string>("");
   const [debouncedMetroSearch, setDebouncedMetroSearch] = useState<string>("");
@@ -58,10 +46,10 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
   const [includeLegend, setIncludeLegend] = useState(true);
   const [includeTitle, setIncludeTitle] = useState(true);
   const [showCities, setShowCities] = useState(false);
-  
+
   const [isExporting, setIsExporting] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
-  
+
   const printStageRef = useRef<PrintStageRef>(null);
 
   // Debounce metro search
@@ -87,10 +75,10 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
   const { availableStates, filteredMetros } = useMemo(() => {
     if (Object.keys(allZipData).length === 0) return { availableStates: [], filteredMetros: [] };
-    
+
     const stateSet = new Set<string>();
     const metroSet = new Set<string>();
-    
+
     for (const zip of Object.values(allZipData)) {
       const metricValue = zip[selectedMetric as keyof ZipData];
       const hasData = metricValue !== null && metricValue !== undefined;
@@ -104,12 +92,12 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     const states = Array.from(stateSet)
       .map(code => ({
         code,
-        name: STATE_MAP[code] || code
+        name: getStateName(code)
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    
+
     const metros = Array.from(metroSet);
-    
+
     let filtered = metros;
     if (debouncedMetroSearch) {
       const query = debouncedMetroSearch.toLowerCase();
@@ -123,7 +111,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         const indexB = bLower.indexOf(query);
 
         if (indexA !== indexB) {
-          return indexA - indexB; 
+          return indexA - indexB;
         }
 
         return a.localeCompare(b);
@@ -131,7 +119,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     } else {
       filtered.sort((a, b) => a.localeCompare(b));
     }
-      
+
     return { availableStates: states, filteredMetros: filtered };
   }, [allZipData, selectedMetric, debouncedMetroSearch]);
 
@@ -145,7 +133,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
   const filteredData = useMemo(() => {
     if (!hasValidSelection) return [];
     if (Object.keys(allZipData).length === 0) return [];
-    
+
     return Object.values(allZipData).filter(zip => {
       if (regionScope === 'state' && selectedState) return zip.state === selectedState;
       if (regionScope === 'metro' && selectedMetro) return zip.metro === selectedMetro;
@@ -155,7 +143,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
   const regionName = useMemo(() => {
     if (regionScope === 'state') {
-      return STATE_MAP[selectedState] || selectedState || "Select a state";
+      return getStateName(selectedState) || "Select a state";
     }
     if (regionScope === 'metro') return selectedMetro || "Select a metro area";
     return "United States";
@@ -203,7 +191,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
       // Give maplibre a moment to ensure tiles are painted
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      const scale = 5; 
+      const scale = 5;
       const canvas = await html2canvas(element, {
         scale,
         useCORS: true,
@@ -231,15 +219,15 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
           subject: `Real Estate Data for ${regionName}`,
           creator: 'Domapus (https://jasperc2024.github.io/Domapus/)',
         });
-        
+
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
-        
+
         const imgAspect = canvas.width / canvas.height;
         const pdfAspect = pdfWidth / pdfHeight;
-        
+
         let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
-        
+
         if (imgAspect > pdfAspect) {
           drawWidth = pdfWidth;
           drawHeight = pdfWidth / imgAspect;
@@ -251,7 +239,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
           offsetX = (pdfWidth - drawWidth) / 2;
           offsetY = 0;
         }
-        
+
         pdf.addImage(imgData, "PNG", offsetX, offsetY, drawWidth, drawHeight);
         const stageRect = element.getBoundingClientRect();
         const links = element.querySelectorAll('a');
@@ -316,10 +304,10 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
               <div className="flex items-center space-x-2"><RadioGroupItem value="state" id="r-state" /><Label htmlFor="r-state" className="text-sm">State</Label></div>
               <div className="flex items-center space-x-2"><RadioGroupItem value="metro" id="r-metro" /><Label htmlFor="r-metro" className="text-sm">Metro Area</Label></div>
             </RadioGroup>
-            
+
             {regionScope === 'state' && (
               <Select value={selectedState} onValueChange={setSelectedState}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Select a state"/></SelectTrigger>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Select a state" /></SelectTrigger>
                 <SelectContent>{availableStates.map(state => (<SelectItem key={state.code} value={state.code}>{state.name}</SelectItem>))}</SelectContent>
               </Select>
             )}
@@ -336,7 +324,8 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
                       setIsMetroListOpen(true);
                       if (selectedMetro && e.target.value !== selectedMetro) setSelectedMetro("");
                     }}
-                    onFocus={(e) => {setIsMetroListOpen(true);
+                    onFocus={(e) => {
+                      setIsMetroListOpen(true);
                       const target = e.currentTarget;
                       setTimeout(() => target.select(), 0);
                     }}
@@ -348,7 +337,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
                     </button>
                   )}
                 </div>
-                
+
                 {isMetroListOpen && (
                   <div className="absolute z-10 w-full mt-1 bg-popover text-popover-foreground border rounded-md shadow-md max-h-[250px] overflow-y-auto">
                     {filteredMetros.length > 0 ? (
@@ -374,7 +363,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
               </div>
             )}
           </div>
-          
+
           <div className="p-3 rounded-md border bg-muted/20 space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               <FileImage className="h-3.5 w-3.5" />
@@ -385,12 +374,12 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
               <div className="flex items-center space-x-2"><RadioGroupItem value="pdf" id="r-pdf" /><Label htmlFor="r-pdf" className="text-sm">PDF</Label></div>
             </RadioGroup>
           </div>
-          
+
           <div className="p-3 rounded-md border bg-muted/20 space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Settings2 className="h-3.5 w-3.5" />
               <span>Customization</span>
-              </div>
+            </div>
             <div className="space-y-2">
               <div className="flex items-center space-x-2"><Checkbox id="c-title" checked={includeTitle} onCheckedChange={(c) => setIncludeTitle(c === true)} /><Label htmlFor="c-title" className="text-sm">Include Title</Label></div>
               <div className="flex items-center space-x-2"><Checkbox id="c-legend" checked={includeLegend} onCheckedChange={(c) => setIncludeLegend(c === true)} /><Label htmlFor="c-legend" className="text-sm">Include Legend</Label></div>
@@ -398,7 +387,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
             </div>
           </div>
         </div>
-        
+
         <div className="p-4 space-y-2 border-t bg-background">
           <Button id="btn-map-export" onClick={handleExport} disabled={isExportDisabled()} className="w-full" size="default">
             {(isExporting || (!isMapReady && hasValidSelection && filteredData.length > 0)) && (
@@ -421,7 +410,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
             {hasValidSelection ? `${filteredData.length.toLocaleString()} ZIP codes` : "Select a region to preview"}
           </p>
         </div>
-        
+
         {/* Container for the PrintStage - Flex centered */}
         <div className="flex-1 flex items-center justify-center min-h-0 w-full">
           {hasValidSelection ? (

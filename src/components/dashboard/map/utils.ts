@@ -1,5 +1,27 @@
 import { ZipData } from "./types";
 
+// Converts a state abbreviation into its full name
+const STATE_MAP: Record<string, string> = {
+  'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California',
+  'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
+  'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa',
+  'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland',
+  'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri',
+  'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
+  'NM': 'New Mexico', 'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
+  'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
+  'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont',
+  'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming',
+  'DC': 'District of Columbia', 'PR': 'Puerto Rico', 'VI': 'Virgin Islands', 'GU': 'Guam',
+  'AS': 'American Samoa', 'MP': 'Northern Mariana Islands'
+};
+
+export function getStateName(stateCode: string | null | undefined): string {
+  if (!stateCode) return "N/A";
+  const code = stateCode.trim().toUpperCase();
+  return STATE_MAP[code] || stateCode;
+}
+
 // Type for format options used in formatting functions
 export type FormatType = 'currency' | 'number' | 'percent' | 'ratio' | 'price' | 'days' | 'percentage';
 
@@ -115,12 +137,12 @@ export function getMetricDisplay(data: ZipData, selectedMetric: string): string 
 
   return `
       <div class="font-bold text-base">${data.zipCode}</div>
-      <div class="text-sm text-gray-600">${data.city || "Unknown City"}, ${data.state}</div>
+      <div class="text-sm text-gray-600">${data.city || "Unknown City"}, ${getStateName(data.state)}</div>
       <div class="text-sm mt-2">
         <span class="font-semibold">${metricInfo?.label || selectedMetric}:</span>
         <span class="font-normal"> ${formattedValue}</span>
       <div class="text-[10px] text-gray-400 mt-1 flex items-center">
-        Click to view details
+        Click ZIP code to view details
       </div>
   `;
 }

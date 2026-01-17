@@ -75,24 +75,43 @@ export function Legend({ selectedMetric, metricValues, isExport = false, autoSca
   const verticalGradient =
     "linear-gradient(to top, hsl(var(--choropleth-1)), hsl(var(--choropleth-3)), hsl(var(--choropleth-5)), hsl(var(--choropleth-8)))";
 
-  // Mobile: compact vertical bar with 3 values (non-export)
+  // Mobile
   if (isMobile && !isExport) {
     return (
-      <div className="bg-card/95 backdrop-blur-sm shadow-lg border border-border rounded-md p-3 w-36">
-        <div className="text-xs font-semibold text-foreground truncate mb-2">
-          {getMetricDisplayName(selectedMetric)}
-        </div>
-        <div className="flex items-stretch gap-2">
+      <div className="bg-card/95 backdrop-blur-sm shadow-lg border border-border rounded-lg p-3 w-[155px]">
+
+        <div className="flex items-stretch gap-2 h-20">
           <div
             className="w-3 rounded-sm border border-border"
             style={{ background: verticalGradient }}
             aria-hidden="true"
           />
-          <div className="flex flex-col justify-between text-[11px] font-medium text-muted-foreground">
+          <div className="flex flex-col justify-between text-[11px] font-medium text-muted-foreground py-0.5">
             <span className="text-foreground">{legendDisplay.max}</span>
             <span>{legendDisplay.mid}</span>
             <span>{legendDisplay.min}</span>
           </div>
+        </div>
+
+        {onAutoScaleChange && (
+          <div className="flex items-center gap-2 my-3">
+            <Checkbox
+              id="legend-auto-scale-mobile"
+              checked={autoScale}
+              onCheckedChange={(c) => onAutoScaleChange(c === true)}
+              className="h-3.5 w-3.5"
+            />
+            <label
+              htmlFor="legend-auto-scale-mobile"
+              className="text-[10px] font-medium leading-none cursor-pointer select-none text-muted-foreground"
+            >
+              Auto Scale
+            </label>
+          </div>
+        )}
+
+        <div className="mt-3 text-[10px] text-muted-foreground text-center italic">
+          Tap a ZIP code for details
         </div>
       </div>
     );
