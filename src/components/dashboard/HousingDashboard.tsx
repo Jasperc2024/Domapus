@@ -5,7 +5,6 @@ import { MapExport } from "@/components/MapExport";
 import { buildSpatialIndex, queryZipsInBounds } from "@/lib/spatial-index";
 import { computeQuantileBuckets, getMetricValue } from "./map/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { trackError } from "@/lib/analytics";
 import { TopBar } from "./TopBar";
 import { MapLibreMap } from "./MapLibreMap";
 import { Legend } from "./Legend";
