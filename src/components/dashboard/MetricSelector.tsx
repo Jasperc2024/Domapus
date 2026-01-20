@@ -1,6 +1,6 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export type MetricType = 
+export type MetricType =
   | "zhvi"
   | "median_sale_price"
   | "median_ppsf"
@@ -22,7 +22,7 @@ interface MetricSelectorProps {
 
 export function MetricSelector({ selectedMetric, onMetricChange }: MetricSelectorProps) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <label className="text-xs font-medium text-dashboard-text-secondary whitespace-nowrap hidden lg:block">
         Metric:
       </label>

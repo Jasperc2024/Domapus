@@ -308,9 +308,9 @@ export function MapLibreMap({
       });
 
       const layers = map.getStyle().layers;
-      let beforeId: string | undefined;
+      const stateBoundaryLayer = layers.find((l) => l.id === "boundary_state");
       const labelLayer = layers.find((l) => l.id === "watername_ocean");
-      if (labelLayer) beforeId = labelLayer.id;
+      const beforeId = stateBoundaryLayer?.id || labelLayer?.id;
 
       // Fill layer
       map.addLayer({

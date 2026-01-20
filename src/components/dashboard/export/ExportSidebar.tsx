@@ -404,14 +404,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
       {/* Right Preview Area */}
       <div className="flex-1 p-6 overflow-hidden flex flex-col bg-muted/30">
-        <div className="mb-3 flex-shrink-0">
-          <h3 className="text-base font-semibold text-foreground">Preview</h3>
-          <p className="text-xs text-muted-foreground">
-            {hasValidSelection ? `${filteredData.length.toLocaleString()} ZIP codes` : "Select a region to preview"}
-          </p>
-        </div>
-
-        {/* Container for the PrintStage - Flex centered */}
+        {/* Container*/}
         <div className="flex-1 flex items-center justify-center min-h-0 w-full">
           {hasValidSelection ? (
             <PrintStage

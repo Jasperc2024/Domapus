@@ -63,8 +63,6 @@ export function HousingDashboard() {
         if (result) {
           setZipData(result.zip_codes);
           setDataBounds(result.bounds);
-
-          // Build spatial index for efficient lookups
           setTimeout(() => {
             buildSpatialIndex(result.zip_codes);
             setIsIndexReady(true);
@@ -72,9 +70,6 @@ export function HousingDashboard() {
         }
       } catch (error: any) {
         console.error("[HousingDashboard] Failed to load initial data:", error);
-        const errorMessage = error?.message || "Failed to load data";
-        setLoadError(errorMessage);
-        trackError("dashboard_data_load_failed", errorMessage);
       }
     };
     loadInitialData();

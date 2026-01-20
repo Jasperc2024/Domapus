@@ -91,7 +91,7 @@ export function TopBar({
           )}
         </div>
 
-        {/* Right Section - Controlled Fluid Search + Actions */}
+        {/* Right Section - Search + Actions */}
         <div className="flex items-center justify-end flex-1 min-w-0 gap-4">
           {!isMobile && (
             <div className="w-full max-w-[300px] min-w-[140px] flex-shrink">
@@ -115,7 +115,7 @@ export function TopBar({
 
             {/* Export */}
             {children}
-            
+
             {/* GitHub button */}
             <Button
               variant="outline"
@@ -154,15 +154,15 @@ export function TopBar({
         </div>
       </header>
 
-        {/* === Mobile Bottom Bar === */}
-        {isMobile && !hideMobileControls && (
-          <div className="fixed bottom-4 left-4 right-4 z-[1001] bg-dashboard-panel border border-dashboard-border rounded-lg p-3 shadow-lg">
-            <div className="space-y-2.5">
-              <MetricSelector selectedMetric={selectedMetric} onMetricChange={onMetricChange}/>
-              <SearchBox onSearch={onSearch} />
-            </div>
+      {/* === Mobile Bottom Bar === */}
+      {isMobile && !hideMobileControls && (
+        <div className="fixed bottom-4 left-4 right-4 z-[1001] bg-dashboard-panel border border-dashboard-border rounded-lg p-3 shadow-lg">
+          <div className="space-y-2.5">
+            <MetricSelector selectedMetric={selectedMetric} onMetricChange={onMetricChange} />
+            <SearchBox onSearch={onSearch} />
           </div>
-        )}
-      </>
-    );
-  }
+        </div>
+      )}
+    </>
+  );
+}

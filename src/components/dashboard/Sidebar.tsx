@@ -1,8 +1,9 @@
 import { useState, lazy, Suspense } from "react";
-import { X, TrendingUp, TrendingDown, BarChart3, MapPin, Building, Loader2 } from "lucide-react";
+import { X, ArrowLeft, TrendingUp, TrendingDown, BarChart3, MapPin, Building, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ZipData } from "./map/types";
+import { Badge } from "@/components/ui/badge";
 import { formatMetricValue, formatChange, METRIC_DEFINITIONS, FormatType, getStateName } from "./map/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -37,10 +38,32 @@ export function Sidebar({ isOpen, zipData, allZipData, onClose }: SidebarProps) 
 
   return (
     <div className={`bg-dashboard-panel border-r border-dashboard-border shadow-lg flex flex-col h-full ${isMobile ? "w-full rounded-none" : "w-96 rounded-none"}`}>
+      {/* Static Top Banner */}
+      <div className="flex-none px-4 py-4 border-b border-dashboard-border bg-dashboard-panel flex items-center justify-between z-10 shadow-sm">
+        <div className="flex items-center gap-2">
+          <MapPin className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-bold tracking-tight text-foreground">
+            {zipData.zipCode || "N/A"}
+          </h2>
+          {showComparison && (
+            <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary border-none text-[10px] uppercase tracking-wider font-bold">
+              Compare
+            </Badge>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground transition-colors"
+          onClick={onClose}
+        >
+          <X className="h-5 w-5" />
+        </Button>
+      </div>
 
       <div className="flex flex-col flex-1 overflow-hidden min-h-0">
         {showComparison ? (
-          <div className="p-4 flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto p-4">
             <Suspense fallback={
               <div className="flex items-center justify-center h-32">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -50,20 +73,8 @@ export function Sidebar({ isOpen, zipData, allZipData, onClose }: SidebarProps) 
             </Suspense>
           </div>
         ) : (
-          <div className="flex-1 p-4 overflow-y-auto space-y-3">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
             <div className="flex-none pt-1 pb-2">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-1">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  <h2 className="text-xl font-bold tracking-tight text-foreground">
-                    {zipData.zipCode || "N/A"}
-                  </h2>
-                </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={onClose}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
               <div className="space-y-1 px-1">
                 {[
                   { label: "City", value: zipData.city },
@@ -101,8 +112,26 @@ export function Sidebar({ isOpen, zipData, allZipData, onClose }: SidebarProps) 
             </div>
           </div>
         )}
-        <div className="flex-shrink-0 px-4 py-4 border-t border-dashboard-border bg-dashboard-panel">
-          <Button variant="outline" className="w-full" onClick={() => setShowComparison(!showComparison)}><BarChart3 className="h-4 w-4 mr-2" />{showComparison ? "Back to Details" : "Compare ZIP Codes"}</Button>
+
+        {/* Static Bottom Banner */}
+        <div className="flex-none p-4 border-t border-dashboard-border bg-dashboard-panel shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+          <Button
+            variant={showComparison ? "outline" : "default"}
+            className="w-full shadow-sm"
+            onClick={() => setShowComparison(!showComparison)}
+          >
+            {showComparison ? (
+              <div className="flex items-center">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Details
+              </div>
+            ) : (
+              <div className="flex items-center">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Compare ZIP Codes
+              </div>
+            )}
+          </Button>
         </div>
       </div>
     </div>

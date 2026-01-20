@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, X } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { ZipData } from './map/types';
 import { formatMetricValue, getComparison, METRIC_DEFINITIONS, FormatType } from './map/utils';
 
@@ -20,7 +20,7 @@ export function ZipComparison({ currentZip, allZipData, onClose }: ZipComparison
 
   const handleSearch = () => {
     if (!searchZip.trim()) return;
-    
+
     setError('');
     const foundZip = allZipData[searchZip.trim()];
 
@@ -40,14 +40,7 @@ export function ZipComparison({ currentZip, allZipData, onClose }: ZipComparison
   }));
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-dashboard-text-primary">Compare ZIP Codes</h3>
-        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close comparison">
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
+    <div className="space-y-4 pt-2">
       <div className="flex space-x-2">
         <Input
           type="text"
