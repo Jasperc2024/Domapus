@@ -262,9 +262,9 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
       }
 
       toast({ title: "Export Complete", description: "Your map has been downloaded.", duration: 10000, });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Export failed:", error);
-      trackError("export_failed", error?.message || "Unknown export error");
+      trackError("export_failed", (error instanceof Error ? error.message : "Unknown export error"));
       toast({ title: "Export Failed", description: "Something went wrong.", variant: "destructive" });
     } finally {
       setIsExporting(false);
@@ -299,7 +299,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
               <Microscope className="h-3.5 w-3.5" />
               <span>Region Scope</span>
             </div>
-            <RadioGroup value={regionScope} onValueChange={(v) => setRegionScope(v as any)} className="space-y-2">
+            <RadioGroup value={regionScope} onValueChange={(v) => setRegionScope(v as "national" | "state" | "metro")} className="space-y-2">
               <div className="flex items-center space-x-2"><RadioGroupItem value="national" id="r-national" /><Label htmlFor="r-national" className="text-sm">National</Label></div>
               <div className="flex items-center space-x-2"><RadioGroupItem value="state" id="r-state" /><Label htmlFor="r-state" className="text-sm">State</Label></div>
               <div className="flex items-center space-x-2"><RadioGroupItem value="metro" id="r-metro" /><Label htmlFor="r-metro" className="text-sm">Metro Area</Label></div>
@@ -369,7 +369,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
               <FileImage className="h-3.5 w-3.5" />
               <span>File Format</span>
             </div>
-            <RadioGroup value={fileFormat} onValueChange={(v) => setFileFormat(v as any)} className="space-y-2">
+            <RadioGroup value={fileFormat} onValueChange={(v) => setFileFormat(v as "png" | "pdf")} className="space-y-2">
               <div className="flex items-center space-x-2"><RadioGroupItem value="png" id="r-png" /><Label htmlFor="r-png" className="text-sm">PNG</Label></div>
               <div className="flex items-center space-x-2"><RadioGroupItem value="pdf" id="r-pdf" /><Label htmlFor="r-pdf" className="text-sm">PDF</Label></div>
             </RadioGroup>

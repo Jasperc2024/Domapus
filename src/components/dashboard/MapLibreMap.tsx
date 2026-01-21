@@ -19,7 +19,7 @@ interface MapProps {
   isLoading: boolean;
   processData: (message: { type: string; data?: LoadDataRequest }) => Promise<DataProcessedResponse>;
   customBuckets: number[] | null;
-  onMapMove: (bounds: LngLatBoundsLike) => void;
+  onMapMove: (bounds: [[number, number], [number, number]]) => void;
 }
 
 const CHOROPLETH_COLORS = [
@@ -96,11 +96,11 @@ export function MapLibreMap({
     map.once("load", () => {
       console.log("[Map] Map initialized");
       setIsMapReady(true);
-      onMapMove(map.getBounds().toArray() as LngLatBoundsLike);
+      onMapMove(map.getBounds().toArray() as [[number, number], [number, number]]);
     });
 
     return map;
-  }, []);
+  }, [onMapMove]);
 
   // 2. Setup Map Instance
   useEffect(() => {
@@ -267,7 +267,7 @@ export function MapLibreMap({
     };
 
     const moveEndHandler = () => {
-      onMapMoveRef.current(map.getBounds().toArray() as LngLatBoundsLike);
+      onMapMoveRef.current(map.getBounds().toArray() as [[number, number], [number, number]]);
     };
 
     map.on("mousemove", mousemoveHandler);

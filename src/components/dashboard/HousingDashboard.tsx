@@ -37,7 +37,7 @@ export function HousingDashboard() {
   const [customBuckets, setCustomBuckets] = useState<number[] | null>(null);
   const [autoScale, setAutoScale] = useState(false);
   const [isIndexReady, setIsIndexReady] = useState(false);
-  const lastBoundsRef = useRef<any>(null);
+  const lastBoundsRef = useRef<[[number, number], [number, number]] | null>(null);
 
   const { processData, isLoading } = useDataWorker();
 
@@ -67,7 +67,7 @@ export function HousingDashboard() {
             setIsIndexReady(true);
           }, 100);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("[HousingDashboard] Failed to load initial data:", error);
       }
     };
@@ -98,7 +98,7 @@ export function HousingDashboard() {
     autoScaleRef.current = autoScale;
   }, [autoScale]);
 
-  const updateColors = useCallback((bounds: any) => {
+  const updateColors = useCallback((bounds: [[number, number], [number, number]] | null) => {
     if (!autoScaleRef.current) {
       setCustomBuckets(null);
       setVisibleZipCodes(null);
@@ -125,7 +125,7 @@ export function HousingDashboard() {
     setCustomBuckets(buckets.length > 0 ? buckets : null);
   }, [zipData, selectedMetric]);
 
-  const handleMapMove = useCallback((bounds: any) => {
+  const handleMapMove = useCallback((bounds: [[number, number], [number, number]]) => {
     lastBoundsRef.current = bounds;
     if (autoScaleRef.current) {
       updateColors(bounds);

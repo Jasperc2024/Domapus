@@ -33,9 +33,9 @@ export function TopBar({
         if (!res.ok) throw new Error("Failed to fetch last_updated.json");
         const data = await res.json();
         setLastUpdated(data.last_updated_utc);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching last_updated.json:", err);
-        trackError("last_updated_fetch_failed", err?.message || "Failed to fetch last updated");
+        trackError("last_updated_fetch_failed", (err instanceof Error ? err.message : "Failed to fetch last updated"));
       }
     };
     fetchLastUpdated();

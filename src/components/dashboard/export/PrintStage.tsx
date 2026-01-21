@@ -118,8 +118,8 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       const st = (zip.state ?? '').toString().toLowerCase();
       const isAk = st === 'ak' || st === 'alaska';
       const isHi = st === 'hi' || st === 'hawaii';
-      const lat = zip.latitude || (zip as any).lat;
-      const lng = zip.longitude || (zip as any).lng;
+      const lat = zip.latitude || (zip as { lat?: number }).lat;
+      const lng = zip.longitude || (zip as { lng?: number }).lng;
 
       if (!lat || !lng) return;
 
@@ -213,9 +213,10 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
           const style = map.getStyle();
           let firstCityLayerId: string | undefined;
           if (style && style.layers) {
-            style.layers.forEach((layer: any) => {
+            style.layers.forEach((layer: import("maplibre-gl").LayerSpecification) => {
               const id = layer.id;
-              const sourceLayer = layer['source-layer'];
+              // source-layer check needs type narrowing or loose access since not all layers have it
+              const sourceLayer = (layer as { 'source-layer'?: string })['source-layer'];
               const isCity = id.includes('place_city');
               const isWater = sourceLayer === 'water';
               const isBoundary = id.includes('boundary_country') || id.includes('boundary_state');
@@ -236,13 +237,13 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
           map.addLayer({
             id: "zips-fill", type: "fill", source: "zips", "source-layer": "us_zip_codes",
-            filter: filterExpression as any,
+            filter: filterExpression as import('maplibre-gl').FilterSpecification,
             paint: { "fill-color": stepExpression, "fill-opacity": 0.9 }
           }, firstCityLayerId);
 
           map.addLayer({
             id: "zips-border", type: "line", source: "zips", "source-layer": "us_zip_codes",
-            filter: filterExpression as any,
+            filter: filterExpression as import('maplibre-gl').FilterSpecification,
             paint: { "line-color": "rgba(0,0,0,0.1)", "line-width": 0.5 }
           }, firstCityLayerId);
 
@@ -290,12 +291,13 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     }
 
     return () => {
-      Object.keys(mapsRef.current).forEach(key => {
-        mapsRef.current[key]?.remove();
-        mapsRef.current[key] = null;
+      const currentMaps = mapsRef.current;
+      Object.keys(currentMaps).forEach(key => {
+        currentMaps[key]?.remove();
+        currentMaps[key] = null;
       });
     };
-  }, [regionScope, regionName, selectedMetric, filteredData, alaskaZips, hawaiiZips, mainlandZips, alaskaBounds, hawaiiBounds, mainlandBounds, showCities]);
+  }, [regionScope, regionName, selectedMetric, filteredData, alaskaZips, hawaiiZips, mainlandZips, alaskaBounds, hawaiiBounds, mainlandBounds, showCities, zipDataMap, buckets, onReady]);
 
   return (
     <div
@@ -333,7 +335,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
           {regionScope === 'national' && (
             <div className="absolute bottom-4 left-4 flex gap-4 z-10">
               {alaskaZips.size > 0 && (
-                <div className="flex flex-col bg-white border border-gray-200">
+                <div className="flex flex-col bg-white border border-black">
                   <span className="text-[10px] uppercase tracking-wider font-semibold py-0.5 px-2 bg-slate-50 text-slate-500 border-b">Alaska</span>
                   <div className="w-48 h-32 relative">
                     <div ref={alaskaMapRef} className="absolute inset-0" />
@@ -341,7 +343,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
                 </div>
               )}
               {hawaiiZips.size > 0 && (
-                <div className="flex flex-col bg-white border border-gray-200">
+                <div className="flex flex-col bg-white border border-black">
                   <span className="text-[10px] uppercase tracking-wider font-semibold py-0.5 px-2 bg-slate-50 text-slate-500 border-b">Hawaii</span>
                   <div className="w-48 h-32 relative">
                     <div ref={hawaiiMapRef} className="absolute inset-0" />
