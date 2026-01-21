@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="License">
   <img src="https://img.shields.io/github/stars/Jasperc2024/Domapus?style=flat" alt="Stars">
 </p>
 
@@ -150,7 +150,7 @@ See [tree.txt](tree.txt)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE.md) file for details.
 
 ---
 
@@ -171,5 +171,5 @@ If you find Domapus useful, consider supporting its development:
 
 <div align="center">
   <strong>Built by <a href="https://github.com/Jasperc2024">Jasper Chen</a></strong>
-   <br><small>Distributed under the MIT License</small>
+   <br><small>Distributed under the Apache License 2.0</small>
 </div>
