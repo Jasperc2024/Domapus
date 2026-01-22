@@ -4,14 +4,15 @@
 
 <p align="center">
   <a href="https://jasperc2024.github.io/Domapus/">
-    <img src="https://img.shields.io/badge/Live_Website-Open_App-1E40AF?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Live Website">
+    <img src="https://img.shields.io/badge/Live_Website-Open-1E40AF?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Live Website">
   </a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="License">
-  <img src="https://img.shields.io/github/stars/Jasperc2024/Domapus?style=flat" alt="Stars">
+<img src="https://img.shields.io/github/stars/Jasperc2024/Domapus?style=flat&color=yellow" alt="Stars">
+
 </p>
 
 **Domapus** is a website that visualizes U.S. housing market data at the ZIP-code level.  
