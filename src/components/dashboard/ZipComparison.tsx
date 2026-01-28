@@ -10,10 +10,9 @@ import { formatMetricValue, getComparison, METRIC_DEFINITIONS, FormatType } from
 interface ZipComparisonProps {
   currentZip: ZipData;
   allZipData: Record<string, ZipData>;
-  onClose: () => void;
 }
 
-export function ZipComparison({ currentZip, allZipData, onClose }: ZipComparisonProps) {
+export function ZipComparison({ currentZip, allZipData }: ZipComparisonProps) {
   const [searchZip, setSearchZip] = useState('');
   const [compareZip, setCompareZip] = useState<ZipData | null>(null);
   const [error, setError] = useState('');

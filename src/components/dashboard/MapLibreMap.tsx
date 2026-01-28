@@ -442,42 +442,45 @@ export function MapLibreMap({
       ...buckets.flatMap((threshold, i) => [threshold, CHOROPLETH_COLORS[Math.min(i + 1, CHOROPLETH_COLORS.length - 1)]])
     ] as ExpressionSpecification;
 
-    const entries = Object.entries(zipData);
-    const BATCH_SIZE = 1000;
-    let batchIndex = 0;
+    if (mapRef.current) {
+      map.setPaintProperty("zips-fill", "fill-color", stepExpression);
+    }
 
+    // Only update feature states if needed
     const shouldUpdateStates = customBuckets === null || lastProcessedMetric.current !== selectedMetric || lastProcessedDataKeys.current !== currentDataKeys;
 
     if (shouldUpdateStates) {
+      const entries = Object.entries(zipData);
+      let batchIndex = 0;
+      const BATCH_SIZE = 2000;
+
       const processBatch = () => {
         if (currentBatchId !== batchIdRef.current) return;
+        const endIndex = Math.min(batchIndex + BATCH_SIZE, entries.length);
 
-        const batch = entries.slice(batchIndex, batchIndex + BATCH_SIZE);
-        batch.forEach(([zipCode, data]) => {
+        while (batchIndex < endIndex) {
+          const [zipCode, data] = entries[batchIndex];
           const metricValue = getMetricValue(data, selectedMetric);
+
           if (mapRef.current && mapRef.current.getStyle() && currentBatchId === batchIdRef.current) {
             map.setFeatureState(
               { source: "zips", sourceLayer: "us_zip_codes", id: zipCode },
               { metricValue }
             );
           }
-        });
+          batchIndex++;
+        }
 
-        batchIndex += BATCH_SIZE;
         if (batchIndex < entries.length && currentBatchId === batchIdRef.current) {
           requestAnimationFrame(processBatch);
-        } else if (currentBatchId === batchIdRef.current) {
-          if (mapRef.current) map.setPaintProperty("zips-fill", "fill-color", stepExpression);
+        } else {
+          console.log(`[Map] Finished updating colors for ${entries.length} ZIPs`);
         }
       };
-      processBatch();
-    } else {
-      requestAnimationFrame(() => {
-        if (currentBatchId === batchIdRef.current && mapRef.current && mapRef.current.getStyle()) {
-          map.setPaintProperty("zips-fill", "fill-color", stepExpression);
-        }
-      });
+
+      requestAnimationFrame(processBatch);
     }
+
   }, [isMapReady, pmtilesLoaded, zipData, selectedMetric, hasData, customBuckets]);
 
   // 6. Fly to Search and Highlight ZIP

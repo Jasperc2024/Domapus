@@ -1,3 +1,4 @@
+import * as d3 from "d3-scale";
 import { ZipData } from "./types";
 
 // Converts a state abbreviation into its full name
@@ -36,10 +37,10 @@ export interface MetricInfo {
 
 // Standard metric definitions for reuse
 export const METRIC_DEFINITIONS: Record<string, MetricInfo> = {
-  zhvi: { key: "zhvi", label: "Zillow Home Value Index", format: 'currency', momKey: "zhvi_mom", yoyKey: "zhvi_yoy" },
-  median_sale_price: { key: "median_sale_price", label: "Median Sale Price", format: 'currency', momKey: "median_sale_price_mom", yoyKey: "median_sale_price_yoy" },
-  median_list_price: { key: "median_list_price", label: "Median List Price", format: 'currency', momKey: "median_list_price_mom", yoyKey: "median_list_price_yoy" },
-  median_ppsf: { key: "median_ppsf", label: "Median Price per Sq Ft", format: 'currency', momKey: "median_ppsf_mom", yoyKey: "median_ppsf_yoy" },
+  zhvi: { key: "zhvi", label: "Zillow Home Value Index", format: 'price', momKey: "zhvi_mom", yoyKey: "zhvi_yoy" },
+  median_sale_price: { key: "median_sale_price", label: "Median Sale Price", format: 'price', momKey: "median_sale_price_mom", yoyKey: "median_sale_price_yoy" },
+  median_list_price: { key: "median_list_price", label: "Median List Price", format: 'price', momKey: "median_list_price_mom", yoyKey: "median_list_price_yoy" },
+  median_ppsf: { key: "median_ppsf", label: "Median Price per Sq Ft", format: 'price', momKey: "median_ppsf_mom", yoyKey: "median_ppsf_yoy" },
   homes_sold: { key: "homes_sold", label: "Homes Sold", format: 'number', momKey: "homes_sold_mom", yoyKey: "homes_sold_yoy" },
   pending_sales: { key: "pending_sales", label: "Pending Sales", format: 'number', momKey: "pending_sales_mom", yoyKey: "pending_sales_yoy" },
   new_listings: { key: "new_listings", label: "New Listings", format: 'number', momKey: "new_listings_mom", yoyKey: "new_listings_yoy" },
@@ -99,29 +100,21 @@ export function getComparison(current: number | null | undefined, compare: numbe
   return diff > 0 ? 'higher' : 'lower';
 }
 
-// Compute quantile buckets for choropleth coloring
+/**
+ * Computes quantile buckets using D3
+ * @param values Array of metric values
+ * @param numBuckets Number of color buckets
+ * @returns Array of thresholds
+ */
 export function computeQuantileBuckets(values: number[], numBuckets = 8): number[] {
-  const sorted = [...values].filter(v => v > 0).sort((a, b) => a - b);
-  if (sorted.length === 0) return [];
+  const validValues = values.filter(v => v > 0).sort((a, b) => a - b);
+  if (validValues.length === 0) return [];
 
-  const minVal = sorted[0];
-  const maxVal = sorted[sorted.length - 1];
-  if (minVal === maxVal) return [minVal];
+  const scale = d3.scaleQuantile<number>()
+    .domain(validValues)
+    .range(Array.from({ length: numBuckets }, (_, i) => i));
 
-  const thresholds: number[] = [];
-  const epsilon = (maxVal - minVal) * 1e-6 || 1e-6;
-
-  const q = (p: number) => sorted[Math.floor(p * (sorted.length - 1))];
-
-  for (let i = 1; i < numBuckets; i++) {
-    let val = q(i / numBuckets);
-    if (thresholds.length && val <= thresholds[thresholds.length - 1]) {
-      val = thresholds[thresholds.length - 1] + epsilon;
-    }
-    thresholds.push(val);
-  }
-
-  return thresholds;
+  return scale.quantiles();
 }
 
 export function getMetricDisplay(data: ZipData, selectedMetric: string): string {

@@ -82,15 +82,15 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           }
           throw new Error(`Failed to load data (${response.status}). Please try refreshing.`);
         }
-        
+
         // Validate response size - empty or too small responses are likely errors
         const contentLength = response.headers.get('content-length');
         if (contentLength && parseInt(contentLength) < 100) {
           throw new Error("Data file appears to be empty or incomplete. Please try refreshing.");
         }
-        
+
         const buffer = await response.arrayBuffer();
-        
+
         // Validate we received actual data
         if (buffer.byteLength < 100) {
           throw new Error("Received incomplete data. Please check your connection and try again.");
@@ -100,15 +100,15 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
         try {
           const jsonText = new TextDecoder().decode(buffer);
-          
+
           // Check if this looks like a Git LFS pointer file instead of actual JSON
           if (jsonText.startsWith('version https://git-lfs.github.com')) {
             console.error('[Worker] Received Git LFS pointer instead of actual data file');
             throw new Error("Data file not available. The server returned a placeholder instead of actual data. Please try refreshing or contact support.");
           }
-          
+
           fullPayload = JSON.parse(jsonText);
-          
+
           // Validate the payload structure
           if (!fullPayload || typeof fullPayload !== 'object') {
             throw new Error("Invalid data format: expected object");
@@ -130,64 +130,24 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         const metricValues: number[] = [];
         const entries = Object.entries(rawZipData);
 
+        const BATCH_SIZE = 5000;
+
         for (let i = 0; i < entries.length; i++) {
           if (signal.aborted) return;
           const [zipCode, raw] = entries[i];
 
-          const rawData: RawZipData = raw ?? {};
-          const normalized: ZipData = {
-            zipCode,
-            city: rawData.city ?? null,
-            county: rawData.county ?? null,
-            state: rawData.state ?? null,
-            metro: rawData.metro ?? null,
-            latitude: rawData.latitude ?? rawData.lat ?? null,
-            longitude: rawData.longitude ?? rawData.lng ?? null,
-            period_end: rawData.period_end ?? null,
-            zhvi: rawData.zhvi ?? null,
-            zhvi_mom: rawData.zhvi_mom ?? null,
-            zhvi_yoy: rawData.zhvi_yoy ?? null,
-            median_sale_price: rawData.median_sale_price ?? null,
-            median_sale_price_mom: rawData.median_sale_price_mom ?? null,
-            median_sale_price_yoy: rawData.median_sale_price_yoy ?? null,
-            median_list_price: rawData.median_list_price ?? null,
-            median_list_price_mom: rawData.median_list_price_mom ?? null,
-            median_list_price_yoy: rawData.median_list_price_yoy ?? null,
-            median_ppsf: rawData.median_ppsf ?? null,
-            median_ppsf_mom: rawData.median_ppsf_mom ?? null,
-            median_ppsf_yoy: rawData.median_ppsf_yoy ?? null,
-            homes_sold: rawData.homes_sold ?? null,
-            homes_sold_mom: rawData.homes_sold_mom ?? null,
-            homes_sold_yoy: rawData.homes_sold_yoy ?? null,
-            pending_sales: rawData.pending_sales ?? null,
-            pending_sales_mom: rawData.pending_sales_mom ?? null,
-            pending_sales_yoy: rawData.pending_sales_yoy ?? null,
-            new_listings: rawData.new_listings ?? null,
-            new_listings_mom: rawData.new_listings_mom ?? null,
-            new_listings_yoy: rawData.new_listings_yoy ?? null,
-            inventory: rawData.inventory ?? null,
-            inventory_mom: rawData.inventory_mom ?? null,
-            inventory_yoy: rawData.inventory_yoy ?? null,
-            median_dom: rawData.median_dom ?? null,
-            median_dom_mom: rawData.median_dom_mom ?? null,
-            median_dom_yoy: rawData.median_dom_yoy ?? null,
-            avg_sale_to_list_ratio: rawData.avg_sale_to_list_ratio ?? null,
-            avg_sale_to_list_mom: rawData.avg_sale_to_list_mom ?? null,
-            avg_sale_to_list_ratio_yoy: rawData.avg_sale_to_list_ratio_yoy ?? null,
-            sold_above_list: rawData.sold_above_list ?? null,
-            sold_above_list_mom: rawData.sold_above_list_mom ?? null,
-            sold_above_list_yoy: rawData.sold_above_list_yoy ?? null,
-            off_market_in_two_weeks: rawData.off_market_in_two_weeks ?? null,
-            off_market_in_two_weeks_mom: rawData.off_market_in_two_weeks_mom ?? null,
-            off_market_in_two_weeks_yoy: rawData.off_market_in_two_weeks_yoy ?? null,
-          };
+          const data = raw as unknown as ZipData;
+          const r = raw as any;
+          if (data.latitude === undefined) data.latitude = r.lat ?? null;
+          if (data.longitude === undefined) data.longitude = r.lng ?? null;
 
-          zipData[zipCode] = normalized;
+          data.zipCode = zipCode;
+          zipData[zipCode] = data;
 
-          const metric = getMetricValue(normalized, selectedMetric);
+          const metric = getMetricValue(data, selectedMetric);
           if (metric > 0) metricValues.push(metric);
 
-          if (i % 2000 === 0) {
+          if (i % BATCH_SIZE === 0) {
             self.postMessage({
               type: "PROGRESS",
               data: { phase: "Indexing ZIP codes...", processed: i, total: entries.length },
@@ -205,8 +165,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           };
 
           return {
-            min: q(0.05), 
-            max: q(0.95)  
+            min: q(0.05),
+            max: q(0.95)
           };
         }
 
@@ -223,10 +183,10 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       const errorType = type || "UNKNOWN";
       console.error("[Worker] Error:", err);
       // Send detailed error to main thread for tracking
-      self.postMessage({ 
-        type: "ERROR", 
-        id, 
-        error: `Worker ${errorType} error: ${errMessage}` 
+      self.postMessage({
+        type: "ERROR",
+        id,
+        error: `Worker ${errorType} error: ${errMessage}`
       });
     }
   }

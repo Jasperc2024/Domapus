@@ -69,7 +69,7 @@ export function Sidebar({ isOpen, zipData, allZipData, onClose }: SidebarProps) 
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             }>
-              <ZipComparison currentZip={zipData} allZipData={allZipData} onClose={() => setShowComparison(false)} />
+              <ZipComparison currentZip={zipData} allZipData={allZipData}/>
             </Suspense>
           </div>
         ) : (
