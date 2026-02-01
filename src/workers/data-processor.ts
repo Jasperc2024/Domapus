@@ -1,4 +1,5 @@
 import { ZipData } from "../components/dashboard/map/types";
+import { computeQuantileBuckets } from "../components/dashboard/map/utils";
 import { WorkerMessage, LoadDataRequest } from "./worker-types";
 
 let currentAbortController: AbortController | null = null;
@@ -171,9 +172,10 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         }
 
         const bounds = computeQuantileBounds(metricValues);
+        const buckets = computeQuantileBuckets(metricValues, 12);
         console.log(`[Worker] Data processed: ${Object.keys(zipData).length} ZIPs, bounds:`, bounds);
 
-        self.postMessage({ type: "DATA_PROCESSED", id, data: { zip_codes: zipData, last_updated_utc, bounds } });
+        self.postMessage({ type: "DATA_PROCESSED", id, data: { zip_codes: zipData, last_updated_utc, bounds, buckets } });
         break;
       }
     }

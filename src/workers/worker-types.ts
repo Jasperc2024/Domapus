@@ -22,6 +22,7 @@ export interface DataProcessedResponse {
   zip_codes: Record<string, ZipData>;
   last_updated_utc: string;
   bounds: { min: number; max: number };
+  buckets?: number[];
 }
 
 export interface ProgressData {

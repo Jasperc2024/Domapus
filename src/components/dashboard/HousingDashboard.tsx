@@ -17,6 +17,7 @@ interface DataPayload {
   last_updated_utc: string;
   zip_codes: Record<string, ZipData>;
   bounds: { min: number; max: number; };
+  buckets?: number[];
 }
 
 const BASE_PATH = import.meta.env.BASE_URL;
@@ -37,6 +38,7 @@ export function HousingDashboard() {
   const [customBuckets, setCustomBuckets] = useState<number[] | null>(null);
   const [autoScale, setAutoScale] = useState(false);
   const [isIndexReady, setIsIndexReady] = useState(false);
+  const [globalBuckets, setGlobalBuckets] = useState<number[] | null>(null);
   const lastBoundsRef = useRef<[[number, number], [number, number]] | null>(null);
 
   const { processData, isLoading } = useDataWorker();
@@ -62,6 +64,7 @@ export function HousingDashboard() {
         if (result) {
           setZipData(result.zip_codes);
           setDataBounds(result.bounds);
+          if (result.buckets) setGlobalBuckets(result.buckets);
           setTimeout(() => {
             buildSpatialIndex(result.zip_codes);
             setIsIndexReady(true);
@@ -238,6 +241,7 @@ export function HousingDashboard() {
               isLoading={isLoading}
               processData={processData}
               customBuckets={customBuckets}
+              globalBuckets={globalBuckets}
               onMapMove={handleMapMove}
             />
           </div>
