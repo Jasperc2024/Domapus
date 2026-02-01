@@ -19,7 +19,6 @@ interface MapProps {
   isLoading: boolean;
   processData: (message: { type: string; data?: LoadDataRequest }) => Promise<DataProcessedResponse>;
   customBuckets: number[] | null;
-  globalBuckets: number[] | null;
   onMapMove: (bounds: [[number, number], [number, number]]) => void;
 }
 
@@ -37,7 +36,6 @@ export function MapLibreMap({
   zipData,
   isLoading,
   customBuckets,
-  globalBuckets,
   onMapMove,
 }: MapProps) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
@@ -56,7 +54,6 @@ export function MapLibreMap({
   const containerSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const batchIdRef = useRef(0);
-  const sourcesAddedRef = useRef(false);
 
   const getDynamicPadding = (container: HTMLDivElement) => {
     const minDim = Math.min(container.clientWidth, container.clientHeight);
@@ -64,10 +61,10 @@ export function MapLibreMap({
   };
 
   // Refs for current data to avoid stale closures
-  const propsRef = useRef({ zipData, selectedMetric, onZipSelect, globalBuckets });
+  const propsRef = useRef({ zipData, selectedMetric, onZipSelect });
   useEffect(() => {
-    propsRef.current = { zipData, selectedMetric, onZipSelect, globalBuckets };
-  }, [zipData, selectedMetric, onZipSelect, globalBuckets]);
+    propsRef.current = { zipData, selectedMetric, onZipSelect };
+  }, [zipData, selectedMetric, onZipSelect]);
   const hasData = useMemo(() => Object.keys(zipData).length > 0, [zipData]);
 
   // 1. Initialize Map with PMTiles
@@ -100,129 +97,10 @@ export function MapLibreMap({
       console.log("[Map] Map initialized");
       setIsMapReady(true);
       onMapMove(map.getBounds().toArray() as [[number, number], [number, number]]);
-
-      // Initialize sources immediately on load to avoid React render cycle delay
-      initializeMapContent(map);
     });
 
     return map;
   }, [onMapMove]);
-
-  // Helper to add sources and layers
-  const initializeMapContent = (map: maplibregl.Map) => {
-    if (sourcesAddedRef.current) return;
-
-    try {
-      // Hide transportation layers for cleaner look
-      const style = map.getStyle();
-      if (style && style.layers) {
-        style.layers.forEach((layer) => {
-          if ('source-layer' in layer) {
-            const sourceLayer = layer['source-layer'] as string;
-            if (sourceLayer === "transportation" || sourceLayer === "transportation_name") {
-              map.setLayoutProperty(layer.id, "visibility", "none");
-            }
-          }
-        });
-      }
-
-      const pmtilesUrl = new URL(`${BASE_PATH}data/us_zip_codes.pmtiles`, window.location.origin).href;
-
-      if (!map.getSource("zips")) {
-        map.addSource("zips", {
-          type: "vector",
-          url: `pmtiles://${pmtilesUrl}`,
-          promoteId: "ZCTA5CE20"
-        });
-      }
-
-      const layers = map.getStyle().layers;
-      const stateBoundaryLayer = layers.find((l) => l.id === "boundary_state");
-      const labelLayer = layers.find((l) => l.id === "watername_ocean");
-      const beforeId = stateBoundaryLayer?.id || labelLayer?.id;
-
-      // Fill layer
-      if (!map.getLayer("zips-fill")) {
-        map.addLayer({
-          id: "zips-fill",
-          type: "fill",
-          source: "zips",
-          "source-layer": "us_zip_codes",
-          paint: {
-            "fill-color": "#cccccc",
-            "fill-opacity": 0.75,
-          }
-        }, beforeId);
-      }
-
-      // Border layer
-      if (!map.getLayer("zips-border")) {
-        map.addLayer({
-          id: "zips-border",
-          type: "line",
-          source: "zips",
-          "source-layer": "us_zip_codes",
-          paint: {
-            "line-color": [
-              "case",
-              ["boolean", ["feature-state", "highlighted"], false],
-              "#ff6b35",
-              "rgba(0,0,0,0.15)"
-            ],
-            "line-width": [
-              "interpolate", ["linear"], ["zoom"],
-              3, ["case", ["boolean", ["feature-state", "highlighted"], false], 2, 0.3],
-              6, ["case", ["boolean", ["feature-state", "highlighted"], false], 3, 0.6],
-              10, ["case", ["boolean", ["feature-state", "highlighted"], false], 4, 1.5],
-              12, ["case", ["boolean", ["feature-state", "highlighted"], false], 5, 2]
-            ]
-          }
-        }, beforeId);
-      }
-
-      // ZIP labels layer - visible at high zoom
-      if (!map.getLayer("zips-labels")) {
-        map.addLayer({
-          id: "zips-labels",
-          type: "symbol",
-          source: "zips",
-          "source-layer": "us_zip_codes",
-          minzoom: 9.5,
-          layout: {
-            "visibility": "visible",
-            "text-field": ["get", "ZCTA5CE20"],
-            "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
-            "text-size": [
-              "interpolate", ["linear"], ["zoom"],
-              9, 10,
-              12, 14
-            ],
-            "text-allow-overlap": false,
-            "text-padding": 8,
-            "symbol-placement": "point",
-            "symbol-sort-key": ["to-number", ["get", "ZCTA5CE20"]],
-            "text-ignore-placement": false,
-            "symbol-avoid-edges": true
-          },
-          paint: {
-            "text-color": "#1E40AF",
-            "text-halo-color": "rgba(255,255,255,0.95)",
-            "text-halo-width": 1.5
-          }
-        });
-      }
-
-      sourcesAddedRef.current = true;
-      setPmtilesLoaded(true);
-      setupMapInteractions();
-
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : "Failed to load PMTiles";
-      console.error("Add PMTiles layer failed", err);
-      trackError("pmtiles_layer_failed", errMsg);
-      setError("Failed to load map data. Try refreshing.");
-    }
-  };
 
   // 2. Setup Map Instance
   useEffect(() => {
@@ -400,11 +278,121 @@ export function MapLibreMap({
     interactionsSetup.current = true;
   }, []);
 
-  // 4. Add PMTiles Source & Layer - Kept as backup or for hot module reload re-init, but main init is in map load
+  // 4. Add PMTiles Source & Layer
   useEffect(() => {
-    if (!isMapReady || !mapRef.current || sourcesAddedRef.current) return;
-    initializeMapContent(mapRef.current);
-  }, [isMapReady]);
+    if (!isMapReady || !mapRef.current) return;
+    const map = mapRef.current;
+
+    if (map.getSource("zips")) return;
+
+    try {
+      // Hide transportation layers for cleaner look
+      const style = map.getStyle();
+      if (!style || !style.layers) return;
+      const styleLayers = style.layers;
+      styleLayers.forEach((layer) => {
+        if ('source-layer' in layer) {
+          const sourceLayer = layer['source-layer'] as string;
+          if (sourceLayer === "transportation" || sourceLayer === "transportation_name") {
+            map.setLayoutProperty(layer.id, "visibility", "none");
+          }
+        }
+      });
+
+      const pmtilesUrl = new URL(`${BASE_PATH}data/us_zip_codes.pmtiles`, window.location.origin).href;
+
+      map.addSource("zips", {
+        type: "vector",
+        url: `pmtiles://${pmtilesUrl}`,
+        promoteId: "ZCTA5CE20"
+      });
+
+      const layers = map.getStyle().layers;
+      const stateBoundaryLayer = layers.find((l) => l.id === "boundary_state");
+      const labelLayer = layers.find((l) => l.id === "watername_ocean");
+      const beforeId = stateBoundaryLayer?.id || labelLayer?.id;
+
+      // Fill layer
+      map.addLayer({
+        id: "zips-fill",
+        type: "fill",
+        source: "zips",
+        "source-layer": "us_zip_codes",
+        paint: {
+          "fill-color": "#cccccc",
+          "fill-opacity": 0.75,
+        }
+      }, beforeId);
+
+      // Border layer
+      map.addLayer({
+        id: "zips-border",
+        type: "line",
+        source: "zips",
+        "source-layer": "us_zip_codes",
+        paint: {
+          "line-color": [
+            "case",
+            ["boolean", ["feature-state", "highlighted"], false],
+            "#ff6b35",
+            "rgba(0,0,0,0.15)"
+          ],
+          "line-width": [
+            "interpolate", ["linear"], ["zoom"],
+            3, ["case", ["boolean", ["feature-state", "highlighted"], false], 2, 0.3],
+            6, ["case", ["boolean", ["feature-state", "highlighted"], false], 3, 0.6],
+            10, ["case", ["boolean", ["feature-state", "highlighted"], false], 4, 1.5],
+            12, ["case", ["boolean", ["feature-state", "highlighted"], false], 5, 2]
+          ]
+        }
+      }, beforeId);
+
+      // ZIP labels layer - visible at high zoom
+      map.addLayer({
+        id: "zips-labels",
+        type: "symbol",
+        source: "zips",
+        "source-layer": "us_zip_codes",
+        minzoom: 9.5,
+        layout: {
+          "visibility": "visible",
+          "text-field": ["get", "ZCTA5CE20"],
+          "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+          "text-size": [
+            "interpolate", ["linear"], ["zoom"],
+            9, 10,
+            12, 14
+          ],
+          "text-allow-overlap": false,
+          "text-padding": 8,
+          "symbol-placement": "point",
+          "symbol-sort-key": ["to-number", ["get", "ZCTA5CE20"]],
+          "text-ignore-placement": false,
+          "symbol-avoid-edges": true
+        },
+        paint: {
+          "text-color": "#1E40AF",
+          "text-halo-color": "rgba(255,255,255,0.95)",
+          "text-halo-width": 1.5
+        }
+      });
+
+
+      map.once("idle", () => {
+        console.log("[MapLibreMap] Map idle");
+      });
+
+      // Proactively set loaded when source is added
+      setPmtilesLoaded(true);
+      setupMapInteractions();
+
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : "Failed to load PMTiles";
+      console.error("Add PMTiles layer failed", err);
+      trackError("pmtiles_layer_failed", errMsg);
+      setError("Failed to load map data. Try refreshing.");
+    }
+  }, [isMapReady, setupMapInteractions]);
 
   // 5. Update Choropleth Colors
   useEffect(() => {
@@ -436,10 +424,6 @@ export function MapLibreMap({
     let buckets: number[] = [];
     if (customBuckets && customBuckets.length > 0) {
       buckets = customBuckets;
-    } else if (propsRef.current.globalBuckets && propsRef.current.globalBuckets.length > 0) {
-      buckets = propsRef.current.globalBuckets;
-      // If we have global buckets from worker, we don't need to recalculate them on main thread
-      // This saves significant time (~30% of main thread time in some profiles)
     } else {
       const values = Object.values(zipData).map(d => getMetricValue(d, selectedMetric));
       buckets = computeQuantileBuckets(values, CHOROPLETH_COLORS.length);
@@ -497,7 +481,7 @@ export function MapLibreMap({
       requestAnimationFrame(processBatch);
     }
 
-  }, [isMapReady, pmtilesLoaded, zipData, selectedMetric, hasData, customBuckets, globalBuckets]);
+  }, [isMapReady, pmtilesLoaded, zipData, selectedMetric, hasData, customBuckets]);
 
   // 6. Fly to Search and Highlight ZIP
   useEffect(() => {
