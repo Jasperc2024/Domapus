@@ -235,19 +235,28 @@ def main():
             try:
                 with open(zip_data_path, 'r') as f:
                     old_data = json.load(f).get('zip_codes', {})
-                new_zips, old_zips = set(output_data.keys()), set(old_data.keys())
-                zip_codes_changed = len(new_zips ^ old_zips)
-                for z in new_zips & old_zips:
-                    for k in output_data[z]:
-                        if output_data[z][k] != old_data[z].get(k):
-                            data_points_changed += 1
+                    
+                new_zips = set(output_data.keys())
+                old_zips = set(old_data.keys())
+                changed_zips_set = new_zips ^ old_zips
+                common_zips = new_zips & old_zips
+                
+                for z in common_zips:
+                    if output_data[z] != old_data[z]:
+                        changed_zips_set.add(z)
+                        
+                        for k, v in output_data[z].items():
+                            if v != old_data[z].get(k):
+                                data_points_changed += 1
+                
+                zip_codes_changed = len(changed_zips_set)
+
             except Exception as e:
                 logging.warning(f"Comparison failed: {e}")
 
         with open(zip_data_path, 'w', encoding='utf-8') as f:
             json.dump({"zip_codes": output_data}, f, separators=(",", ":"))
 
-        # Updated to include period_end field
         with open(DATA_DIR / "last_updated.json", 'w') as f:
             json.dump({
                 "last_updated_utc": datetime.now(timezone.utc).isoformat(),
