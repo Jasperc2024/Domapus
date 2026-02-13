@@ -23,10 +23,24 @@ interface DataPayload {
 
 const BASE_PATH = import.meta.env.BASE_URL;
 
+// Read URL params directly from window.location so they're available before React Router initializes
+function getInitialUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    zip: params.get('zip') || undefined,
+    metric: params.get('metric') || undefined,
+    lat: params.get('lat') ? parseFloat(params.get('lat')!) : undefined,
+    lng: params.get('lng') ? parseFloat(params.get('lng')!) : undefined,
+    zoom: params.get('zoom') ? parseFloat(params.get('zoom')!) : undefined,
+  };
+}
+
+const initialUrlParams = getInitialUrlParams();
+
 export function HousingDashboard() {
   const isMobile = useIsMobile();
-  const { urlState, setUrlState } = useUrlState();
-  const initialUrlStateRef = useRef(urlState);
+  const { setUrlState } = useUrlState();
+  const initialUrlStateRef = useRef(initialUrlParams);
   
   // Initialize selectedMetric from URL or default to 'zhvi'
   const [selectedMetric, setSelectedMetric] = useState<MetricType>((initialUrlStateRef.current.metric as MetricType) || "zhvi");
@@ -167,7 +181,10 @@ export function HousingDashboard() {
     setCustomBuckets(buckets.length > 0 ? buckets : null);
   }, [zipData, selectedMetric]);
 
-  const handleMapMove = useCallback((bounds: [[number, number], [number, number]]) => {
+  const handleMapMove = useCallback((
+    bounds: [[number, number], [number, number]],
+    view?: { lat: number; lng: number; zoom: number }
+  ) => {
     lastBoundsRef.current = bounds;
     if (autoScaleRef.current) {
       updateColors(bounds);
@@ -175,13 +192,17 @@ export function HousingDashboard() {
     
     // Update URL with map position (debounced)
     if (!hasUserInteractedRef.current) return;
-    const center = {
+    if (view) {
+      setUrlState({ lat: view.lat, lng: view.lng, zoom: view.zoom }, true);
+      return;
+    }
+
+    const fallbackCenter = {
       lng: (bounds[0][0] + bounds[1][0]) / 2,
       lat: (bounds[0][1] + bounds[1][1]) / 2,
     };
-    // Estimate zoom level based on bounds (simplified)
-    const zoom = Math.log2(360 / Math.abs(bounds[1][0] - bounds[0][0]));
-    setUrlState({ lat: center.lat, lng: center.lng, zoom }, true);
+    const fallbackZoom = Math.log2(360 / Math.abs(bounds[1][0] - bounds[0][0]));
+    setUrlState({ lat: fallbackCenter.lat, lng: fallbackCenter.lng, zoom: fallbackZoom }, true);
   }, [updateColors, setUrlState]);
 
   const handleUserInteraction = useCallback(() => {

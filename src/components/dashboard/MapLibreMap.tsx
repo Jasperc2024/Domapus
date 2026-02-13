@@ -19,7 +19,10 @@ interface MapProps {
   isLoading: boolean;
   processData: (message: { type: string; data?: LoadDataRequest }) => Promise<DataProcessedResponse>;
   customBuckets: number[] | null;
-  onMapMove: (bounds: [[number, number], [number, number]]) => void;
+  onMapMove: (
+    bounds: [[number, number], [number, number]],
+    view?: { lat: number; lng: number; zoom: number }
+  ) => void;
   onUserInteraction?: () => void;
   initialCenter?: [number, number];
   initialZoom?: number;
@@ -41,8 +44,6 @@ export function MapLibreMap({
   customBuckets,
   onMapMove,
   onUserInteraction,
-  initialCenter,
-  initialZoom,
 }: MapProps) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -61,7 +62,6 @@ export function MapLibreMap({
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const batchIdRef = useRef(0);
   const userInteractionNotifiedRef = useRef(false);
-  const initialViewRef = useRef({ center: initialCenter, zoom: initialZoom });
 
   const getDynamicPadding = (container: HTMLDivElement) => {
     const minDim = Math.min(container.clientWidth, container.clientHeight);
@@ -80,8 +80,18 @@ export function MapLibreMap({
     addPMTilesProtocol();
     const defaultBounds: LngLatBoundsLike = [[-124.7844079, 24.7433195], [-66.9513812, 49.3457868]];
     const dynamicPadding = getDynamicPadding(container);
-    const iv = initialViewRef.current;
-    const hasInitialView = iv.center && iv.zoom !== undefined;
+
+    // Read URL params directly to guarantee we have them at map creation time
+    const params = new URLSearchParams(window.location.search);
+    const urlLat = params.get('lat') ? parseFloat(params.get('lat')!) : undefined;
+    const urlLng = params.get('lng') ? parseFloat(params.get('lng')!) : undefined;
+    const urlZoom = params.get('zoom') ? parseFloat(params.get('zoom')!) : undefined;
+    const hasInitialView = urlLat !== undefined && urlLng !== undefined && urlZoom !== undefined
+      && isFinite(urlLat) && isFinite(urlLng) && isFinite(urlZoom);
+
+    if (hasInitialView) {
+      console.log(`[Map] Using URL position: center=[${urlLng}, ${urlLat}], zoom=${urlZoom}`);
+    }
 
     const map = new maplibregl.Map({
       container,
@@ -89,7 +99,7 @@ export function MapLibreMap({
       minZoom: 3,
       maxZoom: 12,
       ...(hasInitialView
-        ? { center: iv.center, zoom: iv.zoom }
+        ? { center: [urlLng!, urlLat!], zoom: urlZoom! }
         : { bounds: defaultBounds, fitBoundsOptions: { padding: dynamicPadding } }),
       attributionControl: false,
     });
@@ -108,7 +118,11 @@ export function MapLibreMap({
     map.once("load", () => {
       console.log("[Map] Map initialized");
       setIsMapReady(true);
-      onMapMoveRef.current(map.getBounds().toArray() as [[number, number], [number, number]]);
+      const center = map.getCenter();
+      onMapMoveRef.current(
+        map.getBounds().toArray() as [[number, number], [number, number]],
+        { lat: center.lat, lng: center.lng, zoom: map.getZoom() }
+      );
     });
 
     return map;
@@ -291,7 +305,11 @@ export function MapLibreMap({
     };
 
     const moveEndHandler = () => {
-      onMapMoveRef.current(map.getBounds().toArray() as [[number, number], [number, number]]);
+      const center = map.getCenter();
+      onMapMoveRef.current(
+        map.getBounds().toArray() as [[number, number], [number, number]],
+        { lat: center.lat, lng: center.lng, zoom: map.getZoom() }
+      );
     };
 
     map.on("mousemove", mousemoveHandler);
