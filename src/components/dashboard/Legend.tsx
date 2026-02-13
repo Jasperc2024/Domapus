@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Checkbox } from "@/components/ui/checkbox";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Loader2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface LegendProps {
@@ -10,6 +10,7 @@ interface LegendProps {
   isExport?: boolean;
   autoScale?: boolean;
   onAutoScaleChange?: (value: boolean) => void;
+  isIndexReady?: boolean;
 }
 
 // Number formatting helper
@@ -33,7 +34,7 @@ function computeQuantiles(values: number[], percentiles: number[]) {
   });
 }
 
-export function Legend({ selectedMetric, metricValues, isExport = false, autoScale, onAutoScaleChange }: LegendProps) {
+export function Legend({ selectedMetric, metricValues, isExport = false, autoScale, onAutoScaleChange, isIndexReady = true }: LegendProps) {
   const isMobile = useIsMobile();
 
   const legendDisplay = useMemo(() => {
@@ -79,6 +80,12 @@ export function Legend({ selectedMetric, metricValues, isExport = false, autoSca
   if (isMobile && !isExport) {
     return (
       <div className="bg-card/95 backdrop-blur-sm shadow-lg border border-border rounded-lg p-3 w-[155px]">
+        {!isIndexReady && (
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-2">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>Optimizing search...</span>
+          </div>
+        )}
 
         <div className="flex items-stretch gap-2 h-20">
           <div
@@ -123,6 +130,13 @@ export function Legend({ selectedMetric, metricValues, isExport = false, autoSca
       <h3 className="text-sm font-semibold mb-3 text-foreground">
         {getMetricDisplayName(selectedMetric)}
       </h3>
+
+      {!isIndexReady && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3 px-1">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span>Optimizing search...</span>
+        </div>
+      )}
 
       {onAutoScaleChange && (
         <div className="flex items-center gap-2 mb-3 px-1">
