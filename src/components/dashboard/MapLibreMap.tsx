@@ -514,7 +514,17 @@ export function MapLibreMap({
 
   return (
     <div className="absolute inset-0 w-full h-full min-h-[400px]">
-      <div ref={mapContainer} className="w-full h-full" style={{ minHeight: "400px" }} />
+      <div 
+        ref={mapContainer} 
+        className="w-full h-full" 
+        style={{ minHeight: "400px" }}
+        role="application"
+        aria-label="Interactive U.S. housing market choropleth map"
+      >
+        <span className="sr-only">
+          Interactive map showing ZIP-code level housing data. Use the search box to find specific ZIP codes.
+        </span>
+      </div>
       {(isLoading || !isMapReady || error) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-10">
           {error ? <div className="text-red-500 font-bold">{error}</div> : <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />}

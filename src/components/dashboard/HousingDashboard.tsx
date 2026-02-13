@@ -62,10 +62,18 @@ export function HousingDashboard() {
         if (result) {
           setZipData(result.zip_codes);
           setDataBounds(result.bounds);
-          setTimeout(() => {
+          
+          // Use requestIdleCallback with setTimeout fallback
+          const scheduleIndexBuild = () => {
             buildSpatialIndex(result.zip_codes);
             setIsIndexReady(true);
-          }, 100);
+          };
+
+          if ('requestIdleCallback' in window) {
+            requestIdleCallback(scheduleIndexBuild, { timeout: 2000 });
+          } else {
+            setTimeout(scheduleIndexBuild, 100);
+          }
         }
       } catch (error: unknown) {
         console.error("[HousingDashboard] Failed to load initial data:", error);
@@ -194,6 +202,14 @@ export function HousingDashboard() {
 
   return (
     <div className="w-full h-screen bg-dashboard-bg overflow-hidden flex flex-col">
+      {/* Skip Navigation Link */}
+      <a 
+        href="#main-map" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-md"
+      >
+        Skip to map
+      </a>
+      
       {showSponsorBanner && <SponsorBanner onClose={() => setShowSponsorBanner(false)} />}
       <TopBar
         selectedMetric={selectedMetric}
@@ -227,7 +243,7 @@ export function HousingDashboard() {
           />
         </div>
         <div className="flex-1 relative">
-          <div className="absolute inset-0 min-h-[400px]">
+          <div id="main-map" className="absolute inset-0 min-h-[400px]">
             <MapLibreMap
               selectedMetric={selectedMetric}
               onZipSelect={handleZipSelect}
@@ -248,6 +264,7 @@ export function HousingDashboard() {
                 metricValues={legendValues}
                 autoScale={autoScale}
                 onAutoScaleChange={setAutoScale}
+                isIndexReady={isIndexReady}
               />
             </div>
           )}
