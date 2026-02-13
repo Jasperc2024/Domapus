@@ -11,6 +11,8 @@ import { Legend } from "./Legend";
 import { SponsorBanner } from "./SponsorBanner";
 import { Sidebar } from "./Sidebar";
 import { MetricType } from "./MetricSelector";
+import { Drawer } from "vaul";
+import { useUrlState } from "@/hooks/useUrlState";
 
 
 interface DataPayload {
@@ -23,9 +25,12 @@ const BASE_PATH = import.meta.env.BASE_URL;
 
 export function HousingDashboard() {
   const isMobile = useIsMobile();
-  const [selectedMetric, setSelectedMetric] = useState<MetricType>("zhvi");
+  const { urlState, setUrlState } = useUrlState();
+  
+  // Initialize selectedMetric from URL or default to 'zhvi'
+  const [selectedMetric, setSelectedMetric] = useState<MetricType>((urlState.metric as MetricType) || "zhvi");
   const [selectedZip, setSelectedZip] = useState<ZipData | null>(null);
-  const [searchZip, setSearchZip] = useState<string>("");
+  const [searchZip, setSearchZip] = useState<string>(urlState.zip || "");
   const [searchTrigger, setSearchTrigger] = useState<number>(0);
   const [zipData, setZipData] = useState<Record<string, ZipData>>({});
   const [dataBounds, setDataBounds] = useState<{ min: number; max: number } | null>(null);
@@ -38,6 +43,7 @@ export function HousingDashboard() {
   const [autoScale, setAutoScale] = useState(false);
   const [isIndexReady, setIsIndexReady] = useState(false);
   const lastBoundsRef = useRef<[[number, number], [number, number]] | null>(null);
+  const initialLoadRef = useRef(false);
 
   const { processData, isLoading } = useDataWorker();
 
@@ -89,22 +95,44 @@ export function HousingDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Search handler
+  // Search handler - also updates URL
   const handleSearch = useCallback((zip: string, trigger: number) => {
     setSearchZip(zip);
     setSearchTrigger(trigger);
-  }, []);
+    setUrlState({ zip, metric: selectedMetric });
+  }, [selectedMetric, setUrlState]);
 
   const handleZipSelect = useCallback((zip: ZipData) => {
     setSelectedZip(zip);
     setSidebarOpen(true);
-  }, []);
+    setUrlState({ zip: zip.zipCode, metric: selectedMetric });
+  }, [selectedMetric, setUrlState]);
+
+  // Update URL when metric changes
+  const handleMetricChange = useCallback((metric: MetricType) => {
+    setSelectedMetric(metric);
+    setUrlState({ metric, zip: selectedZip?.zipCode });
+  }, [selectedZip, setUrlState]);
 
   // Use ref to always access latest autoScale state in callbacks
   const autoScaleRef = useRef(autoScale);
   useEffect(() => {
     autoScaleRef.current = autoScale;
   }, [autoScale]);
+
+  // Auto-load ZIP from URL on initial data load
+  useEffect(() => {
+    if (!initialLoadRef.current && Object.keys(zipData).length > 0 && urlState.zip) {
+      initialLoadRef.current = true;
+      const zipFromUrl = zipData[urlState.zip];
+      if (zipFromUrl) {
+        setSelectedZip(zipFromUrl);
+        setSidebarOpen(true);
+        setSearchZip(urlState.zip);
+        setSearchTrigger(prev => prev + 1);
+      }
+    }
+  }, [zipData, urlState.zip]);
 
   const updateColors = useCallback((bounds: [[number, number], [number, number]] | null) => {
     if (!autoScaleRef.current) {
@@ -138,7 +166,16 @@ export function HousingDashboard() {
     if (autoScaleRef.current) {
       updateColors(bounds);
     }
-  }, [updateColors]);
+    
+    // Update URL with map position (debounced)
+    const center = {
+      lng: (bounds[0][0] + bounds[1][0]) / 2,
+      lat: (bounds[0][1] + bounds[1][1]) / 2,
+    };
+    // Estimate zoom level based on bounds (simplified)
+    const zoom = Math.log2(360 / Math.abs(bounds[1][0] - bounds[0][0]));
+    setUrlState({ lat: center.lat, lng: center.lng, zoom }, true);
+  }, [updateColors, setUrlState]);
 
   useEffect(() => {
     if (autoScale && lastBoundsRef.current && isIndexReady) {
@@ -213,7 +250,7 @@ export function HousingDashboard() {
       {showSponsorBanner && <SponsorBanner onClose={() => setShowSponsorBanner(false)} />}
       <TopBar
         selectedMetric={selectedMetric}
-        onMetricChange={setSelectedMetric}
+        onMetricChange={handleMetricChange}
         onSearch={handleSearch}
         hideMobileControls={isMobile && sidebarOpen}
       >
@@ -224,16 +261,29 @@ export function HousingDashboard() {
         />
       </TopBar>
       <div className="flex flex-1 relative min-h-[400px] overflow-hidden">
-        {isMobile && sidebarOpen && (
-          <div className="absolute inset-0 z-50">
-            <Sidebar
-              isOpen={sidebarOpen}
-              zipData={selectedZip}
-              allZipData={zipData}
-              onClose={() => setSidebarOpen(false)}
-            />
-          </div>
+        {/* Mobile Bottom Sheet Drawer */}
+        {isMobile && (
+          <Drawer.Root open={sidebarOpen} onOpenChange={setSidebarOpen}>
+            <Drawer.Portal>
+              <Drawer.Overlay className="fixed inset-0 bg-black/40 z-40" />
+              <Drawer.Content className="bg-dashboard-panel flex flex-col rounded-t-[10px] h-[60vh] mt-24 fixed bottom-0 left-0 right-0 z-50">
+                <div className="p-4 bg-dashboard-panel rounded-t-[10px] flex-1 overflow-hidden flex flex-col">
+                  <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mb-4" />
+                  <div className="flex-1 overflow-hidden">
+                    <Sidebar
+                      isOpen={sidebarOpen}
+                      zipData={selectedZip}
+                      allZipData={zipData}
+                      onClose={() => setSidebarOpen(false)}
+                    />
+                  </div>
+                </div>
+              </Drawer.Content>
+            </Drawer.Portal>
+          </Drawer.Root>
         )}
+        
+        {/* Desktop Sidebar */}
         <div className="hidden md:flex absolute top-0 bottom-0 left-0 z-20 flex-col">
           <Sidebar
             isOpen={sidebarOpen}
