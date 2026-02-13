@@ -75,8 +75,8 @@ export function HousingDashboard() {
             setIsIndexReady(true);
           };
 
-          if ('requestIdleCallback' in window) {
-            requestIdleCallback(scheduleIndexBuild, { timeout: 2000 });
+          if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(scheduleIndexBuild, { timeout: 2000 });
           } else {
             setTimeout(scheduleIndexBuild, 100);
           }
