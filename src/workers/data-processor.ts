@@ -122,13 +122,14 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           throw new Error(detailedError);
         }
 
-        const last_updated_utc = fullPayload.last_updated_utc;
+        const last_updated_utc = (fullPayload as { last_updated_utc?: string }).last_updated_utc;
         const zipData: Record<string, ZipData> = {};
         const metricValues: number[] = [];
         const BATCH_SIZE = 5000;
 
         // Detect format: columnar (new) or keyed (old)
-        if ('f' in fullPayload && 'z' in fullPayload && 'd' in fullPayload) {
+        if (typeof fullPayload === 'object' && fullPayload !== null && 
+            'f' in fullPayload && 'z' in fullPayload && 'd' in fullPayload) {
           // New columnar format
           const { f: fields, z: zipCodes, d: rows } = fullPayload as {
             last_updated_utc?: string;
@@ -168,7 +169,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
               });
             }
           }
-        } else if ('zip_codes' in fullPayload) {
+        } else if (typeof fullPayload === 'object' && fullPayload !== null && 'zip_codes' in fullPayload) {
           // Old keyed format (backward compatibility)
           const rawZipData = fullPayload.zip_codes as Record<string, RawZipData>;
           if (!rawZipData) throw new Error("Missing zip_codes data");
