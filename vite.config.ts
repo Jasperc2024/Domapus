@@ -4,7 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 export default defineConfig(({ mode }) => ({
-  base: '/Domapus/',
+  base: mode === "production" ? "/Domapus/" : "/",
   server: {
     host: "::",
     port: 3677,

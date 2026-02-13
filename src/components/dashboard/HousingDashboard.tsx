@@ -26,11 +26,12 @@ const BASE_PATH = import.meta.env.BASE_URL;
 export function HousingDashboard() {
   const isMobile = useIsMobile();
   const { urlState, setUrlState } = useUrlState();
+  const initialUrlStateRef = useRef(urlState);
   
   // Initialize selectedMetric from URL or default to 'zhvi'
-  const [selectedMetric, setSelectedMetric] = useState<MetricType>((urlState.metric as MetricType) || "zhvi");
+  const [selectedMetric, setSelectedMetric] = useState<MetricType>((initialUrlStateRef.current.metric as MetricType) || "zhvi");
   const [selectedZip, setSelectedZip] = useState<ZipData | null>(null);
-  const [searchZip, setSearchZip] = useState<string>(urlState.zip || "");
+  const [searchZip, setSearchZip] = useState<string>(initialUrlStateRef.current.zip || "");
   const [searchTrigger, setSearchTrigger] = useState<number>(0);
   const [zipData, setZipData] = useState<Record<string, ZipData>>({});
   const [dataBounds, setDataBounds] = useState<{ min: number; max: number } | null>(null);
@@ -44,6 +45,7 @@ export function HousingDashboard() {
   const [isIndexReady, setIsIndexReady] = useState(false);
   const lastBoundsRef = useRef<[[number, number], [number, number]] | null>(null);
   const initialLoadRef = useRef(false);
+  const hasUserInteractedRef = useRef(false);
 
   const { processData, isLoading } = useDataWorker();
 
@@ -99,18 +101,21 @@ export function HousingDashboard() {
   const handleSearch = useCallback((zip: string, trigger: number) => {
     setSearchZip(zip);
     setSearchTrigger(trigger);
+    hasUserInteractedRef.current = true;
     setUrlState({ zip, metric: selectedMetric });
   }, [selectedMetric, setUrlState]);
 
   const handleZipSelect = useCallback((zip: ZipData) => {
     setSelectedZip(zip);
     setSidebarOpen(true);
+    hasUserInteractedRef.current = true;
     setUrlState({ zip: zip.zipCode, metric: selectedMetric });
   }, [selectedMetric, setUrlState]);
 
   // Update URL when metric changes
   const handleMetricChange = useCallback((metric: MetricType) => {
     setSelectedMetric(metric);
+    hasUserInteractedRef.current = true;
     setUrlState({ metric, zip: selectedZip?.zipCode });
   }, [selectedZip, setUrlState]);
 
@@ -122,17 +127,18 @@ export function HousingDashboard() {
 
   // Auto-load ZIP from URL on initial data load
   useEffect(() => {
-    if (!initialLoadRef.current && Object.keys(zipData).length > 0 && urlState.zip) {
+    const initialZip = initialUrlStateRef.current.zip;
+    if (!initialLoadRef.current && Object.keys(zipData).length > 0 && initialZip) {
       initialLoadRef.current = true;
-      const zipFromUrl = zipData[urlState.zip];
+      const zipFromUrl = zipData[initialZip];
       if (zipFromUrl) {
         setSelectedZip(zipFromUrl);
         setSidebarOpen(true);
-        setSearchZip(urlState.zip);
+        setSearchZip(initialZip);
         setSearchTrigger(prev => prev + 1);
       }
     }
-  }, [zipData, urlState.zip]);
+  }, [zipData]);
 
   const updateColors = useCallback((bounds: [[number, number], [number, number]] | null) => {
     if (!autoScaleRef.current) {
@@ -168,6 +174,7 @@ export function HousingDashboard() {
     }
     
     // Update URL with map position (debounced)
+    if (!hasUserInteractedRef.current) return;
     const center = {
       lng: (bounds[0][0] + bounds[1][0]) / 2,
       lat: (bounds[0][1] + bounds[1][1]) / 2,
@@ -176,6 +183,10 @@ export function HousingDashboard() {
     const zoom = Math.log2(360 / Math.abs(bounds[1][0] - bounds[0][0]));
     setUrlState({ lat: center.lat, lng: center.lng, zoom }, true);
   }, [updateColors, setUrlState]);
+
+  const handleUserInteraction = useCallback(() => {
+    hasUserInteractedRef.current = true;
+  }, []);
 
   useEffect(() => {
     if (autoScale && lastBoundsRef.current && isIndexReady) {
@@ -305,6 +316,9 @@ export function HousingDashboard() {
               processData={processData}
               customBuckets={customBuckets}
               onMapMove={handleMapMove}
+              onUserInteraction={handleUserInteraction}
+              initialCenter={initialUrlStateRef.current.lng !== undefined && initialUrlStateRef.current.lat !== undefined ? [initialUrlStateRef.current.lng, initialUrlStateRef.current.lat] : undefined}
+              initialZoom={initialUrlStateRef.current.zoom}
             />
           </div>
           {!isExportMode && !(isMobile && sidebarOpen) && (

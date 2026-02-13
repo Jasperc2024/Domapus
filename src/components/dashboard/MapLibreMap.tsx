@@ -20,6 +20,9 @@ interface MapProps {
   processData: (message: { type: string; data?: LoadDataRequest }) => Promise<DataProcessedResponse>;
   customBuckets: number[] | null;
   onMapMove: (bounds: [[number, number], [number, number]]) => void;
+  onUserInteraction?: () => void;
+  initialCenter?: [number, number];
+  initialZoom?: number;
 }
 
 const CHOROPLETH_COLORS = [
@@ -37,6 +40,9 @@ export function MapLibreMap({
   isLoading,
   customBuckets,
   onMapMove,
+  onUserInteraction,
+  initialCenter,
+  initialZoom,
 }: MapProps) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -54,6 +60,8 @@ export function MapLibreMap({
   const containerSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const batchIdRef = useRef(0);
+  const userInteractionNotifiedRef = useRef(false);
+  const initialViewRef = useRef({ center: initialCenter, zoom: initialZoom });
 
   const getDynamicPadding = (container: HTMLDivElement) => {
     const minDim = Math.min(container.clientWidth, container.clientHeight);
@@ -70,15 +78,19 @@ export function MapLibreMap({
   // 1. Initialize Map with PMTiles
   const createAndInitializeMap = useCallback((container: HTMLDivElement) => {
     addPMTilesProtocol();
-    const bounds: LngLatBoundsLike = [[-124.7844079, 24.7433195], [-66.9513812, 49.3457868]];
+    const defaultBounds: LngLatBoundsLike = [[-124.7844079, 24.7433195], [-66.9513812, 49.3457868]];
     const dynamicPadding = getDynamicPadding(container);
+    const iv = initialViewRef.current;
+    const hasInitialView = iv.center && iv.zoom !== undefined;
+
     const map = new maplibregl.Map({
       container,
       style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
       minZoom: 3,
       maxZoom: 12,
-      bounds: bounds,
-      fitBoundsOptions: { padding: dynamicPadding },
+      ...(hasInitialView
+        ? { center: iv.center, zoom: iv.zoom }
+        : { bounds: defaultBounds, fitBoundsOptions: { padding: dynamicPadding } }),
       attributionControl: false,
     });
 
@@ -96,11 +108,11 @@ export function MapLibreMap({
     map.once("load", () => {
       console.log("[Map] Map initialized");
       setIsMapReady(true);
-      onMapMove(map.getBounds().toArray() as [[number, number], [number, number]]);
+      onMapMoveRef.current(map.getBounds().toArray() as [[number, number], [number, number]]);
     });
 
     return map;
-  }, [onMapMove]);
+  }, []);
 
   // 2. Setup Map Instance
   useEffect(() => {
@@ -193,6 +205,10 @@ export function MapLibreMap({
   useEffect(() => {
     onMapMoveRef.current = onMapMove;
   }, [onMapMove]);
+  const onUserInteractionRef = useRef(onUserInteraction);
+  useEffect(() => {
+    onUserInteractionRef.current = onUserInteraction;
+  }, [onUserInteraction]);
 
   // 3. Setup Interactions
   const setupMapInteractions = useCallback(() => {
@@ -201,7 +217,14 @@ export function MapLibreMap({
 
     const layerId = "zips-fill";
 
+    const notifyUserInteraction = () => {
+      if (userInteractionNotifiedRef.current) return;
+      userInteractionNotifiedRef.current = true;
+      onUserInteractionRef.current?.();
+    };
+
     const mousemoveHandler = (e: MapMouseEvent) => {
+      notifyUserInteraction();
       lastMouseEventRef.current = e;
       if (mousemoveRafRef.current) return;
       mousemoveRafRef.current = requestAnimationFrame(() => {
@@ -248,6 +271,7 @@ export function MapLibreMap({
     };
 
     const clickHandler = (e: MapMouseEvent) => {
+      notifyUserInteraction();
       const features = map.queryRenderedFeatures(e.point, { layers: [layerId] });
 
       if (!features.length) return;
@@ -451,34 +475,26 @@ export function MapLibreMap({
 
     if (shouldUpdateStates) {
       const entries = Object.entries(zipData);
-      let batchIndex = 0;
-      const BATCH_SIZE = 2000;
 
-      const processBatch = () => {
+      const applyAllFeatureStates = () => {
         if (currentBatchId !== batchIdRef.current) return;
-        const endIndex = Math.min(batchIndex + BATCH_SIZE, entries.length);
+        if (!map.isStyleLoaded() || !map.getSource("zips") || !map.getLayer("zips-fill")) {
+          requestAnimationFrame(applyAllFeatureStates);
+          return;
+        }
 
-        while (batchIndex < endIndex) {
-          const [zipCode, data] = entries[batchIndex];
+        for (let i = 0; i < entries.length; i++) {
+          const [zipCode, data] = entries[i];
           const metricValue = getMetricValue(data, selectedMetric);
-
-          if (mapRef.current && mapRef.current.getStyle() && currentBatchId === batchIdRef.current) {
-            map.setFeatureState(
-              { source: "zips", sourceLayer: "us_zip_codes", id: zipCode },
-              { metricValue }
-            );
-          }
-          batchIndex++;
+          map.setFeatureState(
+            { source: "zips", sourceLayer: "us_zip_codes", id: zipCode },
+            { metricValue }
+          );
         }
-
-        if (batchIndex < entries.length && currentBatchId === batchIdRef.current) {
-          requestAnimationFrame(processBatch);
-        } else {
-          console.log(`[Map] Finished updating colors for ${entries.length} ZIPs`);
-        }
+        console.log(`[Map] Finished updating colors for ${entries.length} ZIPs`);
       };
 
-      requestAnimationFrame(processBatch);
+      applyAllFeatureStates();
     }
 
   }, [isMapReady, pmtilesLoaded, zipData, selectedMetric, hasData, customBuckets]);
@@ -489,6 +505,7 @@ export function MapLibreMap({
     if (!searchZip || !zipData[searchZip]) return;
 
     const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !map.getSource("zips") || !map.getLayer("zips-border")) return;
     const { longitude, latitude } = zipData[searchZip];
 
     // Clear previous highlight

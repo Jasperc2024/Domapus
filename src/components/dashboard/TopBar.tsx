@@ -63,7 +63,7 @@ export function TopBar({
         <div className="flex items-center gap-4 sm:gap-6 flex-shrink-0">
           <div
             className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-            onClick={() => window.location.reload()}
+            onClick={() => window.location.assign(BASE_PATH)}
             title="Click to reload page"
           >
             <img

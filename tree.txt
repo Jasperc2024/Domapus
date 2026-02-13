@@ -15,15 +15,27 @@ Domapus
 │  ├─ apple-touch-icon.png
 │  ├─ Banner.svg
 │  ├─ data
+│  │  ├─ archive
+│  │  │  ├─ zip-data-2025-11-30.json.gz
+│  │  │  ...
 │  │  ├─ last_updated.json
+│  │  ├─ redfin_temp.tsv.gz
 │  │  ├─ us_zip_codes.pmtiles
 │  │  ├─ zcta-meta.csv
 │  │  └─ zip-data.json
 │  ├─ favicon-16x16.png
 │  ├─ favicon-32x32.png
 │  ├─ favicon.ico
+│  ├─ Logo.png
 │  ├─ Logo.svg
+│  ├─ preview.png
+│  ├─ readme
+│  │  ├─ compare.png
+│  │  ├─ dashboard.png
+│  │  ├─ detail.png
+│  │  └─ export.png
 │  ├─ robots.txt
+│  ├─ show.png
 │  ├─ site.webmanifest
 │  └─ sitemap.xml
 ├─ README.md
@@ -41,25 +53,29 @@ Domapus
 │  │  │  ├─ Legend.tsx
 │  │  │  ├─ map
 │  │  │  │  ├─ types.ts
-│  │  │  │  └─ utils.ts
+│  │  │  │  ├─ utils.ts
+│  │  │  │  └─ __tests__
+│  │  │  │     └─ utils.test.ts
 │  │  │  ├─ MapLibreMap.tsx
 │  │  │  ├─ MetricSelector.tsx
 │  │  │  ├─ SearchBox.tsx
 │  │  │  ├─ Sidebar.tsx
 │  │  │  ├─ SponsorBanner.tsx
 │  │  │  ├─ TopBar.tsx
-│  │  │  └─ ZipComparison.tsx
+│  │  │  ├─ ZipComparison.tsx
+│  │  │  └─ __tests__
+│  │  │     └─ MetricSelector.test.tsx
 │  │  ├─ ErrorBoundary.tsx
 │  │  ├─ MapExport.tsx
 │  │  └─ ui
 │  │     ├─ accordion.tsx
-│  │     ├─ alert-dialog.tsx
 │  │     ...
 │  │     └─ use-toast.ts
 │  ├─ hooks
 │  │  ├─ use-mobile.tsx
 │  │  ├─ use-toast.ts
-│  │  └─ useDataWorker.ts
+│  │  ├─ useDataWorker.ts
+│  │  └─ useUrlState.ts
 │  ├─ index.css
 │  ├─ lib
 │  │  ├─ analytics.ts
@@ -70,6 +86,8 @@ Domapus
 │  ├─ pages
 │  │  ├─ Index.tsx
 │  │  └─ NotFound.tsx
+│  ├─ test
+│  │  └─ setup.ts
 │  ├─ vite-env.d.ts
 │  └─ workers
 │     ├─ data-processor.ts
@@ -79,6 +97,7 @@ Domapus
 ├─ tsconfig.app.json
 ├─ tsconfig.json
 ├─ tsconfig.node.json
-└─ vite.config.ts
+├─ vite.config.ts
+└─ vitest.config.ts
 
 ```
