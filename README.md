@@ -110,13 +110,13 @@ See [tree.txt](tree.txt)
 | **Median Price per Sq Ft** | Yes |
 | **Median Days on Market** | Yes |
 | **Sale-to-List Ratio** | Yes |
-| **Median List Price** | No |
-| **Homes Sold** | No |
-| **Pending Sales** | No |
-| **New Listings** | No |
-| **Inventory** | No |
-| **% Sold Above List** | No |
-| **% Off Market in 2 Weeks** | No |
+| **Median List Price** | Yes |
+| **Homes Sold** | Yes |
+| **Pending Sales** | Yes |
+| **New Listings** | Yes |
+| **Inventory** | Yes |
+| **% Sold Above List** | Yes |
+| **% Off Market in 2 Weeks** | Yes |
 
 ---
 
