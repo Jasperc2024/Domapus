@@ -226,6 +226,7 @@ def main():
         zip_data_path = DATA_DIR / "zip-data.json"
         zip_codes_changed = 0
         data_points_changed = 0
+        old_timestamp = None
 
         if output_data:
             random_zip = random.choice(list(output_data.keys()))
@@ -234,7 +235,25 @@ def main():
         if zip_data_path.exists():
             try:
                 with open(zip_data_path, 'r') as f:
-                    old_data = json.load(f).get('zip_codes', {})
+                    old_payload = json.load(f)
+                    
+                # Preserve the old timestamp
+                old_timestamp = old_payload.get('last_updated_utc')
+                    
+                # Handle both old keyed format and new columnar format
+                if 'zip_codes' in old_payload:
+                    # Old keyed format
+                    old_data = old_payload['zip_codes']
+                elif 'f' in old_payload and 'z' in old_payload and 'd' in old_payload:
+                    # New columnar format - reconstruct for comparison
+                    fields = old_payload['f']
+                    zip_codes = old_payload['z']
+                    rows = old_payload['d']
+                    old_data = {}
+                    for i, z in enumerate(zip_codes):
+                        old_data[z] = {fields[j]: rows[i][j] for j in range(len(fields))}
+                else:
+                    old_data = {}
                     
                 new_zips = set(output_data.keys())
                 old_zips = set(old_data.keys())
@@ -254,8 +273,28 @@ def main():
             except Exception as e:
                 logging.warning(f"Comparison failed: {e}")
 
+        # Convert to columnar format
+        zip_list = []
+        data_rows = []
+        
+        for zip_code in sorted(output_data.keys()):
+            zip_list.append(zip_code)
+            row = [output_data[zip_code].get(field) for field in key_order]
+            data_rows.append(row)
+        
+        # Use current timestamp if this is a new file or if data changed
+        current_timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp_to_use = current_timestamp if (old_timestamp is None or zip_codes_changed > 0 or data_points_changed > 0) else old_timestamp
+        
+        columnar_output = {
+            "last_updated_utc": timestamp_to_use,
+            "f": key_order,
+            "z": zip_list,
+            "d": data_rows
+        }
+        
         with open(zip_data_path, 'w', encoding='utf-8') as f:
-            json.dump({"zip_codes": output_data}, f, separators=(",", ":"))
+            json.dump(columnar_output, f, separators=(",", ":"))
 
         with open(DATA_DIR / "last_updated.json", 'w') as f:
             json.dump({

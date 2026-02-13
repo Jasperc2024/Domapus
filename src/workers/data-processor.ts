@@ -96,7 +96,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           throw new Error("Received incomplete data. Please check your connection and try again.");
         }
 
-        let fullPayload: { last_updated_utc?: string; zip_codes: Record<string, RawZipData> };
+        let fullPayload: unknown;
 
         try {
           const jsonText = new TextDecoder().decode(buffer);
@@ -122,37 +122,86 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           throw new Error(detailedError);
         }
 
-        const { last_updated_utc, zip_codes: rawZipData } = fullPayload;
-        if (!rawZipData) throw new Error("Missing zip_codes data");
-        self.postMessage({ type: "PROGRESS", data: { phase: "Indexing ZIP codes..." } });
-
+        const last_updated_utc = (fullPayload as { last_updated_utc?: string }).last_updated_utc;
         const zipData: Record<string, ZipData> = {};
         const metricValues: number[] = [];
-        const entries = Object.entries(rawZipData);
-
         const BATCH_SIZE = 5000;
 
-        for (let i = 0; i < entries.length; i++) {
-          if (signal.aborted) return;
-          const [zipCode, raw] = entries[i];
+        // Detect format: columnar (new) or keyed (old)
+        if (typeof fullPayload === 'object' && fullPayload !== null && 
+            'f' in fullPayload && 'z' in fullPayload && 'd' in fullPayload) {
+          // New columnar format
+          const { f: fields, z: zipCodes, d: rows } = fullPayload as {
+            last_updated_utc?: string;
+            f: string[];
+            z: string[];
+            d: (string | number | null)[][];
+          };
 
-          const data = raw as unknown as ZipData;
-          const r = raw as any;
-          if (data.latitude === undefined) data.latitude = r.lat ?? null;
-          if (data.longitude === undefined) data.longitude = r.lng ?? null;
+          self.postMessage({ type: "PROGRESS", data: { phase: "Reconstructing ZIP data..." } });
 
-          data.zipCode = zipCode;
-          zipData[zipCode] = data;
+          for (let i = 0; i < zipCodes.length; i++) {
+            if (signal.aborted) return;
 
-          const metric = getMetricValue(data, selectedMetric);
-          if (metric > 0) metricValues.push(metric);
+            const zipCode = zipCodes[i];
+            const row = rows[i];
+            const entry: Record<string, unknown> = { zipCode };
 
-          if (i % BATCH_SIZE === 0) {
-            self.postMessage({
-              type: "PROGRESS",
-              data: { phase: "Indexing ZIP codes...", processed: i, total: entries.length },
-            });
+            for (let j = 0; j < fields.length; j++) {
+              entry[fields[j]] = row[j];
+            }
+
+            // Handle lat/lng aliases
+            const data = entry as unknown as ZipData;
+            const entryWithCoords = entry as { lat?: number | null; lng?: number | null };
+            if (data.latitude === undefined) data.latitude = entryWithCoords.lat ?? null;
+            if (data.longitude === undefined) data.longitude = entryWithCoords.lng ?? null;
+
+            zipData[zipCode] = data;
+
+            const metric = getMetricValue(data, selectedMetric);
+            if (metric > 0) metricValues.push(metric);
+
+            if (i % BATCH_SIZE === 0) {
+              self.postMessage({
+                type: "PROGRESS",
+                data: { phase: "Reconstructing ZIP data...", processed: i, total: zipCodes.length },
+              });
+            }
           }
+        } else if (typeof fullPayload === 'object' && fullPayload !== null && 'zip_codes' in fullPayload) {
+          // Old keyed format (backward compatibility)
+          const rawZipData = fullPayload.zip_codes as Record<string, RawZipData>;
+          if (!rawZipData) throw new Error("Missing zip_codes data");
+          
+          self.postMessage({ type: "PROGRESS", data: { phase: "Indexing ZIP codes..." } });
+
+          const entries = Object.entries(rawZipData);
+
+          for (let i = 0; i < entries.length; i++) {
+            if (signal.aborted) return;
+            const [zipCode, raw] = entries[i];
+
+            const data = raw as unknown as ZipData;
+            const r = raw as RawZipData;
+            if (data.latitude === undefined) data.latitude = r.lat ?? null;
+            if (data.longitude === undefined) data.longitude = r.lng ?? null;
+
+            data.zipCode = zipCode;
+            zipData[zipCode] = data;
+
+            const metric = getMetricValue(data, selectedMetric);
+            if (metric > 0) metricValues.push(metric);
+
+            if (i % BATCH_SIZE === 0) {
+              self.postMessage({
+                type: "PROGRESS",
+                data: { phase: "Indexing ZIP codes...", processed: i, total: entries.length },
+              });
+            }
+          }
+        } else {
+          throw new Error("Invalid data format: expected either columnar format (f, z, d) or keyed format (zip_codes)");
         }
 
         function computeQuantileBounds(values: number[]) {
