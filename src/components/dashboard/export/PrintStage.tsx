@@ -162,21 +162,43 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     return { min: formatLegendValue(min, selectedMetric), mid: formatLegendValue(mid, selectedMetric), max: formatLegendValue(max, selectedMetric) };
   }, [metricValues, selectedMetric]);
 
+  // Use refs to avoid dependency-triggered double renders
+  const bucketsRef = useRef(buckets);
+  bucketsRef.current = buckets;
+  const zipDataMapRef = useRef(zipDataMap);
+  zipDataMapRef.current = zipDataMap;
+  const filteredDataRef = useRef(filteredData);
+  filteredDataRef.current = filteredData;
+  const selectedMetricRef = useRef(selectedMetric);
+  selectedMetricRef.current = selectedMetric;
+
   useImperativeHandle(ref, () => ({ getElement: () => containerRef.current }));
+
+  // Stable key to detect when we actually need to re-create maps
+  const mapCreationKey = useMemo(() => {
+    return `${regionScope}|${regionName}|${selectedMetric}|${filteredData.length}|${showCities}`;
+  }, [regionScope, regionName, selectedMetric, filteredData.length, showCities]);
 
   useEffect(() => {
     addPMTilesProtocol();
     setMapsLoaded(false);
 
     Object.keys(mapsRef.current).forEach(key => { mapsRef.current[key]?.remove(); mapsRef.current[key] = null; });
-    if (filteredData.length === 0) { onReady?.(); return; }
+    if (filteredDataRef.current.length === 0) { onReady?.(); return; }
+
+    const currentBuckets = bucketsRef.current;
+    const currentZipDataMap = zipDataMapRef.current;
+    const currentFilteredData = filteredDataRef.current;
+    const currentMetric = selectedMetricRef.current;
 
     const pmtilesUrl = new URL(`${BASE_PATH}data/us_zip_codes.pmtiles`, window.location.origin).href;
-    const stepExpression: ExpressionSpecification = ["step", ["coalesce", ["feature-state", "metricValue"], 0], "#efefef", 0.000001, CHOROPLETH_COLORS[0], ...buckets.flatMap((threshold, i) => [threshold, CHOROPLETH_COLORS[Math.min(i + 1, CHOROPLETH_COLORS.length - 1)]])] as ExpressionSpecification;
+    const stepExpression: ExpressionSpecification = ["step", ["coalesce", ["feature-state", "metricValue"], 0], "#efefef", 0.000001, CHOROPLETH_COLORS[0], ...currentBuckets.flatMap((threshold, i) => [threshold, CHOROPLETH_COLORS[Math.min(i + 1, CHOROPLETH_COLORS.length - 1)]])] as ExpressionSpecification;
     let loadedCount = 0;
     const requiredMaps = regionScope === 'national' ? 1 + (alaskaZips.size > 0 ? 1 : 0) + (hawaiiZips.size > 0 ? 1 : 0) : 1;
     let isReadyTriggered = false;
+    let isCleanedUp = false;
     const markReady = () => {
+      if (isCleanedUp) return;
       if (loadedCount >= requiredMaps && !isReadyTriggered) {
         isReadyTriggered = true;
         setMapsLoaded(true);
@@ -185,7 +207,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     };
 
     const createMap = (container: HTMLDivElement | null, key: string, bounds?: [[number, number], [number, number]], validZips?: Set<string>) => {
-      if (!container) return;
+      if (!container || isCleanedUp) return;
 
       const map = new maplibregl.Map({
         container,
@@ -247,15 +269,43 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
             paint: { "line-color": "rgba(0,0,0,0.1)", "line-width": 0.5 }
           }, firstCityLayerId);
 
-          (validZips || new Set(filteredData.map(z => z.zipCode))).forEach(zipCode => {
-            const data = zipDataMap[zipCode];
-            if (data) map.setFeatureState({ source: "zips", sourceLayer: "us_zip_codes", id: zipCode }, { metricValue: getMetricValue(data, selectedMetric) });
-          });
+          // Apply feature states. Defer to sourcedata event to ensure tiles are loaded,
+          // which fixes the Alaska/Hawaii insets where tiles load slower.
+          const zipsToColor = validZips || new Set(currentFilteredData.map(z => z.zipCode));
+          let featureStatesApplied = false;
 
-          map.triggerRepaint();
+          const applyFeatureStates = () => {
+            if (featureStatesApplied || isCleanedUp) return;
+            featureStatesApplied = true;
+            zipsToColor.forEach(zipCode => {
+              const data = currentZipDataMap[zipCode];
+              if (data) map.setFeatureState({ source: "zips", sourceLayer: "us_zip_codes", id: zipCode }, { metricValue: getMetricValue(data, currentMetric) });
+            });
+            map.triggerRepaint();
+          };
+
+          // Listen for when source tiles actually arrive
+          const onSourceData = (e: maplibregl.MapSourceDataEvent) => {
+            if (e.sourceId === 'zips' && e.isSourceLoaded && !featureStatesApplied) {
+              map.off('sourcedata', onSourceData);
+              applyFeatureStates();
+            }
+          };
+          map.on('sourcedata', onSourceData);
+
+          // Also try immediately in case tiles are already cached
+          if (map.isSourceLoaded('zips')) {
+            map.off('sourcedata', onSourceData);
+            applyFeatureStates();
+          }
 
           const checkInterval = setInterval(() => {
-            if (map.loaded() && map.isStyleLoaded()) {
+            // Ensure feature states are applied even if sourcedata was missed
+            if (!featureStatesApplied && map.isSourceLoaded('zips')) {
+              map.off('sourcedata', onSourceData);
+              applyFeatureStates();
+            }
+            if (map.loaded() && map.isStyleLoaded() && featureStatesApplied) {
               clearInterval(checkInterval);
               loadedCount++;
               markReady();
@@ -265,10 +315,14 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
           setTimeout(() => {
             if (!isReadyTriggered) {
               clearInterval(checkInterval);
+              if (!featureStatesApplied) {
+                map.off('sourcedata', onSourceData);
+                applyFeatureStates();
+              }
               loadedCount++;
               markReady();
             }
-          }, 5000);
+          }, 8000);
 
         } catch (error: unknown) {
           const errMsg = error instanceof Error ? error.message : "Unknown export map error";
@@ -291,13 +345,15 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     }
 
     return () => {
+      isCleanedUp = true;
       const currentMaps = mapsRef.current;
       Object.keys(currentMaps).forEach(key => {
         currentMaps[key]?.remove();
         currentMaps[key] = null;
       });
     };
-  }, [regionScope, regionName, selectedMetric, filteredData, alaskaZips, hawaiiZips, mainlandZips, alaskaBounds, hawaiiBounds, mainlandBounds, showCities, zipDataMap, buckets, onReady]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapCreationKey, alaskaZips, hawaiiZips, mainlandZips, alaskaBounds, hawaiiBounds, mainlandBounds, onReady]);
 
   return (
     <div

@@ -47,7 +47,7 @@ export function Sidebar({ isOpen, zipData, allZipData, onClose }: SidebarProps) 
   return (
     <div className={`bg-dashboard-panel border-r border-dashboard-border shadow-lg flex flex-col h-full ${isMobile ? "w-full rounded-none" : "w-96 rounded-none"}`}>
       {/* Static Top Banner */}
-      <div className="flex-none px-4 py-4 border-b border-dashboard-border bg-dashboard-panel flex items-center justify-between z-10 shadow-sm">
+      <div className="flex-none px-4 pb-4 border-b border-dashboard-border bg-dashboard-panel flex items-center justify-between z-10 shadow-sm">
         <div className="flex items-center gap-2">
           <MapPin className="h-5 w-5 text-primary" />
           <h2 

@@ -3,7 +3,6 @@ import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ZipData } from "./dashboard/map/types";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { toast } from "@/hooks/use-toast";
 
 const ExportSidebar = lazy(() => import("./dashboard/export/ExportSidebar").then(m => ({ default: m.ExportSidebar })));
 
@@ -26,18 +25,10 @@ export function MapExport({ allZipData, selectedMetric, onExportModeChange }: Ma
   };
 
   const handleExportClick = () => {
-    if (isMobile) {
-      toast({
-        title: "Desktop Only",
-        description: "Sorry, the Export feature is only available on desktop.",
-        variant: "destructive",
-      });
-      return;
-    }
     setIsExportMode(true);
   };
 
-  if (isExportMode && !isMobile) {
+  if (isExportMode) {
     return (
       <Suspense fallback={
         <div className="absolute right-0 top-0 h-full w-80 bg-dashboard-panel border-l border-dashboard-border flex items-center justify-center">

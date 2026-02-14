@@ -6,6 +6,7 @@ import { ZipData } from "./map/types";
 import { addPMTilesProtocol } from "@/lib/pmtiles-protocol";
 import { trackError } from "@/lib/analytics";
 import { LoadDataRequest, DataProcessedResponse } from "@/workers/worker-types";
+import { Fullscreen } from "lucide-react";
 
 const BASE_PATH = import.meta.env.BASE_URL;
 
@@ -81,17 +82,12 @@ export function MapLibreMap({
     const defaultBounds: LngLatBoundsLike = [[-124.7844079, 24.7433195], [-66.9513812, 49.3457868]];
     const dynamicPadding = getDynamicPadding(container);
 
-    // Read URL params directly to guarantee we have them at map creation time
     const params = new URLSearchParams(window.location.search);
     const urlLat = params.get('lat') ? parseFloat(params.get('lat')!) : undefined;
     const urlLng = params.get('lng') ? parseFloat(params.get('lng')!) : undefined;
     const urlZoom = params.get('zoom') ? parseFloat(params.get('zoom')!) : undefined;
     const hasInitialView = urlLat !== undefined && urlLng !== undefined && urlZoom !== undefined
       && isFinite(urlLat) && isFinite(urlLng) && isFinite(urlZoom);
-
-    if (hasInitialView) {
-      console.log(`[Map] Using URL position: center=[${urlLng}, ${urlLat}], zoom=${urlZoom}`);
-    }
 
     const map = new maplibregl.Map({
       container,
@@ -110,6 +106,13 @@ export function MapLibreMap({
     map.on("error", (e) => {
       const mapError = e as { error?: { message?: string } };
       const errMsg = mapError?.error?.message ?? "Map internal error";
+      // Tile decoding errors are non-fatal and happen sporadically with PMTiles.
+      // Don't surface them as fatal errors to the user.
+      const isDecodingError = errMsg.toLowerCase().includes('decoding') || errMsg.toLowerCase().includes('decode');
+      if (isDecodingError) {
+        console.warn("[Map] Non-fatal tile decoding error (suppressed):", errMsg);
+        return;
+      }
       console.error("[Map] Internal error:", mapError?.error ?? e);
       trackError("map_internal_error", errMsg);
       setError("Map internal error. Try refreshing.");
@@ -547,6 +550,24 @@ export function MapLibreMap({
   }, [isMapReady, pmtilesLoaded, searchZip, searchTrigger, zipData]);
 
 
+  const handleResetBounds = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const defaultBounds: LngLatBoundsLike = [[-124.7844079, 24.7433195], [-66.9513812, 49.3457868]];
+    const container = mapContainer.current;
+    const padding = container ? getDynamicPadding(container) : 40;
+    map.fitBounds(defaultBounds, { padding, duration: 1000 });
+
+    // Clear any highlighted zip
+    if (highlightedZipRef.current) {
+      map.setFeatureState(
+        { source: "zips", sourceLayer: "us_zip_codes", id: highlightedZipRef.current },
+        { highlighted: false }
+      );
+      highlightedZipRef.current = null;
+    }
+  }, []);
+
   return (
     <div className="absolute inset-0 w-full h-full min-h-[400px]">
       <div 
@@ -560,6 +581,35 @@ export function MapLibreMap({
           Interactive map showing ZIP-code level housing data. Use the search box to find specific ZIP codes.
         </span>
       </div>
+      {/* Reset to default bounds button - matches maplibregl-ctrl-group exactly */}
+      {isMapReady && !error && (
+        <button
+          onClick={handleResetBounds}
+          style={{
+            position: 'absolute',
+            top: 10 + 89 + 2 + 'px', // 10px margin + nav height (29*3+2 borders) + 2px gap
+            right: '10px',
+            zIndex: 2,
+            width: '29px',
+            height: '29px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            boxShadow: '0 0 0 2px rgba(0,0,0,0.1)',
+            cursor: 'pointer',
+            padding: 0,
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+          aria-label="Reset map to default view"
+          title="Reset to default view"
+        >
+          <Fullscreen style={{ width: '18px', height: '18px', color: '#333' }} />
+        </button>
+      )}
       {(isLoading || !isMapReady || error) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-10">
           {error ? <div className="text-red-500 font-bold">{error}</div> : <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />}

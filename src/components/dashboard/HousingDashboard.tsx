@@ -11,8 +11,8 @@ import { Legend } from "./Legend";
 import { SponsorBanner } from "./SponsorBanner";
 import { Sidebar } from "./Sidebar";
 import { MetricType } from "./MetricSelector";
-import { Drawer } from "vaul";
 import { useUrlState } from "@/hooks/useUrlState";
+import { MobileBottomSheet } from "./MobileBottomSheet";
 
 
 interface DataPayload {
@@ -22,8 +22,6 @@ interface DataPayload {
 }
 
 const BASE_PATH = import.meta.env.BASE_URL;
-
-// Read URL params directly from window.location so they're available before React Router initializes
 function getInitialUrlParams() {
   const params = new URLSearchParams(window.location.search);
   return {
@@ -284,7 +282,7 @@ export function HousingDashboard() {
         selectedMetric={selectedMetric}
         onMetricChange={handleMetricChange}
         onSearch={handleSearch}
-        hideMobileControls={isMobile && sidebarOpen}
+        hideMobileControls={isMobile && (sidebarOpen || isExportMode)}
       >
         <MapExport
           allZipData={zipData}
@@ -293,26 +291,19 @@ export function HousingDashboard() {
         />
       </TopBar>
       <div className="flex flex-1 relative min-h-[400px] overflow-hidden">
-        {/* Mobile Bottom Sheet Drawer */}
+        {/* Mobile Bottom Sheet */}
         {isMobile && (
-          <Drawer.Root open={sidebarOpen} onOpenChange={setSidebarOpen}>
-            <Drawer.Portal>
-              <Drawer.Overlay className="fixed inset-0 bg-black/40 z-40" />
-              <Drawer.Content className="bg-dashboard-panel flex flex-col rounded-t-[10px] h-[60vh] mt-24 fixed bottom-0 left-0 right-0 z-50">
-                <div className="p-4 bg-dashboard-panel rounded-t-[10px] flex-1 overflow-hidden flex flex-col">
-                  <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mb-4" />
-                  <div className="flex-1 overflow-hidden">
-                    <Sidebar
-                      isOpen={sidebarOpen}
-                      zipData={selectedZip}
-                      allZipData={zipData}
-                      onClose={() => setSidebarOpen(false)}
-                    />
-                  </div>
-                </div>
-              </Drawer.Content>
-            </Drawer.Portal>
-          </Drawer.Root>
+          <MobileBottomSheet
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+          >
+            <Sidebar
+              isOpen={sidebarOpen}
+              zipData={selectedZip}
+              allZipData={zipData}
+              onClose={() => setSidebarOpen(false)}
+            />
+          </MobileBottomSheet>
         )}
         
         {/* Desktop Sidebar */}
