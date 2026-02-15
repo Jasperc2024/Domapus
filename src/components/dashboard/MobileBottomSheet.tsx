@@ -82,35 +82,35 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
     return closest;
   }, []);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    const touch = e.touches[0];
+  const handlePointerStart = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
     const now = Date.now();
+    e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = {
       isDragging: true,
-      startY: touch.clientY,
+      startY: e.clientY,
       startHeight: sheetHeight,
       currentHeight: sheetHeight,
       startTime: now,
-      lastY: touch.clientY,
+      lastY: e.clientY,
       lastTime: now,
       hasMoved: false,
     };
     setIsDragging(true);
   }, [sheetHeight]);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current.isDragging) return;
 
-    const touch = e.touches[0];
-    const deltaY = dragRef.current.startY - touch.clientY;
+    const deltaY = dragRef.current.startY - e.clientY;
     const deltaVh = (deltaY / window.innerHeight) * 100;
     const now = Date.now();
 
-    if (Math.abs(touch.clientY - dragRef.current.startY) > DRAG_THRESHOLD) {
+    if (Math.abs(e.clientY - dragRef.current.startY) > DRAG_THRESHOLD) {
       dragRef.current.hasMoved = true;
     }
 
-    dragRef.current.lastY = touch.clientY;
+    dragRef.current.lastY = e.clientY;
     dragRef.current.lastTime = now;
 
     const newHeight = Math.max(0, Math.min(SNAP_FULL + 5, dragRef.current.startHeight + deltaVh));
@@ -118,8 +118,14 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
     setSheetHeight(newHeight);
   }, []);
 
-  const handleTouchEnd = useCallback(() => {
+  const handlePointerEnd = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current.isDragging) return;
+
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // No-op if capture was not set.
+    }
 
     const now = Date.now();
     const dt = now - dragRef.current.lastTime || 1;
@@ -166,17 +172,22 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
           height: `${sheetHeight}vh`,
           transition: isDragging ? 'none' : 'height 300ms cubic-bezier(0.32, 0.72, 0, 1)',
           willChange: 'height',
-          maxHeight: '95vh',
+          maxHeight: '100vh',
+          paddingTop: 'env(safe-area-inset-top)',
         }}
       >
         {/* Drag handle area */}
-        <div
-          className="flex-shrink-0 pt-2 pb-1 cursor-grab active:cursor-grabbing touch-none select-none"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div className="mx-auto w-10 h-1 rounded-full bg-gray-300" />
+        <div className="relative flex-shrink-0">
+          <div
+            className="absolute inset-x-0 -top-3 -bottom-3 cursor-grab active:cursor-grabbing touch-none select-none"
+            onPointerDown={handlePointerStart}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerEnd}
+            onPointerCancel={handlePointerEnd}
+          />
+          <div className="pt-2 pb-1">
+            <div className="mx-auto w-10 h-1 rounded-full bg-gray-300" />
+          </div>
         </div>
 
         {/* Content */}

@@ -69,6 +69,25 @@ export function MapLibreMap({
     return Math.min(minDim * 0.12, 100);
   };
 
+  const applyLabelContrast = useCallback((map: maplibregl.Map) => {
+    const style = map.getStyle();
+    if (!style?.layers) return;
+
+    style.layers.forEach((layer) => {
+      if (layer.type !== "symbol") return;
+      const layout = (layer.layout ?? {}) as Record<string, unknown>;
+      if (!layout["text-field"]) return;
+
+      try {
+        map.setPaintProperty(layer.id, "text-halo-color", "rgba(255,255,255,0.95)");
+        map.setPaintProperty(layer.id, "text-halo-width", 1.25);
+        map.setPaintProperty(layer.id, "text-halo-blur", 0.2);
+      } catch (err) {
+        console.warn(`[Map] Could not update label contrast for ${layer.id}`, err);
+      }
+    });
+  }, []);
+
   // Refs for current data to avoid stale closures
   const propsRef = useRef({ zipData, selectedMetric, onZipSelect });
   useEffect(() => {
@@ -106,8 +125,6 @@ export function MapLibreMap({
     map.on("error", (e) => {
       const mapError = e as { error?: { message?: string } };
       const errMsg = mapError?.error?.message ?? "Map internal error";
-      // Tile decoding errors are non-fatal and happen sporadically with PMTiles.
-      // Don't surface them as fatal errors to the user.
       const isDecodingError = errMsg.toLowerCase().includes('decoding') || errMsg.toLowerCase().includes('decode');
       if (isDecodingError) {
         console.warn("[Map] Non-fatal tile decoding error (suppressed):", errMsg);
@@ -120,6 +137,7 @@ export function MapLibreMap({
 
     map.once("load", () => {
       console.log("[Map] Map initialized");
+      applyLabelContrast(map);
       setIsMapReady(true);
       const center = map.getCenter();
       onMapMoveRef.current(
@@ -129,7 +147,7 @@ export function MapLibreMap({
     });
 
     return map;
-  }, []);
+  }, [applyLabelContrast]);
 
   // 2. Setup Map Instance
   useEffect(() => {
@@ -581,13 +599,16 @@ export function MapLibreMap({
           Interactive map showing ZIP-code level housing data. Use the search box to find specific ZIP codes.
         </span>
       </div>
-      {/* Reset to default bounds button - matches maplibregl-ctrl-group exactly */}
+      {/* Reset to default bounds button */}
       {isMapReady && !error && (
         <button
-          onClick={handleResetBounds}
+          onClick={() => {
+            handleResetBounds();
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }}
           style={{
             position: 'absolute',
-            top: 10 + 89 + 2 + 'px', // 10px margin + nav height (29*3+2 borders) + 2px gap
+            top: 10 + 89 + 2 + 'px',
             right: '10px',
             zIndex: 2,
             width: '29px',
