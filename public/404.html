@@ -4,17 +4,74 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex,follow" />
-  <title>Page Not Found | Domapus</title>
+  <title>Redirecting... | Domapus</title>
   <link rel="canonical" href="https://jasperc2024.github.io/Domapus/" />
+  
+  <!-- SPA redirect script for GitHub Pages -->
+  <script>
+    // Store the current path to redirect properly
+    sessionStorage.setItem('redirectPath', window.location.pathname + window.location.search + window.location.hash);
+    
+    // Redirect to the base URL
+    window.location.replace('/Domapus/');
+  </script>
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background-color: #f3f4f6;
+    }
+    .container {
+      text-align: center;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: #1f2937;
+    }
+    p {
+      color: #6b7280;
+      margin-bottom: 1.5rem;
+    }
+    a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .spinner {
+      border: 3px solid #e5e7eb;
+      border-top: 3px solid #3b82f6;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
-  <main>
-    <h1>404 - Page Not Found</h1>
-    <p>The page you requested does not exist.</p>
-    <p>
-      Return to the home page:
-      <a href="https://jasperc2024.github.io/Domapus/">Domapus</a>
-    </p>
-  </main>
+  <div class="container">
+    <h1>Redirecting...</h1>
+    <div class="spinner"></div>
+    <p>If you are not redirected automatically, please <a href="/Domapus/">click here</a>.</p>
+  </div>
+  
+  <!-- Fallback for users with JavaScript disabled -->
+  <noscript>
+    <meta http-equiv="refresh" content="0; url=/Domapus/">
+  </noscript>
 </body>
 </html>

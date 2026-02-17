@@ -13,6 +13,16 @@ const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 
 const App = () => {
   useEffect(() => {
+    // Handle redirect from 404.html for GitHub Pages SPA routing
+    const redirectPath = sessionStorage.getItem('redirectPath');
+    if (redirectPath) {
+      sessionStorage.removeItem('redirectPath');
+      const path = redirectPath.replace(basename, '');
+      if (path && path !== '/' && path !== basename) {
+        window.history.replaceState(null, '', basename + path);
+      }
+    }
+
     const handleGlobalError = (event: ErrorEvent) => {
       trackError("javascript_crash", event.message);
     };
