@@ -58,7 +58,7 @@ export function TopBar({
   return (
     <>
       {/* === Desktop / Main Header === */}
-      <header className="flex items-center justify-between px-4 sm:px-6 py-2 bg-dashboard-panel border-b border-dashboard-border h-14 sm:h-16 gap-4">
+      <header data-top-bar className="flex items-center justify-between px-4 sm:px-6 py-2 bg-dashboard-panel border-b border-dashboard-border h-14 sm:h-16 gap-4">
         {/* Left Section - Logo + Metric Selector */}
         <div className="flex items-center gap-4 sm:gap-6 flex-shrink-0">
           <div

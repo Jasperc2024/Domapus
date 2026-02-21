@@ -69,13 +69,16 @@ export function HousingDashboard() {
       if (hasRun) return;
       hasRun = true;
       const dataUrl = new URL(`${BASE_PATH}data/zip-data.json`, window.location.origin).href;
+      const earlyBuffer: ArrayBuffer | null = await ((window as unknown as Record<string, unknown>).__zipDataPromise as Promise<ArrayBuffer | null> | undefined ?? Promise.resolve(null));
 
       try {
         setLoadError(null);
+
+        const transfer: Transferable[] = earlyBuffer ? [earlyBuffer] : [];
         const result = await processData({
           type: 'LOAD_AND_PROCESS_DATA',
-          data: { url: dataUrl, selectedMetric: 'zhvi' }
-        }) as DataPayload;
+          data: { url: dataUrl, selectedMetric: 'zhvi', prefetchedBuffer: earlyBuffer ?? undefined }
+        }, { transfer }) as DataPayload;
 
         if (!isMounted) return;
 

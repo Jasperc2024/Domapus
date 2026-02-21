@@ -6,13 +6,11 @@ interface MobileBottomSheetProps {
   children: ReactNode;
 }
 
-// Snap points as percentage of viewport height from bottom
-const SNAP_CLOSED = 0;      // fully closed
-const SNAP_PEEK = 45;       // ~45% - initial peek
-const SNAP_FULL = 92;       // ~92% - near full screen
-
-const VELOCITY_THRESHOLD = 0.5; // px/ms - flick detection
-const DRAG_THRESHOLD = 10;      // min px to count as drag vs tap
+const SNAP_CLOSED = 0;
+const SNAP_PEEK = 48;
+const SNAP_FULL = 100;
+const VELOCITY_THRESHOLD = 0.5;
+const DRAG_THRESHOLD = 10;
 
 export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -29,6 +27,47 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
   const [sheetHeight, setSheetHeight] = useState(SNAP_CLOSED);
   const [isDragging, setIsDragging] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [maxSheetHeightPx, setMaxSheetHeightPx] = useState(0);
+
+  useEffect(() => {
+    const updateMaxSheetHeight = () => {
+      const header = document.querySelector<HTMLElement>('[data-top-bar]');
+      const visualViewport = window.visualViewport;
+      const layoutViewportHeight = window.innerHeight;
+      const viewportBottom = visualViewport
+        ? visualViewport.offsetTop + visualViewport.height
+        : layoutViewportHeight;
+
+      if (!header) {
+        setMaxSheetHeightPx(viewportBottom);
+        return;
+      }
+
+      const topBarBottom = header.getBoundingClientRect().bottom;
+      const availableHeight = Math.max(0, viewportBottom - topBarBottom);
+      setMaxSheetHeightPx(availableHeight);
+    };
+
+    updateMaxSheetHeight();
+    window.addEventListener('resize', updateMaxSheetHeight);
+    window.visualViewport?.addEventListener('resize', updateMaxSheetHeight);
+    window.visualViewport?.addEventListener('scroll', updateMaxSheetHeight);
+
+    const header = document.querySelector<HTMLElement>('[data-top-bar]');
+    const observer = header ? new ResizeObserver(updateMaxSheetHeight) : null;
+    if (header && observer) {
+      observer.observe(header);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateMaxSheetHeight);
+      window.visualViewport?.removeEventListener('resize', updateMaxSheetHeight);
+      window.visualViewport?.removeEventListener('scroll', updateMaxSheetHeight);
+      if (observer) {
+        observer.disconnect();
+      }
+    };
+  }, []);
 
   // Open/close animations
   useEffect(() => {
@@ -52,7 +91,7 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
       setSheetHeight(SNAP_CLOSED);
       onClose();
     } else {
-      setSheetHeight(targetHeight);
+      setSheetHeight(Math.min(targetHeight, SNAP_FULL));
     }
   }, [onClose]);
 
@@ -103,7 +142,7 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
     if (!dragRef.current.isDragging) return;
 
     const deltaY = dragRef.current.startY - e.clientY;
-    const deltaVh = (deltaY / window.innerHeight) * 100;
+    const deltaPercent = maxSheetHeightPx > 0 ? (deltaY / maxSheetHeightPx) * 100 : 0;
     const now = Date.now();
 
     if (Math.abs(e.clientY - dragRef.current.startY) > DRAG_THRESHOLD) {
@@ -113,10 +152,10 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
     dragRef.current.lastY = e.clientY;
     dragRef.current.lastTime = now;
 
-    const newHeight = Math.max(0, Math.min(SNAP_FULL + 5, dragRef.current.startHeight + deltaVh));
+    const newHeight = Math.max(0, Math.min(SNAP_FULL + 5, dragRef.current.startHeight + deltaPercent));
     dragRef.current.currentHeight = newHeight;
     setSheetHeight(newHeight);
-  }, []);
+  }, [maxSheetHeightPx]);
 
   const handlePointerEnd = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current.isDragging) return;
@@ -130,8 +169,8 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
     const now = Date.now();
     const dt = now - dragRef.current.lastTime || 1;
     const dy = dragRef.current.lastY - dragRef.current.startY;
-    // velocity in vh/ms (positive = dragging down)
-    const velocity = (dy / window.innerHeight * 100) / dt;
+    // velocity in px/ms (positive = dragging down)
+    const velocity = dy / dt;
 
     dragRef.current.isDragging = false;
     setIsDragging(false);
@@ -147,9 +186,28 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
     snapTo(SNAP_CLOSED);
   }, [snapTo]);
 
+  useEffect(() => {
+    if (!isVisible || sheetHeight <= 5) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyTouchAction = document.body.style.touchAction;
+    const previousBodyOverscrollBehavior = document.body.style.overscrollBehavior;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+    document.body.style.overscrollBehavior = 'none';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.touchAction = previousBodyTouchAction;
+      document.body.style.overscrollBehavior = previousBodyOverscrollBehavior;
+    };
+  }, [isVisible, sheetHeight]);
+
   if (!isVisible) return null;
 
   const overlayOpacity = Math.min(sheetHeight / SNAP_PEEK, 1) * 0.4;
+  const sheetHeightPx = (sheetHeight / 100) * maxSheetHeightPx;
 
   return (
     <>
@@ -169,10 +227,10 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
         ref={sheetRef}
         className="fixed bottom-0 left-0 right-0 z-50 bg-dashboard-panel rounded-t-[14px] flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.15)]"
         style={{
-          height: `${sheetHeight}vh`,
+          height: `${sheetHeightPx}px`,
           transition: isDragging ? 'none' : 'height 300ms cubic-bezier(0.32, 0.72, 0, 1)',
           willChange: 'height',
-          maxHeight: '100vh',
+          maxHeight: `${maxSheetHeightPx}px`,
           paddingTop: 'env(safe-area-inset-top)',
         }}
       >

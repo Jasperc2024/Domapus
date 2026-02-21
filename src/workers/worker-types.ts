@@ -16,6 +16,7 @@ export interface WorkerResponse {
 export interface LoadDataRequest {
   url: string;
   selectedMetric: string;
+  prefetchedBuffer?: ArrayBuffer;
 }
 
 export interface DataProcessedResponse {

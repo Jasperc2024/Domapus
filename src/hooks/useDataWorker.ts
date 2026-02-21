@@ -73,8 +73,8 @@ export function useDataWorker() {
     };
   }, []);
 
-  const processData = useCallback((message: { type: string; data?: LoadDataRequest }, options: { timeout?: number; retries?: number } = {}): Promise<DataProcessedResponse> => {
-    const { timeout = 30000, retries = 2 } = options;
+  const processData = useCallback((message: { type: string; data?: LoadDataRequest }, options: { timeout?: number; retries?: number; transfer?: Transferable[] } = {}): Promise<DataProcessedResponse> => {
+    const { timeout = 30000, retries = 2, transfer = [] } = options;
     const worker = workerRef.current;
 
     if (!worker || !isInitializedRef.current) {
@@ -121,7 +121,7 @@ export function useDataWorker() {
         });
 
         setIsLoading(true);
-        worker.postMessage({ id, ...message });
+        worker.postMessage({ id, ...message }, transfer);
       });
     };
 

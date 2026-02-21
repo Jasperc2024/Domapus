@@ -80,7 +80,7 @@ export function MapLibreMap({
 
       try {
         map.setPaintProperty(layer.id, "text-halo-color", "rgba(255,255,255,0.95)");
-        map.setPaintProperty(layer.id, "text-halo-width", 1.25);
+        map.setPaintProperty(layer.id, "text-halo-width", 1);
         map.setPaintProperty(layer.id, "text-halo-blur", 0.2);
       } catch (err) {
         console.warn(`[Map] Could not update label contrast for ${layer.id}`, err);
@@ -95,7 +95,7 @@ export function MapLibreMap({
   }, [zipData, selectedMetric, onZipSelect]);
   const hasData = useMemo(() => Object.keys(zipData).length > 0, [zipData]);
 
-  // 1. Initialize Map with PMTiles
+  // 1. Initialize Map
   const createAndInitializeMap = useCallback((container: HTMLDivElement) => {
     addPMTilesProtocol();
     const defaultBounds: LngLatBoundsLike = [[-124.7844079, 24.7433195], [-66.9513812, 49.3457868]];
@@ -199,7 +199,7 @@ export function MapLibreMap({
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && mapRef.current) {
-        console.log("[Map] Tab visible, refreshing...");
+        console.log("Refreshing...");
         mapRef.current.resize();
         mapRef.current.triggerRepaint();
       }
@@ -505,10 +505,6 @@ export function MapLibreMap({
       ...buckets.flatMap((threshold, i) => [threshold, CHOROPLETH_COLORS[Math.min(i + 1, CHOROPLETH_COLORS.length - 1)]])
     ] as ExpressionSpecification;
 
-    if (mapRef.current) {
-      map.setPaintProperty("zips-fill", "fill-color", stepExpression);
-    }
-
     // Only update feature states if needed
     const shouldUpdateStates = customBuckets === null || lastProcessedMetric.current !== selectedMetric || lastProcessedDataKeys.current !== currentDataKeys;
 
@@ -530,10 +526,19 @@ export function MapLibreMap({
             { metricValue }
           );
         }
+
+        if (mapRef.current) {
+          map.setPaintProperty("zips-fill", "fill-color", stepExpression);
+        }
+
         console.log(`[Map] Finished updating colors for ${entries.length} ZIPs`);
       };
 
       applyAllFeatureStates();
+    } else {
+      if (mapRef.current) {
+        map.setPaintProperty("zips-fill", "fill-color", stepExpression);
+      }
     }
 
   }, [isMapReady, pmtilesLoaded, zipData, selectedMetric, hasData, customBuckets]);
@@ -623,7 +628,7 @@ export function MapLibreMap({
             cursor: 'pointer',
             padding: 0,
           }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f2f2f2'}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
           aria-label="Reset map to default view"
           title="Reset to default view"

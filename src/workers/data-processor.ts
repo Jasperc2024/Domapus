@@ -71,29 +71,37 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   try {
     switch (type) {
       case "LOAD_AND_PROCESS_DATA": {
-        const { url, selectedMetric } = data as LoadDataRequest;
-        self.postMessage({ type: "PROGRESS", data: { phase: "Fetching market data..." } });
-        const response = await fetch(url, { signal });
-        if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error("Data file not found. Please try refreshing the page.");
-          } else if (response.status >= 500) {
-            throw new Error("Server error. Please try again later.");
+        const { url, selectedMetric, prefetchedBuffer } = data as LoadDataRequest;
+
+        let buffer: ArrayBuffer;
+
+        if (prefetchedBuffer && prefetchedBuffer.byteLength > 100) {
+          buffer = prefetchedBuffer;
+          self.postMessage({ type: "PROGRESS", data: { phase: "Processing cached data..." } });
+        } else {
+          self.postMessage({ type: "PROGRESS", data: { phase: "Fetching market data..." } });
+          const response = await fetch(url, { signal });
+          if (!response.ok) {
+            if (response.status === 404) {
+              throw new Error("Data file not found. Please try refreshing the page.");
+            } else if (response.status >= 500) {
+              throw new Error("Server error. Please try again later.");
+            }
+            throw new Error(`Failed to load data (${response.status}). Please try refreshing.`);
           }
-          throw new Error(`Failed to load data (${response.status}). Please try refreshing.`);
-        }
 
-        // Validate response size - empty or too small responses are likely errors
-        const contentLength = response.headers.get('content-length');
-        if (contentLength && parseInt(contentLength) < 100) {
-          throw new Error("Data file appears to be empty or incomplete. Please try refreshing.");
-        }
+          // Validate response size - empty or too small responses are likely errors
+          const contentLength = response.headers.get('content-length');
+          if (contentLength && parseInt(contentLength) < 100) {
+            throw new Error("Data file appears to be empty or incomplete. Please try refreshing.");
+          }
 
-        const buffer = await response.arrayBuffer();
+          buffer = await response.arrayBuffer();
 
-        // Validate we received actual data
-        if (buffer.byteLength < 100) {
-          throw new Error("Received incomplete data. Please check your connection and try again.");
+          // Validate we received actual data
+          if (buffer.byteLength < 100) {
+            throw new Error("Received incomplete data. Please check your connection and try again.");
+          }
         }
 
         let fullPayload: unknown;
