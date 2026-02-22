@@ -9,6 +9,7 @@ import random
 from datetime import datetime, timezone
 from pathlib import Path
 from io import BytesIO
+from generate_lite_data import generate_lite_data
 
 # --- Configuration ---
 logging.basicConfig(
@@ -304,6 +305,10 @@ def main():
                 "zip_codes_changed": zip_codes_changed,
                 "data_points_changed": data_points_changed
             }, f, indent=2)
+
+        # Generate lite data file for fast initial page load
+        logging.info("Generating lite data file...")
+        generate_lite_data(zip_data_path)
 
         logging.info(f"Run completed. Processed {len(output_data)} ZIP codes.")
 

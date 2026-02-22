@@ -1,4 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
 
 export type MetricType =
   | "zhvi"
@@ -29,18 +30,26 @@ export const METRICS = {
   "off_market_in_two_weeks": "% Off Market in 2 Weeks",
 } as const;
 
+// Fields available in the lite data file (loaded first for fast initial render)
+const LITE_METRICS = new Set<string>(["zhvi"]);
+
 interface MetricSelectorProps {
   selectedMetric: MetricType;
   onMetricChange: (metric: MetricType) => void;
+  isFullDataLoaded?: boolean;
 }
 
-export function MetricSelector({ selectedMetric, onMetricChange }: MetricSelectorProps) {
+export function MetricSelector({ selectedMetric, onMetricChange, isFullDataLoaded = false }: MetricSelectorProps) {
+  const handleMetricChange = (metric: string) => {
+    onMetricChange(metric as MetricType);
+  };
+
   return (
     <div className="flex items-center gap-1">
       <label className="text-xs font-medium text-dashboard-text-secondary whitespace-nowrap hidden lg:block">
         Metric:
       </label>
-      <Select value={selectedMetric} onValueChange={onMetricChange}>
+      <Select value={selectedMetric} onValueChange={handleMetricChange}>
         <SelectTrigger className="w-50 h-8 text-sm px-3 justify-between" aria-label="Select visualization metric">
           <div className="flex-1 text-left truncate pr-2">
             <SelectValue placeholder="Select a metric" />
@@ -49,7 +58,12 @@ export function MetricSelector({ selectedMetric, onMetricChange }: MetricSelecto
         <SelectContent className="z-[9999]">
           {Object.entries(METRICS).map(([key, label]) => (
             <SelectItem key={key} value={key}>
-              {label}
+              <span className="flex items-center gap-1.5">
+                {label}
+                {!isFullDataLoaded && !LITE_METRICS.has(key) && (
+                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                )}
+              </span>
             </SelectItem>
           ))}
         </SelectContent>

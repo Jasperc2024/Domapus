@@ -12,6 +12,7 @@ interface TopBarProps {
   onMetricChange: (metric: MetricType) => void;
   onSearch: (zipCode: string, trigger: number) => void;
   hideMobileControls?: boolean;
+  isFullDataLoaded?: boolean;
   children?: React.ReactNode; // Optional buttons like <MapExport />
 }
 
@@ -20,6 +21,7 @@ export function TopBar({
   onMetricChange,
   onSearch,
   hideMobileControls = false,
+  isFullDataLoaded = false,
   children,
 }: TopBarProps) {
   const isMobile = useIsMobile();
@@ -87,6 +89,7 @@ export function TopBar({
             <MetricSelector
               selectedMetric={selectedMetric}
               onMetricChange={onMetricChange}
+              isFullDataLoaded={isFullDataLoaded}
             />
           )}
         </div>
@@ -158,7 +161,7 @@ export function TopBar({
       {isMobile && !hideMobileControls && (
         <div className="fixed bottom-4 left-4 right-4 z-[1001] bg-dashboard-panel border border-dashboard-border rounded-lg p-3 shadow-lg">
           <div className="space-y-2.5">
-            <MetricSelector selectedMetric={selectedMetric} onMetricChange={onMetricChange} />
+            <MetricSelector selectedMetric={selectedMetric} onMetricChange={onMetricChange} isFullDataLoaded={isFullDataLoaded} />
             <SearchBox onSearch={onSearch} />
           </div>
         </div>
