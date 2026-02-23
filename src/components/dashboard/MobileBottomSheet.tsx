@@ -237,14 +237,14 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
         {/* Drag handle area */}
         <div className="relative flex-shrink-0">
           <div
-            className="absolute inset-x-0 -top-3 -bottom-3 cursor-grab active:cursor-grabbing touch-none select-none"
+            className="absolute inset-x-0 -top-5 h-16 cursor-grab active:cursor-grabbing touch-none select-none z-10"
             onPointerDown={handlePointerStart}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerEnd}
             onPointerCancel={handlePointerEnd}
           />
-          <div className="pt-2 pb-1">
-            <div className="mx-auto w-10 h-1 rounded-full bg-gray-300" />
+          <div className="py-2">
+            <div className="mx-auto w-12 h-1 rounded-full bg-gray-300" />
           </div>
         </div>
 

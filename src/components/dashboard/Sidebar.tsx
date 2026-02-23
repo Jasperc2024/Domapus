@@ -47,7 +47,7 @@ export function Sidebar({ isOpen, zipData, allZipData, onClose }: SidebarProps) 
   return (
     <div className={`bg-dashboard-panel border-r border-dashboard-border shadow-lg flex flex-col h-full ${isMobile ? "w-full rounded-none" : "w-96 rounded-none"}`}>
       {/* Static Top Banner */}
-      <div className="flex-none px-4 pb-4 border-b border-dashboard-border bg-dashboard-panel flex items-center justify-between z-10 shadow-sm">
+      <div className="flex-none px-4 pb-1 border-b border-dashboard-border bg-dashboard-panel flex items-center justify-between z-10 shadow-sm">
         <div className="flex items-center gap-2">
           <MapPin className="h-5 w-5 text-primary" />
           <h2 
@@ -66,11 +66,11 @@ export function Sidebar({ isOpen, zipData, allZipData, onClose }: SidebarProps) 
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground transition-colors"
+          className={`text-muted-foreground hover:text-foreground transition-colors ${isMobile ? 'h-11 w-11' : 'h-8 w-8'}`}
           onClick={onClose}
           aria-label="Close sidebar"
         >
-          <X className="h-5 w-5" />
+          <X className={`pt--2 ${isMobile ? 'h-8 w-8' : 'h-7 w-7'}`} />
         </Button>
       </div>
 
