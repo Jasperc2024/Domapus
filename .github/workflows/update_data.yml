@@ -27,17 +27,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install pandas requests
 
-    - name: Run Redfin Data Pipeline
+    - name: Run Data Update Pipeline
       run: |
         python -u scripts/update-market-data.py
-
-    - name: Display Logs
-      if: always() 
-      run: |
-        echo "--- Displaying contents of data_pipeline.log ---"
-        cat data_pipeline.log
-        echo "--- End of log ---"
-
 
     - name: Create Archive Copy
       id: archive_logic
