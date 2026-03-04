@@ -70,7 +70,7 @@ export function Sidebar({ isOpen, zipData, allZipData, onClose }: SidebarProps) 
           onClick={onClose}
           aria-label="Close sidebar"
         >
-          <X className={`pt--2 ${isMobile ? 'h-8 w-8' : 'h-7 w-7'}`} />
+          <X className={`${isMobile ? 'h-8 w-8' : 'h-7 w-7'}`} />
         </Button>
       </div>
 

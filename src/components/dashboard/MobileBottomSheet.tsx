@@ -28,52 +28,55 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
   const [isDragging, setIsDragging] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [maxSheetHeightPx, setMaxSheetHeightPx] = useState(0);
+  const [bottomOffset, setBottomOffset] = useState(0);
 
   useEffect(() => {
-    const updateMaxSheetHeight = () => {
+    const updateLayout = () => {
       const header = document.querySelector<HTMLElement>('[data-top-bar]');
-      const visualViewport = window.visualViewport;
-      const layoutViewportHeight = window.innerHeight;
-      const viewportBottom = visualViewport
-        ? visualViewport.offsetTop + visualViewport.height
-        : layoutViewportHeight;
+      const vv = window.visualViewport;
+      const layoutH = window.innerHeight;
+      const keyboardGap = vv
+        ? Math.max(0, layoutH - (vv.offsetTop + vv.height))
+        : 0;
+      setBottomOffset(keyboardGap);
 
-      if (!header) {
-        setMaxSheetHeightPx(viewportBottom);
-        return;
-      }
+      const topBarBottom = header
+        ? header.getBoundingClientRect().bottom
+        : 0;
 
-      const topBarBottom = header.getBoundingClientRect().bottom;
-      const availableHeight = Math.max(0, viewportBottom - topBarBottom);
-      setMaxSheetHeightPx(availableHeight);
+
+      const availableBottom = vv
+        ? vv.offsetTop + vv.height
+        : layoutH;
+
+      const available = Math.max(0, availableBottom - topBarBottom);
+      setMaxSheetHeightPx(available);
     };
 
-    updateMaxSheetHeight();
-    window.addEventListener('resize', updateMaxSheetHeight);
-    window.visualViewport?.addEventListener('resize', updateMaxSheetHeight);
-    window.visualViewport?.addEventListener('scroll', updateMaxSheetHeight);
+    updateLayout();
+    window.addEventListener('resize', updateLayout);
+    window.visualViewport?.addEventListener('resize', updateLayout);
+    window.visualViewport?.addEventListener('scroll', updateLayout);
 
     const header = document.querySelector<HTMLElement>('[data-top-bar]');
-    const observer = header ? new ResizeObserver(updateMaxSheetHeight) : null;
+    const observer = header ? new ResizeObserver(updateLayout) : null;
     if (header && observer) {
       observer.observe(header);
     }
 
     return () => {
-      window.removeEventListener('resize', updateMaxSheetHeight);
-      window.visualViewport?.removeEventListener('resize', updateMaxSheetHeight);
-      window.visualViewport?.removeEventListener('scroll', updateMaxSheetHeight);
+      window.removeEventListener('resize', updateLayout);
+      window.visualViewport?.removeEventListener('resize', updateLayout);
+      window.visualViewport?.removeEventListener('scroll', updateLayout);
       if (observer) {
         observer.disconnect();
       }
     };
   }, []);
 
-  // Open/close animations
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
-      // Small delay so the CSS transition kicks in
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setSheetHeight(SNAP_PEEK);
@@ -96,18 +99,15 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
   }, [onClose]);
 
   const getClosestSnap = useCallback((height: number, velocity: number) => {
-    // If flicking down fast, close or go to peek
     if (velocity > VELOCITY_THRESHOLD) {
       if (height > SNAP_PEEK + 10) return SNAP_PEEK;
       return SNAP_CLOSED;
     }
-    // If flicking up fast, expand
     if (velocity < -VELOCITY_THRESHOLD) {
       if (height < SNAP_PEEK - 10) return SNAP_PEEK;
       return SNAP_FULL;
     }
 
-    // Otherwise snap to closest
     const snaps = [SNAP_CLOSED, SNAP_PEEK, SNAP_FULL];
     let closest = snaps[0];
     let minDist = Math.abs(height - closest);
@@ -163,13 +163,11 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {
-      // No-op if capture was not set.
     }
 
     const now = Date.now();
     const dt = now - dragRef.current.lastTime || 1;
     const dy = dragRef.current.lastY - dragRef.current.startY;
-    // velocity in px/ms (positive = dragging down)
     const velocity = dy / dt;
 
     dragRef.current.isDragging = false;
@@ -185,6 +183,13 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
   const handleOverlayClick = useCallback(() => {
     snapTo(SNAP_CLOSED);
   }, [snapTo]);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    if (bottomOffset > 50 && sheetHeight < SNAP_FULL) {
+      setSheetHeight(SNAP_FULL);
+    }
+  }, [bottomOffset, isVisible, sheetHeight]);
 
   useEffect(() => {
     if (!isVisible || sheetHeight <= 5) return;
@@ -225,13 +230,13 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
       {/* Bottom sheet */}
       <div
         ref={sheetRef}
-        className="fixed bottom-0 left-0 right-0 z-50 bg-dashboard-panel rounded-t-[14px] flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.15)]"
+        className="fixed left-0 right-0 z-50 bg-dashboard-panel rounded-t-[14px] flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.15)]"
         style={{
+          bottom: `${bottomOffset}px`,
           height: `${sheetHeightPx}px`,
-          transition: isDragging ? 'none' : 'height 300ms cubic-bezier(0.32, 0.72, 0, 1)',
-          willChange: 'height',
+          transition: isDragging ? 'none' : 'height 300ms cubic-bezier(0.32, 0.72, 0, 1), bottom 100ms ease',
+          willChange: 'height, bottom',
           maxHeight: `${maxSheetHeightPx}px`,
-          paddingTop: 'env(safe-area-inset-top)',
         }}
       >
         {/* Drag handle area */}

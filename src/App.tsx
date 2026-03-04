@@ -13,7 +13,7 @@ const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 
 const App = () => {
   useEffect(() => {
-    // Handle redirect from 404.html for GitHub Pages SPA routing
+
     const redirectPath = sessionStorage.getItem('redirectPath');
     if (redirectPath) {
       sessionStorage.removeItem('redirectPath');
@@ -28,7 +28,18 @@ const App = () => {
     };
 
     const handlePromiseError = (event: PromiseRejectionEvent) => {
-      const message = event.reason?.message || "Unhandled Promise Rejection";
+      const reason = event.reason;
+      if (
+        reason?.name === 'AbortError' ||
+        (typeof reason?.message === 'string' &&
+          (reason.message.includes('signal is aborted') ||
+           reason.message.includes('Request superseded') ||
+           reason.message.includes('user aborted')))
+      ) {
+        event.preventDefault();
+        return;
+      }
+      const message = reason?.message || "Unhandled Promise Rejection";
       trackError("promise_error", message);
     };
 

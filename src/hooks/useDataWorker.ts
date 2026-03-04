@@ -31,6 +31,16 @@ export function useDataWorker() {
           setProgress(data as ProgressData);
           break;
 
+        case 'ABORTED': {
+          setIsLoading(false);
+          const aborted = requestsRef.current.get(id);
+          if (aborted) {
+            aborted.reject(new DOMException('Request superseded', 'AbortError'));
+            requestsRef.current.delete(id);
+          }
+          break;
+        }
+
         case 'ERROR': {
           console.error('[useDataWorker] Worker error:', error);
           trackError("worker_error", error || "Unknown worker error");
