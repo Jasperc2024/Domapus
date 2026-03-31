@@ -172,5 +172,5 @@ If you find Domapus useful, consider supporting its development:
 
 <div align="center">
   <strong>Built by <a href="https://github.com/Jasperc2024">Jasper Chen</a></strong>
-   <br><small>Distributed under the Apache License 2.0</small>
+   <br><small>Distributed under the [Apache License 2.0](https://github.com/Jasperc2024/Domapus?tab=Apache-2.0-1-ov-file)</small>
 </div>
