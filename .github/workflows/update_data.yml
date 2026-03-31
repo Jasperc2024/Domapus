@@ -78,7 +78,7 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add public/data/zip-data.json public/data/last_updated.json public/data/archive/
+        git add public/data/zip-data.json public/data/zip-data-lite.json public/data/last_updated.json public/data/archive/
         git commit -m "Update market data - $(date +'%Y-%m-%d %H:%M:%S' --utc)"
         git push
       env:
