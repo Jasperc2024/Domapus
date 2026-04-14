@@ -13,6 +13,17 @@ const BASE_WIDTH = 1200;
 const BASE_HEIGHT = 900;
 const BOUNDS_BUFFER = 0.15;
 
+// Export canvas dimensions and attribution constants — shared with ExportSidebar
+// so the PDF hyperlink overlay can be positioned from the same source of truth.
+export const EXPORT_CANVAS_W = 3600;
+export const EXPORT_CANVAS_H = 2700; // 4:3
+export const EXPORT_CANVAS_PAD = 80;
+export const ATTRIBUTION_TEXT = "Built by Domapus • Data: Redfin & Zillow";
+export const ATTRIBUTION_FONT = "24px sans-serif";
+// Baseline of attribution text in canvas pixels (used for PDF link mapping)
+export const ATTRIBUTION_BASELINE_Y = EXPORT_CANVAS_PAD + 40;
+export const ATTRIBUTION_RIGHT_X = EXPORT_CANVAS_W - EXPORT_CANVAS_PAD;
+
 // Default Alaska viewport — used when coordinate data is unavailable
 const ALASKA_DEFAULT_BOUNDS: [[number, number], [number, number]] = [[-168.5, 54.5], [-141.0, 71.5]];
 const HAWAII_DEFAULT_BOUNDS: [[number, number], [number, number]] = [[-160.5, 18.9], [-154.8, 22.3]];
@@ -179,13 +190,13 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
         ak.add(zip.zipCode);
         // Exclude Alaskan islands that have crossed the International Date Line (positive lng)
         // so the bbox stays in the Western Hemisphere and fitBounds works correctly.
-        if (lat && lng && lng < 0) akPts.push(point([lng, lat]));
+        if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng) && lng < 0) akPts.push(point([lng, lat]));
       } else if (isHi) {
         hi.add(zip.zipCode);
-        if (lat && lng) hiPts.push(point([lng, lat]));
+        if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)) hiPts.push(point([lng, lat]));
       } else {
         ml.add(zip.zipCode);
-        if (lat && lng) mlPts.push(point([lng, lat]));
+        if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)) mlPts.push(point([lng, lat]));
       }
     });
 
@@ -256,9 +267,9 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
   // into a single 2D canvas ready for download. No DOM screenshot libraries needed.
   // ---------------------------------------------------------------------------
   const exportToCanvas = useCallback(async (): Promise<HTMLCanvasElement> => {
-    const EXPORT_W = 3600;
-    const EXPORT_H = 2700; // 4:3 to match the preview aspect ratio
-    const PAD = 80;
+    const EXPORT_W = EXPORT_CANVAS_W;
+    const EXPORT_H = EXPORT_CANVAS_H;
+    const PAD = EXPORT_CANVAS_PAD;
 
     const out = document.createElement("canvas");
     out.width = EXPORT_W;
@@ -298,11 +309,11 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       mapTop = PAD + 150;
     }
 
-    // Attribution (top-right)
+    // Attribution (top-right) — position defined by ATTRIBUTION_* module constants
     ctx.fillStyle = "#9CA3AF";
-    ctx.font = "24px sans-serif";
+    ctx.font = ATTRIBUTION_FONT;
     ctx.textAlign = "right";
-    ctx.fillText("Built by Domapus • Data: Redfin & Zillow", EXPORT_W - PAD, PAD + 40);
+    ctx.fillText(ATTRIBUTION_TEXT, ATTRIBUTION_RIGHT_X, ATTRIBUTION_BASELINE_Y);
     ctx.textAlign = "left";
 
     // ── Map area ─────────────────────────────────────────────────────────────
@@ -362,7 +373,12 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       });
 
       ctx.beginPath();
-      ctx.roundRect(legendX, legendY, LEGEND_W, LEGEND_H, 4);
+      // roundRect is not available in all environments; fall back to rect() if needed
+      if (typeof ctx.roundRect === "function") {
+        ctx.roundRect(legendX, legendY, LEGEND_W, LEGEND_H, 4);
+      } else {
+        ctx.rect(legendX, legendY, LEGEND_W, LEGEND_H);
+      }
       ctx.fillStyle = gradient;
       ctx.fill();
 

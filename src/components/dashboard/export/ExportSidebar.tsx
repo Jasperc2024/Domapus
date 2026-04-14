@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { PrintStage, PrintStageRef } from "./PrintStage";
+import { PrintStage, PrintStageRef, EXPORT_CANVAS_W, EXPORT_CANVAS_H, ATTRIBUTION_TEXT, ATTRIBUTION_FONT, ATTRIBUTION_BASELINE_Y, ATTRIBUTION_RIGHT_X } from "./PrintStage";
 import { cn } from "@/lib/utils";
 import { jsPDF, jsPDFOptions } from "jspdf";
 import { toast } from "@/hooks/use-toast";
@@ -216,12 +216,23 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
         pdf.addImage(imgData, "PNG", offsetX, offsetY, drawWidth, drawHeight);
 
-        // Add a clickable hyperlink over the attribution text rendered at the top-right
-        // of the canvas. The text sits at approximately x: 70%–97% and y: 3%–5% of the canvas.
-        const attrX = offsetX + drawWidth * 0.70;
-        const attrY = offsetY + drawHeight * 0.03;
-        const attrW = drawWidth * 0.27;
-        const attrH = drawHeight * 0.06;
+        // Compute the exact PDF bounding box of the attribution text using the same
+        // constants that PrintStage uses when drawing it, plus measureText for width/height.
+        const tmpCtx = document.createElement("canvas").getContext("2d")!;
+        tmpCtx.font = ATTRIBUTION_FONT;
+        const metrics = tmpCtx.measureText(ATTRIBUTION_TEXT);
+        // Canvas coordinates of the attribution text bounding box
+        const canvasTextRight = ATTRIBUTION_RIGHT_X;
+        const canvasTextLeft = canvasTextRight - metrics.width;
+        const canvasTextTop = ATTRIBUTION_BASELINE_Y - (metrics.actualBoundingBoxAscent ?? 20);
+        const canvasTextBottom = ATTRIBUTION_BASELINE_Y + (metrics.actualBoundingBoxDescent ?? 4);
+        // Map canvas pixel space → PDF mm space (with a small padding of 2px each side)
+        const scaleX = drawWidth / EXPORT_CANVAS_W;
+        const scaleY = drawHeight / EXPORT_CANVAS_H;
+        const attrX = offsetX + (canvasTextLeft - 2) * scaleX;
+        const attrY = offsetY + (canvasTextTop - 2) * scaleY;
+        const attrW = (metrics.width + 4) * scaleX;
+        const attrH = (canvasTextBottom - canvasTextTop + 4) * scaleY;
         pdf.link(attrX, attrY, attrW, attrH, { url: "https://jasperc2024.github.io/Domapus/" });
 
         pdf.save(`Domapus-${selectedMetric}-${regionScope}.pdf`);
