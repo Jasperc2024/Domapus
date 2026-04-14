@@ -261,16 +261,21 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
 
-    const captureOrNull = async (map: maplibregl.Map | null) => {
+    const captureRequired = async (map: maplibregl.Map | null, mapName: string) => {
+      if (!map) throw new Error(`Could not capture ${mapName} map: map is not initialized`);
+      return await captureMapCanvas(map);
+    };
+
+    const captureOptional = async (map: maplibregl.Map | null) => {
       if (!map) return null;
       try { return await captureMapCanvas(map); }
       catch { return null; }
     };
 
     const [mainGl, alaskaGl, hawaiiGl] = await Promise.all([
-      captureOrNull(mapsRef.current.main),
-      captureOrNull(mapsRef.current.alaska),
-      captureOrNull(mapsRef.current.hawaii),
+      captureRequired(mapsRef.current.main, "main"),
+      captureOptional(mapsRef.current.alaska),
+      captureOptional(mapsRef.current.hawaii),
     ]);
 
     let mapTop = PAD;
