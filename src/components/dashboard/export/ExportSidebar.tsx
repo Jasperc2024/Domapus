@@ -183,6 +183,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         link.click();
       } else {
         const imgData = canvas.toDataURL("image/png", 1.0);
+        const MARGIN = 15; // mm — margin on all sides
         const options: jsPDFOptions = { orientation: "l", unit: "mm", format: "a4" };
         const pdf = new jsPDF(options);
 
@@ -192,25 +193,37 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
           creator: "Domapus (https://jasperc2024.github.io/Domapus/)",
         });
 
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgAspect = canvas.width / canvas.height;
-        const pdfAspect = pdfWidth / pdfHeight;
+        const pdfWidth = pdf.internal.pageSize.getWidth();   // ~297mm landscape
+        const pdfHeight = pdf.internal.pageSize.getHeight(); // ~210mm landscape
+        const usableWidth = pdfWidth - 2 * MARGIN;
+        const usableHeight = pdfHeight - 2 * MARGIN;
+        const imgAspect = canvas.width / canvas.height; // 4:3
 
-        let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
-        if (imgAspect > pdfAspect) {
-          drawWidth = pdfWidth;
-          drawHeight = pdfWidth / imgAspect;
-          offsetX = 0;
-          offsetY = (pdfHeight - drawHeight) / 2;
+        let drawWidth: number, drawHeight: number;
+        if (usableWidth / usableHeight > imgAspect) {
+          // Height is the constraint
+          drawHeight = usableHeight;
+          drawWidth = drawHeight * imgAspect;
         } else {
-          drawHeight = pdfHeight;
-          drawWidth = pdfHeight * imgAspect;
-          offsetX = (pdfWidth - drawWidth) / 2;
-          offsetY = 0;
+          // Width is the constraint
+          drawWidth = usableWidth;
+          drawHeight = drawWidth / imgAspect;
         }
 
+        // Center the image within the usable area
+        const offsetX = MARGIN + (usableWidth - drawWidth) / 2;
+        const offsetY = MARGIN + (usableHeight - drawHeight) / 2;
+
         pdf.addImage(imgData, "PNG", offsetX, offsetY, drawWidth, drawHeight);
+
+        // Add a clickable hyperlink over the attribution text rendered at the top-right
+        // of the canvas. The text sits at approximately x: 70%–97% and y: 3%–5% of the canvas.
+        const attrX = offsetX + drawWidth * 0.70;
+        const attrY = offsetY + drawHeight * 0.03;
+        const attrW = drawWidth * 0.27;
+        const attrH = drawHeight * 0.06;
+        pdf.link(attrX, attrY, attrW, attrH, { url: "https://jasperc2024.github.io/Domapus/" });
+
         pdf.save(`Domapus-${selectedMetric}-${regionScope}.pdf`);
       }
 

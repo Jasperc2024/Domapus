@@ -257,7 +257,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
   // ---------------------------------------------------------------------------
   const exportToCanvas = useCallback(async (): Promise<HTMLCanvasElement> => {
     const EXPORT_W = 3600;
-    const EXPORT_H = 2250;
+    const EXPORT_H = 2700; // 4:3 to match the preview aspect ratio
     const PAD = 80;
 
     const out = document.createElement("canvas");

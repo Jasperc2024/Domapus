@@ -367,7 +367,7 @@ describe("PrintStage", () => {
 
     expect(canvas).toBeInstanceOf(HTMLCanvasElement);
     expect(canvas!.width).toBe(3600);
-    expect(canvas!.height).toBe(2250);
+    expect(canvas!.height).toBe(2700);
   }, 10_000);
 
   it("calls onReady only once for a given config (no double-fire)", async () => {
