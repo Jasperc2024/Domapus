@@ -63,8 +63,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const { id, type, data } = e.data;
 
   if (currentAbortController) {
-    // Abort previous request and notify the main thread so its promise
-    // can be cleaned up immediately instead of hanging until timeout.
     currentAbortController.abort('superseded');
   }
   currentAbortController = new AbortController();
@@ -238,8 +236,6 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
   } catch (err) {
     if (signal.aborted) {
-      // Request was superseded by a newer one — notify main thread
-      // so it can resolve/reject the pending promise cleanly.
       self.postMessage({ type: "ABORTED", id });
     } else {
       const errMessage = err instanceof Error ? err.message : "Unknown error";
