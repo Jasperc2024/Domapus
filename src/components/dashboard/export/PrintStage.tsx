@@ -13,21 +13,16 @@ const BASE_WIDTH = 1200;
 const BASE_HEIGHT = 900;
 const BOUNDS_BUFFER = 0.15;
 
-// Export canvas dimensions and attribution constants — shared with ExportSidebar
-// so the PDF hyperlink overlay can be positioned from the same source of truth.
 export const EXPORT_CANVAS_W = 3600;
-export const EXPORT_CANVAS_H = 2700; // 4:3
+export const EXPORT_CANVAS_H = 2700;
 export const EXPORT_CANVAS_PAD = 80;
 export const ATTRIBUTION_TEXT = "Built by Domapus • Data: Redfin & Zillow";
-export const ATTRIBUTION_FONT = "24px sans-serif";
-// Baseline of attribution text in canvas pixels (used for PDF link mapping)
-export const ATTRIBUTION_BASELINE_Y = EXPORT_CANVAS_PAD + 40;
+export const ATTRIBUTION_FONT = "32px sans-serif";
+export const ATTRIBUTION_BASELINE_Y = EXPORT_CANVAS_PAD + 48;
 export const ATTRIBUTION_RIGHT_X = EXPORT_CANVAS_W - EXPORT_CANVAS_PAD;
 
-// Default Alaska viewport — used when coordinate data is unavailable
 const ALASKA_DEFAULT_BOUNDS: [[number, number], [number, number]] = [[-168.5, 54.5], [-141.0, 71.5]];
 const HAWAII_DEFAULT_BOUNDS: [[number, number], [number, number]] = [[-160.5, 18.9], [-154.8, 22.3]];
-// Safety timeout before marking a map ready even if tiles haven't fully loaded
 const MAP_READY_TIMEOUT_MS = 10_000;
 
 export interface PrintStageProps {
@@ -43,10 +38,6 @@ export interface PrintStageProps {
 
 export interface PrintStageRef {
   getElement: () => HTMLDivElement | null;
-  /**
-   * Composites all map canvases (WebGL) with title and legend into a single
-   * HTMLCanvasElement ready for PNG/PDF download — no DOM screenshot needed.
-   */
   exportToCanvas: () => Promise<HTMLCanvasElement>;
 }
 
@@ -123,7 +114,6 @@ function captureMapCanvas(map: maplibregl.Map): Promise<HTMLCanvasElement> {
       if (settled) return;
       settled = true;
       clearTimeout(timeoutId);
-      // triggerRepaint ensures the GL framebuffer is current before we read it
       map.once("render", () => resolve(map.getCanvas()));
       map.triggerRepaint();
     };
@@ -149,7 +139,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [scale, setScale] = useState(1);
 
-  // Keep onReady stable — avoid re-running the heavy map effect when the parent re-renders
   const onReadyRef = useRef(onReady);
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
 
@@ -188,8 +177,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
       if (isAk) {
         ak.add(zip.zipCode);
-        // Exclude Alaskan islands that have crossed the International Date Line (positive lng)
-        // so the bbox stays in the Western Hemisphere and fitBounds works correctly.
         if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng) && lng < 0) akPts.push(point([lng, lat]));
       } else if (isHi) {
         hi.add(zip.zipCode);
@@ -213,7 +200,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       alaskaZips: ak,
       hawaiiZips: hi,
       mainlandZips: ml,
-      // Fall back to well-known bounds when coordinates are missing
       alaskaBounds: ak.size > 0 ? (getSmartBbox(akPts) ?? ALASKA_DEFAULT_BOUNDS) : null,
       hawaiiBounds: hi.size > 0 ? (getSmartBbox(hiPts) ?? HAWAII_DEFAULT_BOUNDS) : null,
       mainlandBounds: getSmartBbox(mlPts),
@@ -242,7 +228,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     };
   }, [metricValues, selectedMetric]);
 
-  // Keep stable refs so the map effect doesn't need to list them as deps
   const bucketsRef = useRef(buckets);
   bucketsRef.current = buckets;
   const zipDataMapRef = useRef(zipDataMap);
@@ -262,10 +247,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
   const regionScopeRef = useRef(regionScope);
   regionScopeRef.current = regionScope;
 
-  // ---------------------------------------------------------------------------
-  // exportToCanvas — composites all WebGL map canvases with title/legend/insets
-  // into a single 2D canvas ready for download. No DOM screenshot libraries needed.
-  // ---------------------------------------------------------------------------
   const exportToCanvas = useCallback(async (): Promise<HTMLCanvasElement> => {
     const EXPORT_W = EXPORT_CANVAS_W;
     const EXPORT_H = EXPORT_CANVAS_H;
@@ -277,11 +258,9 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     const ctx = out.getContext("2d");
     if (!ctx) throw new Error("Could not get 2D context");
 
-    // Background
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
 
-    // Capture each map's GL canvas (preserveDrawingBuffer keeps the framebuffer intact)
     const captureOrNull = async (map: maplibregl.Map | null) => {
       if (!map) return null;
       try { return await captureMapCanvas(map); }
@@ -294,36 +273,32 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       captureOrNull(mapsRef.current.hawaii),
     ]);
 
-    // ── Header ──────────────────────────────────────────────────────────────
     let mapTop = PAD;
 
     if (includeTitleRef.current) {
-      ctx.fillStyle = "#111827";
-      ctx.font = "bold 60px sans-serif";
-      ctx.fillText(`${getMetricDisplayName(selectedMetricRef.current)} by ZIP Code`, PAD, PAD + 60);
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 72px sans-serif";
+      ctx.fillText(`${getMetricDisplayName(selectedMetricRef.current)} by ZIP Code`, PAD, PAD + 72);
 
-      ctx.fillStyle = "#6B7280";
-      ctx.font = "36px sans-serif";
-      ctx.fillText(`${regionNameRef.current} • ${getDate()}`, PAD, PAD + 112);
+      ctx.fillStyle = "#475569";
+      ctx.font = "42px sans-serif";
+      ctx.fillText(`${regionNameRef.current} • ${getDate()}`, PAD, PAD + 130);
 
-      mapTop = PAD + 150;
+      mapTop = PAD + 170;
     }
 
-    // Attribution (top-right) — position defined by ATTRIBUTION_* module constants
     ctx.fillStyle = "#9CA3AF";
     ctx.font = ATTRIBUTION_FONT;
     ctx.textAlign = "right";
     ctx.fillText(ATTRIBUTION_TEXT, ATTRIBUTION_RIGHT_X, ATTRIBUTION_BASELINE_Y);
     ctx.textAlign = "left";
 
-    // ── Map area ─────────────────────────────────────────────────────────────
     const mapLeft = PAD;
     const mapRight = EXPORT_W - PAD;
     const mapBottom = EXPORT_H - PAD;
     const mapWidth = mapRight - mapLeft;
     const mapHeight = mapBottom - mapTop;
 
-    // Slate-50 background behind map
     ctx.fillStyle = "#F8FAFC";
     ctx.fillRect(mapLeft, mapTop, mapWidth, mapHeight);
 
@@ -331,7 +306,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       ctx.drawImage(mainGl, mapLeft, mapTop, mapWidth, mapHeight);
     }
 
-    // ── Insets (Alaska & Hawaii for national scope) ───────────────────────────
     if (regionScopeRef.current === "national") {
       const INSET_W = 400;
       const INSET_H = 260;
@@ -341,17 +315,14 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
       const drawInset = (glCanvas: HTMLCanvasElement | null, label: string) => {
         if (!glCanvas) return;
-        // White background + border
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(insetX, insetY, INSET_W, INSET_H + INSET_LABEL_H);
         ctx.strokeStyle = "#000000";
         ctx.lineWidth = 1;
         ctx.strokeRect(insetX, insetY, INSET_W, INSET_H + INSET_LABEL_H);
-        // Label
         ctx.fillStyle = "#64748B";
-        ctx.font = "bold 20px sans-serif";
-        ctx.fillText(label, insetX + 8, insetY + 22);
-        // Map image
+        ctx.font = "bold 24px sans-serif";
+        ctx.fillText(label, insetX + 8, insetY + 24);
         ctx.drawImage(glCanvas, insetX, insetY + INSET_LABEL_H, INSET_W, INSET_H);
         insetX += INSET_W + 12;
       };
@@ -360,12 +331,13 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       if (hawaiiZips.size > 0) drawInset(hawaiiGl, "Hawaii");
     }
 
-    // ── Legend ────────────────────────────────────────────────────────────────
     if (includeLegendRef.current) {
-      const LEGEND_W = 500;
-      const LEGEND_H = 20;
-      const legendX = mapRight - LEGEND_W - 12;
-      const legendY = mapBottom - 100;
+      const LEGEND_W = 600;
+      const LEGEND_H = 28;
+      const LEGEND_MARGIN_R = 40;
+      const LEGEND_MARGIN_B = 40;
+      const legendX = mapRight - LEGEND_W - LEGEND_MARGIN_R;
+      const legendY = mapBottom - LEGEND_MARGIN_B - 32 - LEGEND_H;
 
       const gradient = ctx.createLinearGradient(legendX, 0, legendX + LEGEND_W, 0);
       CHOROPLETH_COLORS.forEach((color, i) => {
@@ -373,7 +345,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       });
 
       ctx.beginPath();
-      // roundRect is not available in all environments; fall back to rect() if needed
       if (typeof ctx.roundRect === "function") {
         ctx.roundRect(legendX, legendY, LEGEND_W, LEGEND_H, 4);
       } else {
@@ -383,14 +354,14 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       ctx.fill();
 
       const ld = legendDisplayRef.current;
-      ctx.fillStyle = "#374151";
-      ctx.font = "bold 22px sans-serif";
+      ctx.fillStyle = "#1e293b";
+      ctx.font = "bold 26px sans-serif";
       ctx.textAlign = "left";
-      ctx.fillText(ld.min, legendX, legendY + LEGEND_H + 30);
+      ctx.fillText(ld.min, legendX, legendY + LEGEND_H + 32);
       ctx.textAlign = "center";
-      ctx.fillText(ld.mid, legendX + LEGEND_W / 2, legendY + LEGEND_H + 30);
+      ctx.fillText(ld.mid, legendX + LEGEND_W / 2, legendY + LEGEND_H + 32);
       ctx.textAlign = "right";
-      ctx.fillText(ld.max, legendX + LEGEND_W, legendY + LEGEND_H + 30);
+      ctx.fillText(ld.max, legendX + LEGEND_W, legendY + LEGEND_H + 32);
       ctx.textAlign = "left";
     }
 
@@ -402,7 +373,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     exportToCanvas,
   }), [exportToCanvas]);
 
-  // Stable key: only re-create maps when something fundamental changes
   const mapCreationKey = useMemo(
     () => `${regionScope}|${regionName}|${selectedMetric}|${filteredData.length}|${showCities}`,
     [regionScope, regionName, selectedMetric, filteredData.length, showCities],
@@ -412,7 +382,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     addPMTilesProtocol();
     setMapsLoaded(false);
 
-    // Destroy old maps
     (["main", "alaska", "hawaii"] as const).forEach(k => {
       mapsRef.current[k]?.remove();
       mapsRef.current[k] = null;
@@ -471,10 +440,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
         interactive: false,
         attributionControl: false,
         fadeDuration: 0,
-        // Prevent tile repetition when panning across the International Date Line,
-        // which would show duplicate features in the Alaska/Hawaii insets.
         renderWorldCopies: false,
-        // Required so map.getCanvas().toDataURL() works after rendering
         preserveDrawingBuffer: true,
       });
       mapsRef.current[key] = map;
@@ -493,7 +459,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
             }
           }
 
-          // Selectively show only water, boundaries, and optionally city labels
           const style = map.getStyle();
           let firstCityLayerId: string | undefined;
           if (style?.layers) {
@@ -555,7 +520,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
             map.triggerRepaint();
           };
 
-          // Apply feature states as soon as the source tiles arrive
           const onSourceData = (e: maplibregl.MapSourceDataEvent) => {
             if (e.sourceId === "zips" && e.isSourceLoaded && !featureStatesApplied) {
               map.off("sourcedata", onSourceData);
@@ -568,7 +532,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
             applyFeatureStates();
           }
 
-          // Poll until the map is fully idle with feature states applied
           const checkInterval = setInterval(() => {
             if (isCleanedUp) { clearInterval(checkInterval); return; }
             if (!featureStatesApplied && map.isSourceLoaded("zips")) {
@@ -582,7 +545,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
             }
           }, 250);
 
-          // Safety timeout — mark ready even if tiles never fully load
           setTimeout(() => {
             if (!isReadyTriggered && !isCleanedUp) {
               clearInterval(checkInterval);

@@ -35,8 +35,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
   const [selectedMetro, setSelectedMetro] = useState<string>("");
 
   // Metro Search States
-  const [metroSearch, setMetroSearch] = useState<string>("");
-  const [debouncedMetroSearch, setDebouncedMetroSearch] = useState<string>("");
+  const [metroSearch, setMetroSearch] = useState<string>("");  const [debouncedMetroSearch, setDebouncedMetroSearch] = useState<string>("");
   const [isMetroListOpen, setIsMetroListOpen] = useState(false);
   const metroContainerRef = useRef<HTMLDivElement>(null);
 
@@ -50,7 +49,6 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
   const printStageRef = useRef<PrintStageRef>(null);
 
-  // Debounce metro search
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedMetroSearch(metroSearch), 150);
     return () => clearTimeout(timer);
@@ -66,7 +64,6 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Reset map readiness when core settings change
   useEffect(() => {
     setIsMapReady(false);
   }, [regionScope, selectedState, selectedMetro, selectedMetric, showCities]);
@@ -173,17 +170,17 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     setIsExporting(true);
 
     try {
-      // Composite all WebGL map canvases into a single 2D canvas — no DOM screenshot needed
       const canvas = await printStageRef.current.exportToCanvas();
+      const safeRegionName = regionName.replace(/[^a-zA-Z0-9 -]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim();
 
       if (fileFormat === "png") {
         const link = document.createElement("a");
-        link.download = `Domapus-${selectedMetric}-${regionScope}.png`;
+        link.download = `Domapus-${selectedMetric}-${safeRegionName}.png`;
         link.href = canvas.toDataURL("image/png", 1.0);
         link.click();
       } else {
         const imgData = canvas.toDataURL("image/png", 1.0);
-        const MARGIN = 15; // mm — margin on all sides
+        const MARGIN = 8;
         const options: jsPDFOptions = { orientation: "l", unit: "mm", format: "a4" };
         const pdf = new jsPDF(options);
 
@@ -193,40 +190,33 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
           creator: "Domapus (https://jasperc2024.github.io/Domapus/)",
         });
 
-        const pdfWidth = pdf.internal.pageSize.getWidth();   // ~297mm landscape
-        const pdfHeight = pdf.internal.pageSize.getHeight(); // ~210mm landscape
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
         const usableWidth = pdfWidth - 2 * MARGIN;
         const usableHeight = pdfHeight - 2 * MARGIN;
-        const imgAspect = canvas.width / canvas.height; // 4:3
+        const imgAspect = canvas.width / canvas.height;
 
         let drawWidth: number, drawHeight: number;
         if (usableWidth / usableHeight > imgAspect) {
-          // Height is the constraint
           drawHeight = usableHeight;
           drawWidth = drawHeight * imgAspect;
         } else {
-          // Width is the constraint
           drawWidth = usableWidth;
           drawHeight = drawWidth / imgAspect;
         }
 
-        // Center the image within the usable area
         const offsetX = MARGIN + (usableWidth - drawWidth) / 2;
         const offsetY = MARGIN + (usableHeight - drawHeight) / 2;
 
         pdf.addImage(imgData, "PNG", offsetX, offsetY, drawWidth, drawHeight);
 
-        // Compute the exact PDF bounding box of the attribution text using the same
-        // constants that PrintStage uses when drawing it, plus measureText for width/height.
         const tmpCtx = document.createElement("canvas").getContext("2d")!;
         tmpCtx.font = ATTRIBUTION_FONT;
         const metrics = tmpCtx.measureText(ATTRIBUTION_TEXT);
-        // Canvas coordinates of the attribution text bounding box
         const canvasTextRight = ATTRIBUTION_RIGHT_X;
         const canvasTextLeft = canvasTextRight - metrics.width;
-        const canvasTextTop = ATTRIBUTION_BASELINE_Y - (metrics.actualBoundingBoxAscent ?? 20);
-        const canvasTextBottom = ATTRIBUTION_BASELINE_Y + (metrics.actualBoundingBoxDescent ?? 4);
-        // Map canvas pixel space → PDF mm space (with a small padding of 2px each side)
+        const canvasTextTop = ATTRIBUTION_BASELINE_Y - (metrics.actualBoundingBoxAscent ?? 24);
+        const canvasTextBottom = ATTRIBUTION_BASELINE_Y + (metrics.actualBoundingBoxDescent ?? 5);
         const scaleX = drawWidth / EXPORT_CANVAS_W;
         const scaleY = drawHeight / EXPORT_CANVAS_H;
         const attrX = offsetX + (canvasTextLeft - 2) * scaleX;
@@ -235,7 +225,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         const attrH = (canvasTextBottom - canvasTextTop + 4) * scaleY;
         pdf.link(attrX, attrY, attrW, attrH, { url: "https://jasperc2024.github.io/Domapus/" });
 
-        pdf.save(`Domapus-${selectedMetric}-${regionScope}.pdf`);
+        pdf.save(`Domapus-${selectedMetric}-${safeRegionName}.pdf`);
       }
 
       toast({ title: "Export Complete", description: "Your map has been downloaded.", duration: 10000 });
