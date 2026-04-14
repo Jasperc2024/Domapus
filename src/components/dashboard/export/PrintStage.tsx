@@ -16,6 +16,8 @@ const BOUNDS_BUFFER = 0.15;
 // Default Alaska viewport — used when coordinate data is unavailable
 const ALASKA_DEFAULT_BOUNDS: [[number, number], [number, number]] = [[-168.5, 54.5], [-141.0, 71.5]];
 const HAWAII_DEFAULT_BOUNDS: [[number, number], [number, number]] = [[-160.5, 18.9], [-154.8, 22.3]];
+// Safety timeout before marking a map ready even if tiles haven't fully loaded
+const MAP_READY_TIMEOUT_MS = 10_000;
 
 export interface PrintStageProps {
   filteredData: ZipData[];
@@ -96,7 +98,7 @@ function computeQuantiles(values: number[], percentiles: number[]) {
 /** Wait for a map to reach the idle state then capture its GL canvas as an image. */
 function captureMapCanvas(map: maplibregl.Map): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
-    const CAPTURE_TIMEOUT_MS = 12_000;
+    const CAPTURE_TIMEOUT_MS = 10_000;
     let settled = false;
 
     const timeoutId = setTimeout(() => {
@@ -167,7 +169,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     const akPts: ReturnType<typeof point>[] = [], hiPts: ReturnType<typeof point>[] = [], mlPts: ReturnType<typeof point>[] = [];
 
     filteredData.forEach(zip => {
-      const st = (zip.state ?? '').toString().toUpperCase();
+      const st = (zip.state ?? '').toUpperCase();
       const isAk = st === 'AK';
       const isHi = st === 'HI';
       const lat = zip.latitude;
@@ -453,6 +455,8 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
         interactive: false,
         attributionControl: false,
         fadeDuration: 0,
+        // Prevent tile repetition when panning across the International Date Line,
+        // which would show duplicate features in the Alaska/Hawaii insets.
         renderWorldCopies: false,
         // Required so map.getCanvas().toDataURL() works after rendering
         preserveDrawingBuffer: true,
@@ -573,7 +577,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
               loadedCount++;
               markReady();
             }
-          }, 10_000);
+          }, MAP_READY_TIMEOUT_MS);
 
         } catch (error: unknown) {
           const errMsg = error instanceof Error ? error.message : "Unknown export map error";
