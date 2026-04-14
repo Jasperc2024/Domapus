@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, forwardRef, useImperativeHandle, useState } from "react";
+import { useEffect, useRef, useMemo, forwardRef, useImperativeHandle, useState, useCallback } from "react";
 import maplibregl, { ExpressionSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { ZipData } from "../map/types";
@@ -13,6 +13,10 @@ const BASE_WIDTH = 1200;
 const BASE_HEIGHT = 900;
 const BOUNDS_BUFFER = 0.15;
 
+// Default Alaska viewport — used when coordinate data is unavailable
+const ALASKA_DEFAULT_BOUNDS: [[number, number], [number, number]] = [[-168.5, 54.5], [-141.0, 71.5]];
+const HAWAII_DEFAULT_BOUNDS: [[number, number], [number, number]] = [[-160.5, 18.9], [-154.8, 22.3]];
+
 export interface PrintStageProps {
   filteredData: ZipData[];
   selectedMetric: string;
@@ -24,7 +28,14 @@ export interface PrintStageProps {
   onReady?: () => void;
 }
 
-export interface PrintStageRef { getElement: () => HTMLDivElement | null; }
+export interface PrintStageRef {
+  getElement: () => HTMLDivElement | null;
+  /**
+   * Composites all map canvases (WebGL) with title and legend into a single
+   * HTMLCanvasElement ready for PNG/PDF download — no DOM screenshot needed.
+   */
+  exportToCanvas: () => Promise<HTMLCanvasElement>;
+}
 
 function getMetricValue(data: ZipData | undefined, metric: string): number {
   if (!data) return 0;
@@ -49,11 +60,19 @@ function computeQuantileBuckets(values: number[], numBuckets = 8): number[] {
 }
 
 const getMetricDisplayName = (metric: string): string => {
-  const metricNames: Record<string, string> = { "zhvi": "Zillow Home Value Index", "median_sale_price": "Median Sale Price", "median_ppsf": "Median Price per Sq Ft", "avg_sale_to_list_ratio": "Sale-to-List Ratio", "median_dom": "Median Days on Market" };
+  const metricNames: Record<string, string> = {
+    "zhvi": "Zillow Home Value Index",
+    "median_sale_price": "Median Sale Price",
+    "median_ppsf": "Median Price per Sq Ft",
+    "avg_sale_to_list_ratio": "Sale-to-List Ratio",
+    "median_dom": "Median Days on Market",
+  };
   return metricNames[metric] || metric.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 };
 
-const getDate = (): string => new Date(new Date().setMonth(new Date().getMonth() - 1)).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+const getDate = (): string =>
+  new Date(new Date().setMonth(new Date().getMonth() - 1))
+    .toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
 function formatLegendValue(value: number, metric: string): string {
   const m = metric.toLowerCase();
@@ -74,6 +93,36 @@ function computeQuantiles(values: number[], percentiles: number[]) {
   });
 }
 
+/** Wait for a map to reach the idle state then capture its GL canvas as an image. */
+function captureMapCanvas(map: maplibregl.Map): Promise<HTMLCanvasElement> {
+  return new Promise((resolve, reject) => {
+    const CAPTURE_TIMEOUT_MS = 12_000;
+    let settled = false;
+
+    const timeoutId = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error("Map capture timed out"));
+      }
+    }, CAPTURE_TIMEOUT_MS);
+
+    const doCapture = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      // triggerRepaint ensures the GL framebuffer is current before we read it
+      map.once("render", () => resolve(map.getCanvas()));
+      map.triggerRepaint();
+    };
+
+    if (map.loaded() && map.isStyleLoaded()) {
+      doCapture();
+    } else {
+      map.once("idle", doCapture);
+    }
+  });
+}
+
 export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
   filteredData, selectedMetric, regionScope, regionName, includeLegend, includeTitle, showCities = false, onReady
 }, ref) => {
@@ -81,20 +130,23 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
   const mainMapRef = useRef<HTMLDivElement>(null);
   const alaskaMapRef = useRef<HTMLDivElement>(null);
   const hawaiiMapRef = useRef<HTMLDivElement>(null);
-  const mapsRef = useRef<{ [key: string]: maplibregl.Map | null }>({});
+  const mapsRef = useRef<{ main: maplibregl.Map | null; alaska: maplibregl.Map | null; hawaii: maplibregl.Map | null }>({
+    main: null, alaska: null, hawaii: null,
+  });
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [scale, setScale] = useState(1);
+
+  // Keep onReady stable — avoid re-running the heavy map effect when the parent re-renders
+  const onReadyRef = useRef(onReady);
+  useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
 
   useEffect(() => {
     const handleResize = () => {
       if (containerRef.current && containerRef.current.parentElement) {
         const parent = containerRef.current.parentElement;
-        const availWidth = parent.clientWidth;
-        const availHeight = parent.clientHeight;
-        const scaleW = availWidth / BASE_WIDTH;
-        const scaleH = availHeight / BASE_HEIGHT;
-        const newScale = Math.min(scaleW, scaleH);
-        setScale(newScale);
+        const scaleW = parent.clientWidth / BASE_WIDTH;
+        const scaleH = parent.clientHeight / BASE_HEIGHT;
+        setScale(Math.min(scaleW, scaleH));
         Object.values(mapsRef.current).forEach(map => map?.resize());
       }
     };
@@ -115,54 +167,69 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     const akPts: ReturnType<typeof point>[] = [], hiPts: ReturnType<typeof point>[] = [], mlPts: ReturnType<typeof point>[] = [];
 
     filteredData.forEach(zip => {
-      const st = (zip.state ?? '').toString().toLowerCase();
-      const isAk = st === 'ak' || st === 'alaska';
-      const isHi = st === 'hi' || st === 'hawaii';
-      const lat = zip.latitude || (zip as { lat?: number }).lat;
-      const lng = zip.longitude || (zip as { lng?: number }).lng;
-
-      if (!lat || !lng) return;
+      const st = (zip.state ?? '').toString().toUpperCase();
+      const isAk = st === 'AK';
+      const isHi = st === 'HI';
+      const lat = zip.latitude;
+      const lng = zip.longitude;
 
       if (isAk) {
         ak.add(zip.zipCode);
-        if (lng < 0) akPts.push(point([lng, lat]));
-      }
-      else if (isHi) {
+        // Exclude Alaskan islands that have crossed the International Date Line (positive lng)
+        // so the bbox stays in the Western Hemisphere and fitBounds works correctly.
+        if (lat && lng && lng < 0) akPts.push(point([lng, lat]));
+      } else if (isHi) {
         hi.add(zip.zipCode);
-        hiPts.push(point([lng, lat]));
-      }
-      else {
+        if (lat && lng) hiPts.push(point([lng, lat]));
+      } else {
         ml.add(zip.zipCode);
-        mlPts.push(point([lng, lat]));
+        if (lat && lng) mlPts.push(point([lng, lat]));
       }
     });
 
-    const getSmartBbox = (pts: ReturnType<typeof point>[]) => {
+    const getSmartBbox = (pts: ReturnType<typeof point>[]): [[number, number], [number, number]] | null => {
       if (pts.length === 0) return null;
       const b = bbox(featureCollection(pts));
-      let [minX, minY, maxX, maxY] = b;
-      minX -= BOUNDS_BUFFER; minY -= BOUNDS_BUFFER;
-      maxX += BOUNDS_BUFFER; maxY += BOUNDS_BUFFER;
-      return [[minX, minY], [maxX, maxY]] as [[number, number], [number, number]];
+      return [
+        [b[0] - BOUNDS_BUFFER, b[1] - BOUNDS_BUFFER],
+        [b[2] + BOUNDS_BUFFER, b[3] + BOUNDS_BUFFER],
+      ];
     };
 
     return {
-      alaskaZips: ak, hawaiiZips: hi, mainlandZips: ml,
-      alaskaBounds: getSmartBbox(akPts),
-      hawaiiBounds: getSmartBbox(hiPts),
-      mainlandBounds: getSmartBbox(mlPts)
+      alaskaZips: ak,
+      hawaiiZips: hi,
+      mainlandZips: ml,
+      // Fall back to well-known bounds when coordinates are missing
+      alaskaBounds: ak.size > 0 ? (getSmartBbox(akPts) ?? ALASKA_DEFAULT_BOUNDS) : null,
+      hawaiiBounds: hi.size > 0 ? (getSmartBbox(hiPts) ?? HAWAII_DEFAULT_BOUNDS) : null,
+      mainlandBounds: getSmartBbox(mlPts),
     };
   }, [filteredData]);
 
-  const buckets = useMemo(() => computeQuantileBuckets(filteredData.map(d => getMetricValue(d, selectedMetric))), [filteredData, selectedMetric]);
-  const metricValues = useMemo(() => filteredData.map(d => d[selectedMetric as keyof ZipData] as number).filter(v => typeof v === "number" && v > 0), [filteredData, selectedMetric]);
+  const buckets = useMemo(
+    () => computeQuantileBuckets(filteredData.map(d => getMetricValue(d, selectedMetric))),
+    [filteredData, selectedMetric],
+  );
+
+  const metricValues = useMemo(
+    () => filteredData
+      .map(d => d[selectedMetric as keyof ZipData] as number)
+      .filter(v => typeof v === "number" && v > 0),
+    [filteredData, selectedMetric],
+  );
+
   const legendDisplay = useMemo(() => {
     if (metricValues.length === 0) return { min: "N/A", mid: "N/A", max: "N/A" };
     const [min, mid, max] = computeQuantiles(metricValues, [0.05, 0.5, 0.95]);
-    return { min: formatLegendValue(min, selectedMetric), mid: formatLegendValue(mid, selectedMetric), max: formatLegendValue(max, selectedMetric) };
+    return {
+      min: formatLegendValue(min, selectedMetric),
+      mid: formatLegendValue(mid, selectedMetric),
+      max: formatLegendValue(max, selectedMetric),
+    };
   }, [metricValues, selectedMetric]);
 
-  // Use refs to avoid dependency-triggered double renders
+  // Keep stable refs so the map effect doesn't need to list them as deps
   const bucketsRef = useRef(buckets);
   bucketsRef.current = buckets;
   const zipDataMapRef = useRef(zipDataMap);
@@ -171,20 +238,172 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
   filteredDataRef.current = filteredData;
   const selectedMetricRef = useRef(selectedMetric);
   selectedMetricRef.current = selectedMetric;
+  const legendDisplayRef = useRef(legendDisplay);
+  legendDisplayRef.current = legendDisplay;
+  const includeLegendRef = useRef(includeLegend);
+  includeLegendRef.current = includeLegend;
+  const includeTitleRef = useRef(includeTitle);
+  includeTitleRef.current = includeTitle;
+  const regionNameRef = useRef(regionName);
+  regionNameRef.current = regionName;
+  const regionScopeRef = useRef(regionScope);
+  regionScopeRef.current = regionScope;
 
-  useImperativeHandle(ref, () => ({ getElement: () => containerRef.current }));
+  // ---------------------------------------------------------------------------
+  // exportToCanvas — composites all WebGL map canvases with title/legend/insets
+  // into a single 2D canvas ready for download. No DOM screenshot libraries needed.
+  // ---------------------------------------------------------------------------
+  const exportToCanvas = useCallback(async (): Promise<HTMLCanvasElement> => {
+    const EXPORT_W = 3600;
+    const EXPORT_H = 2250;
+    const PAD = 80;
 
-  // Stable key to detect when we actually need to re-create maps
-  const mapCreationKey = useMemo(() => {
-    return `${regionScope}|${regionName}|${selectedMetric}|${filteredData.length}|${showCities}`;
-  }, [regionScope, regionName, selectedMetric, filteredData.length, showCities]);
+    const out = document.createElement("canvas");
+    out.width = EXPORT_W;
+    out.height = EXPORT_H;
+    const ctx = out.getContext("2d");
+    if (!ctx) throw new Error("Could not get 2D context");
+
+    // Background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
+
+    // Capture each map's GL canvas (preserveDrawingBuffer keeps the framebuffer intact)
+    const captureOrNull = async (map: maplibregl.Map | null) => {
+      if (!map) return null;
+      try { return await captureMapCanvas(map); }
+      catch { return null; }
+    };
+
+    const [mainGl, alaskaGl, hawaiiGl] = await Promise.all([
+      captureOrNull(mapsRef.current.main),
+      captureOrNull(mapsRef.current.alaska),
+      captureOrNull(mapsRef.current.hawaii),
+    ]);
+
+    // ── Header ──────────────────────────────────────────────────────────────
+    let mapTop = PAD;
+
+    if (includeTitleRef.current) {
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 60px sans-serif";
+      ctx.fillText(`${getMetricDisplayName(selectedMetricRef.current)} by ZIP Code`, PAD, PAD + 60);
+
+      ctx.fillStyle = "#6B7280";
+      ctx.font = "36px sans-serif";
+      ctx.fillText(`${regionNameRef.current} • ${getDate()}`, PAD, PAD + 112);
+
+      mapTop = PAD + 150;
+    }
+
+    // Attribution (top-right)
+    ctx.fillStyle = "#9CA3AF";
+    ctx.font = "24px sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("Built by Domapus • Data: Redfin & Zillow", EXPORT_W - PAD, PAD + 40);
+    ctx.textAlign = "left";
+
+    // ── Map area ─────────────────────────────────────────────────────────────
+    const mapLeft = PAD;
+    const mapRight = EXPORT_W - PAD;
+    const mapBottom = EXPORT_H - PAD;
+    const mapWidth = mapRight - mapLeft;
+    const mapHeight = mapBottom - mapTop;
+
+    // Slate-50 background behind map
+    ctx.fillStyle = "#F8FAFC";
+    ctx.fillRect(mapLeft, mapTop, mapWidth, mapHeight);
+
+    if (mainGl) {
+      ctx.drawImage(mainGl, mapLeft, mapTop, mapWidth, mapHeight);
+    }
+
+    // ── Insets (Alaska & Hawaii for national scope) ───────────────────────────
+    if (regionScopeRef.current === "national") {
+      const INSET_W = 400;
+      const INSET_H = 260;
+      const INSET_LABEL_H = 32;
+      const insetY = mapBottom - INSET_H - INSET_LABEL_H - 12;
+      let insetX = mapLeft + 12;
+
+      const drawInset = (glCanvas: HTMLCanvasElement | null, label: string) => {
+        if (!glCanvas) return;
+        // White background + border
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(insetX, insetY, INSET_W, INSET_H + INSET_LABEL_H);
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(insetX, insetY, INSET_W, INSET_H + INSET_LABEL_H);
+        // Label
+        ctx.fillStyle = "#64748B";
+        ctx.font = "bold 20px sans-serif";
+        ctx.fillText(label, insetX + 8, insetY + 22);
+        // Map image
+        ctx.drawImage(glCanvas, insetX, insetY + INSET_LABEL_H, INSET_W, INSET_H);
+        insetX += INSET_W + 12;
+      };
+
+      if (alaskaZips.size > 0) drawInset(alaskaGl, "Alaska");
+      if (hawaiiZips.size > 0) drawInset(hawaiiGl, "Hawaii");
+    }
+
+    // ── Legend ────────────────────────────────────────────────────────────────
+    if (includeLegendRef.current) {
+      const LEGEND_W = 500;
+      const LEGEND_H = 20;
+      const legendX = mapRight - LEGEND_W - 12;
+      const legendY = mapBottom - 100;
+
+      const gradient = ctx.createLinearGradient(legendX, 0, legendX + LEGEND_W, 0);
+      CHOROPLETH_COLORS.forEach((color, i) => {
+        gradient.addColorStop(i / (CHOROPLETH_COLORS.length - 1), color);
+      });
+
+      ctx.beginPath();
+      ctx.roundRect(legendX, legendY, LEGEND_W, LEGEND_H, 4);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      const ld = legendDisplayRef.current;
+      ctx.fillStyle = "#374151";
+      ctx.font = "bold 22px sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(ld.min, legendX, legendY + LEGEND_H + 30);
+      ctx.textAlign = "center";
+      ctx.fillText(ld.mid, legendX + LEGEND_W / 2, legendY + LEGEND_H + 30);
+      ctx.textAlign = "right";
+      ctx.fillText(ld.max, legendX + LEGEND_W, legendY + LEGEND_H + 30);
+      ctx.textAlign = "left";
+    }
+
+    return out;
+  }, [alaskaZips.size, hawaiiZips.size]);
+
+  useImperativeHandle(ref, () => ({
+    getElement: () => containerRef.current,
+    exportToCanvas,
+  }), [exportToCanvas]);
+
+  // Stable key: only re-create maps when something fundamental changes
+  const mapCreationKey = useMemo(
+    () => `${regionScope}|${regionName}|${selectedMetric}|${filteredData.length}|${showCities}`,
+    [regionScope, regionName, selectedMetric, filteredData.length, showCities],
+  );
 
   useEffect(() => {
     addPMTilesProtocol();
     setMapsLoaded(false);
 
-    Object.keys(mapsRef.current).forEach(key => { mapsRef.current[key]?.remove(); mapsRef.current[key] = null; });
-    if (filteredDataRef.current.length === 0) { onReady?.(); return; }
+    // Destroy old maps
+    (["main", "alaska", "hawaii"] as const).forEach(k => {
+      mapsRef.current[k]?.remove();
+      mapsRef.current[k] = null;
+    });
+
+    if (filteredDataRef.current.length === 0) {
+      onReadyRef.current?.();
+      return;
+    }
 
     const currentBuckets = bucketsRef.current;
     const currentZipDataMap = zipDataMapRef.current;
@@ -192,21 +411,39 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
     const currentMetric = selectedMetricRef.current;
 
     const pmtilesUrl = new URL(`${BASE_PATH}data/us_zip_codes.pmtiles`, window.location.origin).href;
-    const stepExpression: ExpressionSpecification = ["step", ["coalesce", ["feature-state", "metricValue"], 0], "#efefef", 0.000001, CHOROPLETH_COLORS[0], ...currentBuckets.flatMap((threshold, i) => [threshold, CHOROPLETH_COLORS[Math.min(i + 1, CHOROPLETH_COLORS.length - 1)]])] as ExpressionSpecification;
+    const stepExpression: ExpressionSpecification = [
+      "step",
+      ["coalesce", ["feature-state", "metricValue"], 0],
+      "#efefef",
+      0.000001, CHOROPLETH_COLORS[0],
+      ...currentBuckets.flatMap((threshold, i) => [
+        threshold,
+        CHOROPLETH_COLORS[Math.min(i + 1, CHOROPLETH_COLORS.length - 1)],
+      ]),
+    ] as ExpressionSpecification;
+
     let loadedCount = 0;
-    const requiredMaps = regionScope === 'national' ? 1 + (alaskaZips.size > 0 ? 1 : 0) + (hawaiiZips.size > 0 ? 1 : 0) : 1;
+    const requiredMaps = regionScope === "national"
+      ? 1 + (alaskaZips.size > 0 ? 1 : 0) + (hawaiiZips.size > 0 ? 1 : 0)
+      : 1;
     let isReadyTriggered = false;
     let isCleanedUp = false;
+
     const markReady = () => {
-      if (isCleanedUp) return;
-      if (loadedCount >= requiredMaps && !isReadyTriggered) {
+      if (isCleanedUp || isReadyTriggered) return;
+      if (loadedCount >= requiredMaps) {
         isReadyTriggered = true;
         setMapsLoaded(true);
-        onReady?.();
+        onReadyRef.current?.();
       }
     };
 
-    const createMap = (container: HTMLDivElement | null, key: string, bounds?: [[number, number], [number, number]], validZips?: Set<string>) => {
+    const createMap = (
+      container: HTMLDivElement | null,
+      key: "main" | "alaska" | "hawaii",
+      bounds?: [[number, number], [number, number]],
+      validZips?: Set<string>,
+    ) => {
       if (!container || isCleanedUp) return;
 
       const map = new maplibregl.Map({
@@ -216,62 +453,71 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
         interactive: false,
         attributionControl: false,
         fadeDuration: 0,
-        renderWorldCopies: true,
+        renderWorldCopies: false,
+        // Required so map.getCanvas().toDataURL() works after rendering
+        preserveDrawingBuffer: true,
       });
       mapsRef.current[key] = map;
 
-      map.on('load', () => {
+      map.on("load", () => {
+        if (isCleanedUp) { map.remove(); return; }
         try {
           map.resize();
 
           if (bounds) {
-            const padding = (key === 'alaska' || key === 'hawaii') ? 20 : 40;
             const isValid = bounds.flat().every(n => Number.isFinite(n));
             if (isValid) {
-              map.fitBounds(bounds, { padding, animate: false, maxZoom: key === 'main' ? 12 : 6 });
+              const padding = key === "main" ? 40 : 20;
+              const maxZoom = key === "main" ? 12 : 6;
+              map.fitBounds(bounds, { padding, animate: false, maxZoom });
             }
           }
 
+          // Selectively show only water, boundaries, and optionally city labels
           const style = map.getStyle();
           let firstCityLayerId: string | undefined;
-          if (style && style.layers) {
-            style.layers.forEach((layer: import("maplibre-gl").LayerSpecification) => {
+          if (style?.layers) {
+            for (const layer of style.layers) {
               const id = layer.id;
-              // source-layer check needs type narrowing or loose access since not all layers have it
-              const sourceLayer = (layer as { 'source-layer'?: string })['source-layer'];
-              const isCity = id.includes('place_city');
-              const isWater = sourceLayer === 'water';
-              const isBoundary = id.includes('boundary_country') || id.includes('boundary_state');
+              const sourceLayer = (layer as { "source-layer"?: string })["source-layer"];
+              const isCity = id.includes("place_city");
+              const isWater = sourceLayer === "water";
+              const isBoundary = id.includes("boundary_country") || id.includes("boundary_state");
 
               if (isCity) {
                 if (!firstCityLayerId) firstCityLayerId = id;
-                map.setLayoutProperty(id, 'visibility', showCities ? 'visible' : 'none');
+                map.setLayoutProperty(id, "visibility", showCities ? "visible" : "none");
               } else if (isWater || isBoundary) {
-                map.setLayoutProperty(id, 'visibility', 'visible');
+                map.setLayoutProperty(id, "visibility", "visible");
               } else {
-                map.setLayoutProperty(id, 'visibility', 'none');
+                map.setLayoutProperty(id, "visibility", "none");
               }
-            });
+            }
           }
 
-          map.addSource("zips", { type: "vector", url: `pmtiles://${pmtilesUrl}`, promoteId: "ZCTA5CE20" });
-          const filterExpression = validZips ? ["in", ["get", "ZCTA5CE20"], ["literal", Array.from(validZips)]] : ["has", "ZCTA5CE20"];
+          map.addSource("zips", {
+            type: "vector",
+            url: `pmtiles://${pmtilesUrl}`,
+            promoteId: "ZCTA5CE20",
+          });
+
+          const filterExpr = validZips
+            ? ["in", ["get", "ZCTA5CE20"], ["literal", Array.from(validZips)]]
+            : ["has", "ZCTA5CE20"];
 
           map.addLayer({
             id: "zips-fill", type: "fill", source: "zips", "source-layer": "us_zip_codes",
-            filter: filterExpression as import('maplibre-gl').FilterSpecification,
-            paint: { "fill-color": stepExpression, "fill-opacity": 0.9 }
+            filter: filterExpr as import("maplibre-gl").FilterSpecification,
+            paint: { "fill-color": stepExpression, "fill-opacity": 0.9 },
           }, firstCityLayerId);
 
           map.addLayer({
             id: "zips-border", type: "line", source: "zips", "source-layer": "us_zip_codes",
-            filter: filterExpression as import('maplibre-gl').FilterSpecification,
-            paint: { "line-color": "rgba(0,0,0,0.1)", "line-width": 0.5 }
+            filter: filterExpr as import("maplibre-gl").FilterSpecification,
+            paint: { "line-color": "rgba(0,0,0,0.1)", "line-width": 0.5 },
           }, firstCityLayerId);
 
-          // Apply feature states. Defer to sourcedata event to ensure tiles are loaded,
-          // which fixes the Alaska/Hawaii insets where tiles load slower.
-          const zipsToColor = validZips || new Set(currentFilteredData.map(z => z.zipCode));
+          const zipsToColor = validZips ?? new Set(currentFilteredData.map(z => z.zipCode));
           let featureStatesApplied = false;
 
           const applyFeatureStates = () => {
@@ -279,30 +525,34 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
             featureStatesApplied = true;
             zipsToColor.forEach(zipCode => {
               const data = currentZipDataMap[zipCode];
-              if (data) map.setFeatureState({ source: "zips", sourceLayer: "us_zip_codes", id: zipCode }, { metricValue: getMetricValue(data, currentMetric) });
+              if (data) {
+                map.setFeatureState(
+                  { source: "zips", sourceLayer: "us_zip_codes", id: zipCode },
+                  { metricValue: getMetricValue(data, currentMetric) },
+                );
+              }
             });
             map.triggerRepaint();
           };
 
-          // Listen for when source tiles actually arrive
+          // Apply feature states as soon as the source tiles arrive
           const onSourceData = (e: maplibregl.MapSourceDataEvent) => {
-            if (e.sourceId === 'zips' && e.isSourceLoaded && !featureStatesApplied) {
-              map.off('sourcedata', onSourceData);
+            if (e.sourceId === "zips" && e.isSourceLoaded && !featureStatesApplied) {
+              map.off("sourcedata", onSourceData);
               applyFeatureStates();
             }
           };
-          map.on('sourcedata', onSourceData);
-
-          // Also try immediately in case tiles are already cached
-          if (map.isSourceLoaded('zips')) {
-            map.off('sourcedata', onSourceData);
+          map.on("sourcedata", onSourceData);
+          if (map.isSourceLoaded("zips")) {
+            map.off("sourcedata", onSourceData);
             applyFeatureStates();
           }
 
+          // Poll until the map is fully idle with feature states applied
           const checkInterval = setInterval(() => {
-            // Ensure feature states are applied even if sourcedata was missed
-            if (!featureStatesApplied && map.isSourceLoaded('zips')) {
-              map.off('sourcedata', onSourceData);
+            if (isCleanedUp) { clearInterval(checkInterval); return; }
+            if (!featureStatesApplied && map.isSourceLoaded("zips")) {
+              map.off("sourcedata", onSourceData);
               applyFeatureStates();
             }
             if (map.loaded() && map.isStyleLoaded() && featureStatesApplied) {
@@ -312,17 +562,18 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
             }
           }, 250);
 
+          // Safety timeout — mark ready even if tiles never fully load
           setTimeout(() => {
-            if (!isReadyTriggered) {
+            if (!isReadyTriggered && !isCleanedUp) {
               clearInterval(checkInterval);
               if (!featureStatesApplied) {
-                map.off('sourcedata', onSourceData);
+                map.off("sourcedata", onSourceData);
                 applyFeatureStates();
               }
               loadedCount++;
               markReady();
             }
-          }, 8000);
+          }, 10_000);
 
         } catch (error: unknown) {
           const errMsg = error instanceof Error ? error.message : "Unknown export map error";
@@ -334,39 +585,36 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       });
     };
 
-    if (regionScope === 'national') {
-      createMap(mainMapRef.current, 'main', mainlandBounds || undefined, mainlandZips);
-      if (alaskaZips.size > 0) createMap(alaskaMapRef.current, 'alaska', alaskaBounds || undefined, alaskaZips);
-      if (hawaiiZips.size > 0) createMap(hawaiiMapRef.current, 'hawaii', hawaiiBounds || undefined, hawaiiZips);
+    if (regionScope === "national") {
+      createMap(mainMapRef.current, "main", mainlandBounds ?? undefined, mainlandZips);
+      if (alaskaZips.size > 0) createMap(alaskaMapRef.current, "alaska", alaskaBounds ?? undefined, alaskaZips);
+      if (hawaiiZips.size > 0) createMap(hawaiiMapRef.current, "hawaii", hawaiiBounds ?? undefined, hawaiiZips);
     } else {
-      const allBounds = mainlandBounds || alaskaBounds || hawaiiBounds;
+      const allBounds = mainlandBounds ?? alaskaBounds ?? hawaiiBounds;
       const allZips = new Set(filteredData.map(z => z.zipCode));
-      createMap(mainMapRef.current, 'main', allBounds || undefined, allZips);
+      createMap(mainMapRef.current, "main", allBounds ?? undefined, allZips);
     }
 
     return () => {
       isCleanedUp = true;
-      const currentMaps = mapsRef.current;
-      Object.keys(currentMaps).forEach(key => {
-        currentMaps[key]?.remove();
-        currentMaps[key] = null;
+      (["main", "alaska", "hawaii"] as const).forEach(k => {
+        mapsRef.current[k]?.remove();
+        mapsRef.current[k] = null;
       });
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapCreationKey, alaskaZips, hawaiiZips, mainlandZips, alaskaBounds, hawaiiBounds, mainlandBounds, onReady]);
+  }, [mapCreationKey, alaskaZips, hawaiiZips, mainlandZips, alaskaBounds, hawaiiBounds, mainlandBounds]);
 
   return (
-    <div
-      className="w-full h-full flex items-center justify-center overflow-hidden bg-muted/10 select-none"
-    >
+    <div className="w-full h-full flex items-center justify-center overflow-hidden bg-muted/10 select-none">
       <div
         ref={containerRef}
         style={{
           width: `${BASE_WIDTH}px`,
           height: `${BASE_HEIGHT}px`,
           transform: `scale(${scale})`,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-          backgroundColor: '#ffffff'
+          boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+          backgroundColor: "#ffffff",
         }}
         className="flex flex-col flex-shrink-0 origin-center rounded-md"
         onContextMenu={(e) => { e.preventDefault(); return false; }}
@@ -374,25 +622,43 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
         <div className="flex items-start justify-between px-8 pt-6 pb-4">
           {includeTitle && (
             <div>
-              <h1 className="text-3xl font-bold leading-tight text-gray-900">{getMetricDisplayName(selectedMetric)} by ZIP Code</h1>
+              <h1 className="text-3xl font-bold leading-tight text-gray-900">
+                {getMetricDisplayName(selectedMetric)} by ZIP Code
+              </h1>
               <p className="text-base mt-1 text-gray-500">{regionName} • {getDate()}</p>
             </div>
           )}
           <div className="flex items-center gap-2 text-xs text-gray-400 whitespace-nowrap flex-shrink-0 ml-auto mt-1">
-            <span>Built by <a href="https://jasperc2024.github.io/Domapus/" target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline">Domapus</a></span>
+            <span>
+              Built by{" "}
+              <a href="https://jasperc2024.github.io/Domapus/" target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline">
+                Domapus
+              </a>
+            </span>
             <span className="opacity-60">•</span>
-            <span>Data: <a href="https://www.redfin.com/news/data-center/" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: '#0c82a5' }}>Redfin</a> & <a href="https://www.zillow.com/research/data/" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: '#0c82a5' }}>Zillow</a></span>
+            <span>
+              Data:{" "}
+              <a href="https://www.redfin.com/news/data-center/" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: "#0c82a5" }}>
+                Redfin
+              </a>{" "}
+              &{" "}
+              <a href="https://www.zillow.com/research/data/" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: "#0c82a5" }}>
+                Zillow
+              </a>
+            </span>
           </div>
         </div>
 
         <div className="flex-1 mx-8 mb-6 relative bg-slate-50">
           <div ref={mainMapRef} className="absolute inset-0" />
 
-          {regionScope === 'national' && (
+          {regionScope === "national" && (
             <div className="absolute bottom-4 left-4 flex gap-4 z-10">
               {alaskaZips.size > 0 && (
                 <div className="flex flex-col bg-white border border-black">
-                  <span className="text-[10px] uppercase tracking-wider font-semibold py-0.5 px-2 bg-slate-50 text-slate-500 border-b">Alaska</span>
+                  <span className="text-[10px] uppercase tracking-wider font-semibold py-0.5 px-2 bg-slate-50 text-slate-500 border-b">
+                    Alaska
+                  </span>
                   <div className="w-48 h-32 relative">
                     <div ref={alaskaMapRef} className="absolute inset-0" />
                   </div>
@@ -400,7 +666,9 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
               )}
               {hawaiiZips.size > 0 && (
                 <div className="flex flex-col bg-white border border-black">
-                  <span className="text-[10px] uppercase tracking-wider font-semibold py-0.5 px-2 bg-slate-50 text-slate-500 border-b">Hawaii</span>
+                  <span className="text-[10px] uppercase tracking-wider font-semibold py-0.5 px-2 bg-slate-50 text-slate-500 border-b">
+                    Hawaii
+                  </span>
                   <div className="w-48 h-32 relative">
                     <div ref={hawaiiMapRef} className="absolute inset-0" />
                   </div>
@@ -411,9 +679,14 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
 
           {includeLegend && (
             <div className="absolute bottom-4 right-4 z-10 p-4 bg-white/95 backdrop-blur rounded-md">
-              <div className="h-4 w-56" style={{ background: `linear-gradient(to right, ${CHOROPLETH_COLORS.join(', ')})`, borderRadius: '4px' }} />
+              <div
+                className="h-4 w-56"
+                style={{ background: `linear-gradient(to right, ${CHOROPLETH_COLORS.join(", ")})`, borderRadius: "4px" }}
+              />
               <div className="mt-2 flex justify-between text-xs font-semibold w-56 text-gray-600">
-                <span>{legendDisplay.min}</span><span>{legendDisplay.mid}</span><span>{legendDisplay.max}</span>
+                <span>{legendDisplay.min}</span>
+                <span>{legendDisplay.mid}</span>
+                <span>{legendDisplay.max}</span>
               </div>
             </div>
           )}
@@ -422,7 +695,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
             <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-50 backdrop-blur-sm">
               <div className="flex flex-col items-center gap-3">
                 <div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-cyan-600" />
-                <span className="text-sm font-medium text-slate-500">Rendering map...</span>
+                <span className="text-sm font-medium text-slate-500">Rendering map…</span>
               </div>
             </div>
           )}

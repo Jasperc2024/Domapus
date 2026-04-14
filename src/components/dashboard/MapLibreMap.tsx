@@ -122,6 +122,12 @@ export function MapLibreMap({
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
     map.addControl(new maplibregl.NavigationControl(), "top-right");
 
+    // Increase scroll/trackpad zoom sensitivity (default trackpad: 1/100, wheel: 1/450).
+    // These values give ~2× the zoom response per gesture unit, making the map feel
+    // more responsive while staying smooth via MapLibre's built-in easing.
+    map.scrollZoom.setZoomRate(1 / 50);
+    map.scrollZoom.setWheelZoomRate(1 / 200);
+
     map.on("error", (e) => {
       const mapError = e as { error?: { message?: string } };
       const errMsg = mapError?.error?.message ?? "Map internal error";

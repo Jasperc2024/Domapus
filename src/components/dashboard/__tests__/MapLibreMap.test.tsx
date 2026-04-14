@@ -44,6 +44,7 @@ vi.mock("maplibre-gl", () => {
     getSource() { return null; }
     getLayer() { return null; }
     getStyle() { return { layers: [] as any[] }; }
+    scrollZoom = { setZoomRate() {}, setWheelZoomRate() {} };
   }
 
   class MockPopup {

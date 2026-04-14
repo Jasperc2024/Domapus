@@ -9,10 +9,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { PrintStage, PrintStageRef } from "./PrintStage";
 import { cn } from "@/lib/utils";
-import html2canvas from "html2canvas";
 import { jsPDF, jsPDFOptions } from "jspdf";
 import { toast } from "@/hooks/use-toast";
 import { trackError } from "@/lib/analytics";
+import { getStateName } from "../map/utils";
 
 export interface ExportOptions {
   regionScope: "national" | "state" | "metro";
@@ -28,8 +28,6 @@ interface ExportSidebarProps {
   selectedMetric: string;
   onClose: () => void;
 }
-
-import { getStateName } from "../map/utils";
 
 export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSidebarProps) {
   const [regionScope, setRegionScope] = useState<"national" | "state" | "metro">("national");
@@ -90,10 +88,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     }
 
     const states = Array.from(stateSet)
-      .map(code => ({
-        code,
-        name: getStateName(code)
-      }))
+      .map(code => ({ code, name: getStateName(code) }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
     const metros = Array.from(metroSet);
@@ -101,19 +96,13 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
     let filtered = metros;
     if (debouncedMetroSearch) {
       const query = debouncedMetroSearch.toLowerCase();
-
       filtered = metros.filter(m => m.toLowerCase().includes(query));
-
       filtered.sort((a, b) => {
         const aLower = a.toLowerCase();
         const bLower = b.toLowerCase();
         const indexA = aLower.indexOf(query);
         const indexB = bLower.indexOf(query);
-
-        if (indexA !== indexB) {
-          return indexA - indexB;
-        }
-
+        if (indexA !== indexB) return indexA - indexB;
         return a.localeCompare(b);
       });
     } else {
@@ -142,9 +131,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
   }, [allZipData, regionScope, selectedState, selectedMetro, hasValidSelection]);
 
   const regionName = useMemo(() => {
-    if (regionScope === 'state') {
-      return getStateName(selectedState) || "Select a state";
-    }
+    if (regionScope === 'state') return getStateName(selectedState) || "Select a state";
     if (regionScope === 'metro') return selectedMetro || "Select a metro area";
     return "United States";
   }, [regionScope, selectedState, selectedMetro]);
@@ -168,8 +155,7 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
   };
 
   const handleExport = useCallback(async () => {
-    const element = printStageRef.current?.getElement();
-    if (!element) return;
+    if (!printStageRef.current) return;
 
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({
@@ -180,25 +166,15 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         scope: regionScope,
         region_name: regionName,
         include_legend: includeLegend,
-        include_title: includeTitle
-      }
+        include_title: includeTitle,
+      },
     });
 
     setIsExporting(true);
 
     try {
-      await new Promise(resolve => requestAnimationFrame(resolve));
-      // Give maplibre a moment to ensure tiles are painted
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const scale = 5;
-      const canvas = await html2canvas(element, {
-        scale,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        allowTaint: true,
-      });
+      // Composite all WebGL map canvases into a single 2D canvas — no DOM screenshot needed
+      const canvas = await printStageRef.current.exportToCanvas();
 
       if (fileFormat === "png") {
         const link = document.createElement("a");
@@ -207,27 +183,21 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         link.click();
       } else {
         const imgData = canvas.toDataURL("image/png", 1.0);
-        const options: jsPDFOptions = {
-          orientation: "l",
-          unit: "mm",
-          format: "a4",
-        };
+        const options: jsPDFOptions = { orientation: "l", unit: "mm", format: "a4" };
         const pdf = new jsPDF(options);
 
         pdf.setProperties({
           title: `Domapus Export - ${selectedMetric}`,
           subject: `Real Estate Data for ${regionName}`,
-          creator: 'Domapus (https://jasperc2024.github.io/Domapus/)',
+          creator: "Domapus (https://jasperc2024.github.io/Domapus/)",
         });
 
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
-
         const imgAspect = canvas.width / canvas.height;
         const pdfAspect = pdfWidth / pdfHeight;
 
         let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
-
         if (imgAspect > pdfAspect) {
           drawWidth = pdfWidth;
           drawHeight = pdfWidth / imgAspect;
@@ -241,30 +211,13 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
         }
 
         pdf.addImage(imgData, "PNG", offsetX, offsetY, drawWidth, drawHeight);
-        const stageRect = element.getBoundingClientRect();
-        const links = element.querySelectorAll('a');
-
-        links.forEach((link) => {
-          const linkRect = link.getBoundingClientRect();
-          const relX = (linkRect.left - stageRect.left) / stageRect.width;
-          const relY = (linkRect.top - stageRect.top) / stageRect.height;
-          const relW = linkRect.width / stageRect.width;
-          const relH = linkRect.height / stageRect.height;
-
-          const pdfX = offsetX + (relX * drawWidth);
-          const pdfY = offsetY + (relY * drawHeight);
-          const pdfW = relW * drawWidth;
-          const pdfH = relH * drawHeight;
-
-          pdf.link(pdfX, pdfY, pdfW, pdfH, { url: link.href });
-        });
         pdf.save(`Domapus-${selectedMetric}-${regionScope}.pdf`);
       }
 
-      toast({ title: "Export Complete", description: "Your map has been downloaded.", duration: 10000, });
+      toast({ title: "Export Complete", description: "Your map has been downloaded.", duration: 10000 });
     } catch (error: unknown) {
       console.error("Export failed:", error);
-      trackError("export_failed", (error instanceof Error ? error.message : "Unknown export error"));
+      trackError("export_failed", error instanceof Error ? error.message : "Unknown export error");
       toast({ title: "Export Failed", description: "Something went wrong.", variant: "destructive" });
     } finally {
       setIsExporting(false);
@@ -311,7 +264,6 @@ export function ExportSidebar({ allZipData, selectedMetric, onClose }: ExportSid
 
       {/* Settings (bottom on mobile) */}
       <div className="order-2 md:order-1 w-full md:w-80 bg-background border-t md:border-t-0 md:border-r h-auto md:h-full shadow-xl flex flex-col max-h-[48vh] md:max-h-full">
-        {/* Sidebar Content */}
         <div className="p-3 md:p-4 space-y-3 md:space-y-4 flex-1 overflow-y-auto">
           <div className="flex items-center gap-2">
             <Download className="h-4 w-4 text-primary" />
