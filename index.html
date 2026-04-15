@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+  <meta charset="UTF-8" />
   <!-- Google Tag Manager -->
   <script>
     (function (w, d, s, l, i) {
@@ -17,11 +18,10 @@
   </script>
   <!-- End Google Tag Manager -->
 
-  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Domapus: ZIP Code Housing Data Map</title>
   <meta name="description"
-    content="Explore the U.S. housing market with this interactive ZIP code map. Access real-time data on sale prices, inventory, and more for over 26,000 ZIP codes. https://jasperc2024.github.io/Domapus/">
+    content="Interactive map showing ZIP-level housing data. Compare median prices, price per sqft, and days on market across 26,000+ U.S. ZIP codes.">
   <meta name="author" content="Jasper Chen" />
 
   <!-- SEO: Canonical Link -->
@@ -31,6 +31,17 @@
   <link rel="preconnect" href="https://basemaps.cartocdn.com" crossorigin />
   <link rel="preconnect" href="https://tiles.basemaps.cartocdn.com" crossorigin />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- Preload critical data -->
+  <link rel="preload" href="data/zip-data-lite.json" as="fetch" crossorigin />
+  <script>
+    (function () {
+      var liteUrl = new URL('data/zip-data-lite.json', document.baseURI).href;
+      window.__zipDataLitePromise = fetch(liteUrl)
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+        .catch(function () { return null; });
+    })();
+  </script>
 
   <!-- Favicon and Manifest links -->
   <link rel="icon" href="/Domapus/Logo.svg" type="image/svg+xml" />
@@ -45,27 +56,25 @@
     type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Dataset","name":"Interactive U.S. Housing Data Analysis","description":"Aggregated Redfin and Zillow real estate data for 26,000+ US ZIP codes.","url":"https://jasperc2024.github.io/Domapus/","isAccessibleForFree":true,"license":"https://github.com/Jasperc2024/Domapus/blob/main/LICENSE.md","creator":{"@type":"Person","name":"Jasper Chen"},"spatialCoverage":{"@type":"Place","name":"United States"},"distribution":{"@type":"DataDownload","encodingFormat":"application/json","contentUrl":"https://jasperc2024.github.io/Domapus/data/zip-data.json"}},{"@type":"WebApplication","name":"Domapus","url":"https://jasperc2024.github.io/Domapus/","applicationCategory":"VisualizationTool","operatingSystem":"Web Browser","description":"Real-time ZIP-code-level housing data visualization tool exploring prices and inventory trends."}]}</script>
 
   <!-- Open Graph / Social Media -->
-  <meta property="og:image"
-    content="https://raw.githubusercontent.com/Jasperc2024/Domapus/refs/heads/main/public/preview.png" />
+  <meta property="og:image" content="https://jasperc2024.github.io/Domapus/preview.png" />
   <meta property="og:url" content="https://jasperc2024.github.io/Domapus/" />
   <meta property="og:type" content="website" />
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image"
-    content="https://raw.githubusercontent.com/Jasperc2024/Domapus/refs/heads/main/public/preview.png" />
-  <meta name="twitter:creator" content="@Jasperchen925" />
+  <meta name="twitter:image" content="https://jasperc2024.github.io/Domapus/preview.png" />
+  <meta name="twitter:creator" content="@Jasperwchen" />
   <meta property="og:title" content="Domapus: ZIP Code Housing Data Map">
   <meta name="twitter:title" content="Domapus: ZIP Code Housing Data Map">
   <meta property="og:description"
-    content="Explore the U.S. housing market with this interactive ZIP code map. Access real-time data on sale prices, inventory, and more for over 26,000 ZIP codes. https://jasperc2024.github.io/Domapus/">
+    content="Interactive map showing ZIP-level housing data. Compare median prices, price per sqft, and days on market across 26,000+ U.S. ZIP codes.">
   <meta name="twitter:description"
-    content="Explore the U.S. housing market with this interactive ZIP code map. Access real-time data on sale prices, inventory, and more for over 26,000 ZIP codes. https://jasperc2024.github.io/Domapus/">
-  <script type="module" crossorigin src="/Domapus/assets/index-C1VooJf0.js"></script>
+    content="Interactive map showing ZIP-level housing data. Compare median prices, price per sqft, and days on market across 26,000+ U.S. ZIP codes.">
+  <script type="module" crossorigin src="/Domapus/assets/index-BvphkExC.js"></script>
   <link rel="modulepreload" crossorigin href="/Domapus/assets/maplibre-DtjTm36r.js">
-  <link rel="modulepreload" crossorigin href="/Domapus/assets/charts-AC_n-Gm3.js">
-  <link rel="modulepreload" crossorigin href="/Domapus/assets/pdf-export-C9FlfLes.js">
-  <link rel="stylesheet" crossorigin href="/Domapus/assets/index-qwNYr6iZ.css">
+  <link rel="modulepreload" crossorigin href="/Domapus/assets/charts-Da-r13l9.js">
+  <link rel="modulepreload" crossorigin href="/Domapus/assets/pdf-export-qbojG6Xw.js">
+  <link rel="stylesheet" crossorigin href="/Domapus/assets/index-dGKCsQ2j.css">
 </head>
 
 <body>
