@@ -4,6 +4,8 @@ import { MapLibreMap } from "../MapLibreMap";
 import maplibregl from "maplibre-gl";
 
 vi.mock("maplibre-gl", () => {
+  const mockResize = vi.fn();
+  const mockTriggerRepaint = vi.fn();
   let lastMap: any = null;
 
   class MockMap {
@@ -37,7 +39,8 @@ vi.mock("maplibre-gl", () => {
     getCenter() { return { lat: 0, lng: 0 }; }
     getBounds() { return { toArray: () => [[-1, -1], [1, 1]] as [[number, number], [number, number]] }; }
     getZoom() { return 5; }
-    resize() {}
+    resize() { mockResize(); }
+    triggerRepaint() { mockTriggerRepaint(); }
     remove() {}
     isStyleLoaded() { return true; }
     loaded() { return true; }
@@ -60,6 +63,8 @@ vi.mock("maplibre-gl", () => {
     AttributionControl: class {},
     NavigationControl: class {},
     __getLastMap: () => lastMap,
+    __getMockResize: () => mockResize,
+    __getMockTriggerRepaint: () => mockTriggerRepaint,
   };
 
   return { ...mockModule, default: mockModule };
@@ -69,6 +74,7 @@ const mockProcessData = vi.fn(async () => ({}) as any);
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.clearAllMocks();
   // Ensure container has size so map initializes
   Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, value: 800 });
   Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, value: 600 });
@@ -105,6 +111,35 @@ describe("MapLibreMap", () => {
       lastMap.emit("error", { error: { message: "decoding failed" } });
     });
 
-    expect(screen.queryByText("Map internal error. Try refreshing.")).toBeNull();
+    expect(screen.queryByText("Map internal error. Reloading...")).toBeNull();
+  });
+
+  it("suppresses recoverable context-loss errors", async () => {
+    render(
+      <MapLibreMap
+        selectedMetric="zhvi"
+        onZipSelect={() => undefined}
+        zipData={{}}
+        colorScaleDomain={null}
+        isLoading={false}
+        processData={mockProcessData}
+        customBuckets={null}
+        onMapMove={() => undefined}
+      />
+    );
+
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    const lastMap = (maplibregl as any).__getLastMap();
+    await act(async () => {
+      lastMap.emit("error", { error: { message: "WebGL context lost." } });
+      vi.runAllTimers();
+    });
+
+    expect((maplibregl as any).__getMockResize()).toHaveBeenCalled();
+    expect((maplibregl as any).__getMockTriggerRepaint()).toHaveBeenCalled();
+    expect(screen.queryByText("Map internal error. Reloading...")).toBeNull();
   });
 });

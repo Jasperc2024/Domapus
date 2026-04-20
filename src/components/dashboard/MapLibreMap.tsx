@@ -34,6 +34,7 @@ const CHOROPLETH_COLORS = [
   "#F07857", "#E84C61", "#D43D6A", "#C13584", "#9C2A7E",
   "#7B2E8D", "#2E0B59"
 ];
+const MAP_RELOAD_DELAY_MS = 800;
 
 export function MapLibreMap({
   selectedMetric,
@@ -60,14 +61,15 @@ export function MapLibreMap({
   const lastBucketsRef = useRef<string>("");
   const highlightedZipRef = useRef<string | null>(null);
   const containerSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
-  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const resizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reloadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const batchIdRef = useRef(0);
   const userInteractionNotifiedRef = useRef(false);
 
-  const getDynamicPadding = (container: HTMLDivElement) => {
+  const getDynamicPadding = useCallback((container: HTMLDivElement) => {
     const minDim = Math.min(container.clientWidth, container.clientHeight);
     return Math.min(minDim * 0.12, 100);
-  };
+  }, []);
 
   const applyLabelContrast = useCallback((map: maplibregl.Map) => {
     const style = map.getStyle();
@@ -94,6 +96,22 @@ export function MapLibreMap({
     propsRef.current = { zipData, selectedMetric, onZipSelect };
   }, [zipData, selectedMetric, onZipSelect]);
   const hasData = useMemo(() => Object.keys(zipData).length > 0, [zipData]);
+  const scheduleReload = useCallback(() => {
+    if (reloadTimeoutRef.current) {
+      clearTimeout(reloadTimeoutRef.current);
+    }
+    reloadTimeoutRef.current = setTimeout(() => {
+      window.location.reload();
+    }, MAP_RELOAD_DELAY_MS);
+  }, []);
+
+  const recoverMapView = useCallback((map: maplibregl.Map) => {
+    setError(null);
+    requestAnimationFrame(() => {
+      map.resize();
+      map.triggerRepaint();
+    });
+  }, []);
 
   // 1. Initialize Map
   const createAndInitializeMap = useCallback((container: HTMLDivElement) => {
@@ -125,14 +143,20 @@ export function MapLibreMap({
     map.on("error", (e) => {
       const mapError = e as { error?: { message?: string } };
       const errMsg = mapError?.error?.message ?? "Map internal error";
-      const isDecodingError = errMsg.toLowerCase().includes('decoding') || errMsg.toLowerCase().includes('decode');
-      if (isDecodingError) {
-        console.warn("[Map] Non-fatal tile decoding error (suppressed):", errMsg);
+      const normalizedErr = errMsg.toLowerCase();
+      const isDecodingError = normalizedErr.includes('decoding') || normalizedErr.includes('decode');
+      const isContextLossError =
+        normalizedErr.includes("webgl context") ||
+        /context.*lost|lost.*context/.test(normalizedErr);
+      if (isDecodingError || isContextLossError) {
+        console.warn("[Map] Recoverable map error (suppressed):", errMsg);
+        recoverMapView(map);
         return;
       }
       console.error("[Map] Internal error:", mapError?.error ?? e);
       trackError("map_internal_error", errMsg);
-      setError("Map internal error. Try refreshing.");
+      setError("Map internal error. Reloading...");
+      scheduleReload();
     });
 
     map.once("load", () => {
@@ -147,7 +171,7 @@ export function MapLibreMap({
     });
 
     return map;
-  }, [applyLabelContrast]);
+  }, [applyLabelContrast, getDynamicPadding, recoverMapView, scheduleReload]);
 
   // 2. Setup Map Instance
   useEffect(() => {
@@ -199,9 +223,7 @@ export function MapLibreMap({
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && mapRef.current) {
-        console.log("Refreshing...");
-        mapRef.current.resize();
-        mapRef.current.triggerRepaint();
+        recoverMapView(mapRef.current);
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -212,6 +234,10 @@ export function MapLibreMap({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current);
+      }
+      if (reloadTimeoutRef.current !== null) {
+        clearTimeout(reloadTimeoutRef.current);
+        reloadTimeoutRef.current = null;
       }
       if (mousemoveRafRef.current) {
         cancelAnimationFrame(mousemoveRafRef.current);
@@ -234,7 +260,7 @@ export function MapLibreMap({
       setIsMapReady(false);
       interactionsSetup.current = false;
     };
-  }, [createAndInitializeMap]);
+  }, [createAndInitializeMap, recoverMapView]);
 
   const onMapMoveRef = useRef(onMapMove);
   useEffect(() => {

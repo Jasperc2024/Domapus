@@ -10,6 +10,7 @@ Domapus
 ├─ package.json
 ├─ postcss.config.js
 ├─ public
+│  ├─ 404.html
 │  ├─ android-chrome-192x192.png
 │  ├─ android-chrome-512x512.png
 │  ├─ apple-touch-icon.png
@@ -18,10 +19,11 @@ Domapus
 │  │  ├─ archive
 │  │  │  ├─ zip-data-2025-11-30.json.gz
 │  │  │  ...
+│  │  │  └─ zip-data-2026-02-28.json.gz
 │  │  ├─ last_updated.json
-│  │  ├─ redfin_temp.tsv.gz
 │  │  ├─ us_zip_codes.pmtiles
 │  │  ├─ zcta-meta.csv
+│  │  ├─ zip-data-lite.json
 │  │  └─ zip-data.json
 │  ├─ favicon-16x16.png
 │  ├─ favicon-32x32.png
@@ -41,7 +43,11 @@ Domapus
 ├─ README.md
 ├─ requirements.txt
 ├─ scripts
-│  └─ update-market-data.py
+│  ├─ generate_lite_data.py
+│  ├─ tests
+│  │  └─ test_data_pipeline.py
+│  ├─ update-market-data.py
+│  └─ update_market_data.py
 ├─ src
 │  ├─ App.tsx
 │  ├─ components
@@ -58,12 +64,15 @@ Domapus
 │  │  │  │     └─ utils.test.ts
 │  │  │  ├─ MapLibreMap.tsx
 │  │  │  ├─ MetricSelector.tsx
+│  │  │  ├─ MobileBottomSheet.tsx
 │  │  │  ├─ SearchBox.tsx
 │  │  │  ├─ Sidebar.tsx
 │  │  │  ├─ SponsorBanner.tsx
 │  │  │  ├─ TopBar.tsx
 │  │  │  ├─ ZipComparison.tsx
 │  │  │  └─ __tests__
+│  │  │     ├─ Export.test.tsx
+│  │  │     ├─ MapLibreMap.test.tsx
 │  │  │     └─ MetricSelector.test.tsx
 │  │  ├─ ErrorBoundary.tsx
 │  │  ├─ MapExport.tsx

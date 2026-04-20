@@ -162,7 +162,9 @@ export function MobileBottomSheet({ isOpen, onClose, children }: MobileBottomShe
 
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
+    } catch (err) {
+      // Pointer may already be released; safe to ignore.
+      void err;
     }
 
     const now = Date.now();
