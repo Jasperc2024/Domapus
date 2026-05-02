@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Github, Heart, Calendar } from "lucide-react";
+import { ExternalLink, Heart, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
@@ -131,7 +131,7 @@ export function TopBar({
                 rel="noopener noreferrer"
                 title="GitHub"
               >
-                <Github className="h-4 w-4" />
+                <ExternalLink className="h-4 w-4" />
                 {!isMobile && <span>GitHub</span>}
               </a>
             </Button>
