@@ -3,5 +3,11 @@
   "extends": [
     "config:recommended",
     "group:allNonMajor"
+  ],
+  "packageRules": [
+    {
+      "matchConfidence": ["low", "neutral"],
+      "dependencyDashboardApproval": true
+    }
   ]
 }
