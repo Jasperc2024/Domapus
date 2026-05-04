@@ -3,5 +3,18 @@
   "extends": [
     "config:recommended",
     "group:allNonMajor"
+  ],
+  "hostRules": [
+    {
+      "matchHost": "https://developer.mend.io",
+      "hostType": "merge-confidence",
+      "token": "{{ secrets.MEND_RENOVATE_TOKEN }}"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchConfidence": ["low", "neutral"],
+      "enabled": false
+    }
   ]
 }
