@@ -120,6 +120,56 @@ export const METRICS: Record<string, MetricInfo> = {
 
 export type MetricKey = keyof typeof METRICS;
 
+/**
+ * How the detail panel groups the fifteen metrics.
+ *
+ * The panel used to render all fifteen as a flat run of cards — one number per
+ * card, each with its own border and 16 px of padding — which was about 1,400 px
+ * of scroll and gave the reader no way to tell that "Median Sale Price" and
+ * "Months of Supply" answer different questions. Three groups is the natural cut:
+ * what homes cost, how fast they are moving, and how many there are.
+ *
+ * Order within a group is deliberate — the most-asked-for number first, so the
+ * two collapsed groups still show their headline when opened.
+ */
+export const METRIC_GROUPS: { id: string; label: string; keys: string[] }[] = [
+  {
+    id: "prices",
+    label: "Prices",
+    keys: [
+      "median_sale_price", "zhvi", "median_ppsf",
+      "median_list_price", "median_list_ppsf", "avg_sale_to_list_ratio",
+    ],
+  },
+  {
+    id: "activity",
+    label: "Sales activity",
+    keys: [
+      "homes_sold", "median_dom", "sold_above_list",
+      "pending_sales", "new_listings", "off_market_in_two_weeks",
+    ],
+  },
+  {
+    id: "supply",
+    label: "Supply",
+    keys: ["active_listings", "inventory", "months_of_supply"],
+  },
+];
+
+// Every metric belongs to exactly one group, or the panel silently drops it.
+// This runs at module load, which is the only time it can fail usefully.
+if (import.meta.env.DEV) {
+  const grouped = METRIC_GROUPS.flatMap((g) => g.keys);
+  const missing = Object.keys(METRICS).filter((k) => !grouped.includes(k));
+  const unknown = grouped.filter((k) => !(k in METRICS));
+  if (missing.length || unknown.length) {
+    console.error(
+      "[metrics] METRIC_GROUPS is out of sync with METRICS.",
+      { notGrouped: missing, noSuchMetric: unknown },
+    );
+  }
+}
+
 /** The dropdown's contents. Eight of fifteen; the rest are detail-panel only. */
 export const PAINTED_METRICS: Record<string, MetricInfo> = Object.fromEntries(
   Object.entries(METRICS).filter(([, m]) => m.painted),

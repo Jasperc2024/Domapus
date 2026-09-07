@@ -8,7 +8,7 @@ import { addPMTilesProtocol } from "@/lib/pmtiles-protocol";
 import { trackError } from "@/lib/analytics";
 import { Fullscreen } from "lucide-react";
 import {
-  ChoroplethPainter, classOpacityExpression, classPaintExpression, lisaPaintExpression,
+  ChoroplethPainter, classOpacityExpression, classPaintExpression, outlierColorExpression,
   loadedZips,
 } from "@/lib/choropleth-painter";
 import type { ClassSource } from "@/lib/class-source";
@@ -30,17 +30,23 @@ interface MapProps {
   /** The one live class authority. Swapping it bumps an epoch; the painter
    *  rewrites the full ZIP set and the paint expression never changes. */
   classSource: ClassSource | null;
-  /** `loaded` is the ZIPs on loaded TILES, which is the correct scope for
-   *  painting; the viewport filter that auto-scale needs is applied upstream
-   *  against real polygon bounds. */
+  /** `loaded` is a LAZY accessor for the ZIPs on loaded TILES, which is the
+   *  correct scope for painting; the viewport filter that auto-scale needs is
+   *  applied upstream against real polygon bounds.
+   *
+   *  It is a function and not an array on purpose. Producing it is a
+   *  `querySourceFeatures` over every loaded tile — 38,077 feature instances at
+   *  z3 — plus a Set build, and the only consumer is auto-scale, which is off by
+   *  default. Passing the array meant every pan and zoom ended by allocating and
+   *  discarding tens of thousands of feature objects for a caller that returned
+   *  immediately. Passing the thunk puts the cost at the call site that wants it. */
   onMapMove: (
-    loaded: readonly string[],
+    loaded: () => readonly string[],
     bounds: maplibregl.LngLatBounds,
     view?: { lat: number; lng: number; zoom: number }
   ) => void;
   onUserInteraction?: () => void;
-  /** Show the spatial-cluster overlay. Off by default: it is a second reading of
-   *  the same map and it only means anything over the rankable set. */
+  /** Mark the ZIPs whose price disagrees with their neighbours. Off by default. */
   showLisa?: boolean;
   initialCenter?: [number, number];
   initialZoom?: number;
@@ -49,6 +55,18 @@ interface MapProps {
 const MAP_RELOAD_DELAY_MS = 800;
 const RELOAD_ATTEMPTS_KEY = "domapus:map-reload-attempts";
 const MAX_RELOAD_ATTEMPTS = 2;
+
+const LABEL_SOURCE = "zip-labels";
+const OUTLIER_SOURCE = "zip-outliers";
+const OUTLIER_LAYER = "zip-outliers-dots";
+/** ZIP numbers appear here. Below it the polygons are too small to label. */
+const LABEL_MIN_ZOOM = 9.5;
+/** Degrees of slack around the viewport, so a label near the edge is already
+ *  placed when the pan brings it in rather than popping in afterwards. */
+const LABEL_MARGIN_DEG = 0.25;
+
+type PointFC = GeoJSON.FeatureCollection<GeoJSON.Point>;
+const EMPTY_FC: PointFC = { type: "FeatureCollection", features: [] };
 
 export function MapLibreMap({
   selectedMetric,
@@ -76,6 +94,11 @@ export function MapLibreMap({
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const painterRef = useRef<ChoroplethPainter | null>(null);
   const highlightedZipRef = useRef<string | null>(null);
+  /** The ZIP currently under the cursor, so the popup is rebuilt on change only. */
+  const hoveredZipRef = useRef<string | null>(null);
+  /** Features currently in the label source, so an already-empty source is not
+   *  re-set to empty on every moveend below the label zoom. */
+  const labelCountRef = useRef(0);
   const containerSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const resizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reloadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -198,7 +221,7 @@ export function MapLibreMap({
       setIsMapReady(true);
       const center = map.getCenter();
       onMapMoveRef.current(
-        loadedZips(map),
+        () => loadedZips(map),
         map.getBounds(),
         { lat: center.lat, lng: center.lng, zoom: map.getZoom() }
       );
@@ -334,6 +357,16 @@ export function MapLibreMap({
       onUserInteractionRef.current?.();
     };
 
+    /** Clear the hover outline, wherever it currently is. */
+    const clearHover = () => {
+      if (hoveredZipRef.current === null) return;
+      map.setFeatureState(
+        { source: "zips", sourceLayer: "us_zip_codes", id: hoveredZipRef.current },
+        { hovered: false },
+      );
+      hoveredZipRef.current = null;
+    };
+
     const mousemoveHandler = (e: MapMouseEvent) => {
       notifyUserInteraction();
       lastMouseEventRef.current = e;
@@ -350,19 +383,43 @@ export function MapLibreMap({
 
           if (!isHovering) {
             popupRef.current?.remove();
+            clearHover();
             return;
           }
 
           const props = features[0].properties ?? {};
           const zipCode = (props.ZCTA5CE20 || props.zipCode || props.id) as string;
           const { store: currentStore, selectedMetric: currentMetric } = propsRef.current;
+
+          // THE POPUP CONTENT IS REBUILT ONLY WHEN THE ZIP UNDER THE CURSOR
+          // CHANGES. This used to call `createMetricPopupContent` and
+          // `setDOMContent` on every animation frame the mouse moved — a full DOM
+          // teardown and rebuild about sixty times a second while the pointer sits
+          // inside one large ZIP. Following the cursor within a ZIP is now a
+          // `setLngLat`, which moves a transform and touches no DOM.
+          if (zipCode && zipCode === hoveredZipRef.current && popupRef.current) {
+            popupRef.current.setLngLat(ev.lngLat);
+            return;
+          }
+
           // One object per hover, materialised on demand — not 33,771 at load.
           const row = zipCode ? currentStore?.get(zipCode) : null;
 
           if (!row) {
             popupRef.current?.remove();
+            clearHover();
             return;
           }
+
+          // The map itself reacting to the cursor. Without this the only hover
+          // feedback was the popup, so the surface being pointed at never
+          // acknowledged the pointer and the map read as unresponsive.
+          clearHover();
+          map.setFeatureState(
+            { source: "zips", sourceLayer: "us_zip_codes", id: zipCode },
+            { hovered: true },
+          );
+          hoveredZipRef.current = zipCode;
 
           if (!popupRef.current) {
             popupRef.current = new maplibregl.Popup({
@@ -385,12 +442,24 @@ export function MapLibreMap({
 
     const clickHandler = (e: MapMouseEvent) => {
       notifyUserInteraction();
-      const features = map.queryRenderedFeatures(e.point, { layers: [layerId] });
+      // Outlier markers are queried first, with a small box, so a 9 px dot is
+      // clickable without hitting its exact centre. Falling through to the fill
+      // makes clicking a marker and clicking its polygon do the same thing, which
+      // is what a reader expects of a mark drawn on top of a shape.
+      const hit = map.getLayer(OUTLIER_LAYER)
+        ? map.queryRenderedFeatures(
+            [[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]],
+            { layers: [OUTLIER_LAYER] },
+          )
+        : [];
+      const features = hit.length
+        ? hit
+        : map.queryRenderedFeatures(e.point, { layers: [layerId] });
 
       if (!features.length) return;
 
       const props = features[0].properties ?? {};
-      const zipCode = (props.ZCTA5CE20 || props.zipCode || props.id) as string;
+      const zipCode = (props.ZCTA5CE20 || props.zip || props.zipCode || props.id) as string;
       const { store: currentStore, onZipSelect: currentOnSelect } = propsRef.current;
       const row = zipCode ? currentStore?.get(zipCode) : null;
       if (row) currentOnSelect(row);
@@ -399,12 +468,14 @@ export function MapLibreMap({
     const mouseoutHandler = () => {
       map.getCanvas().style.cursor = "";
       popupRef.current?.remove();
+      clearHover();
     };
 
     const moveEndHandler = () => {
       const center = map.getCenter();
+      labelBuildRef.current();
       onMapMoveRef.current(
-        loadedZips(map),
+        () => loadedZips(map),
         map.getBounds(),
         { lat: center.lat, lng: center.lng, zoom: map.getZoom() }
       );
@@ -466,19 +537,17 @@ export function MapLibreMap({
         }
       }, beforeId);
 
-      // LISA overlay, above the fill and below the borders. Hidden until the
-      // user asks for it; the toggle moves `fill-opacity` between two literals,
-      // which is not a data-driven value and so costs no source reload.
-      map.addLayer({
-        id: "zips-lisa",
-        type: "fill",
-        source: "zips",
-        "source-layer": "us_zip_codes",
-        paint: {
-          "fill-color": lisaPaintExpression() as never,
-          "fill-opacity": 0,
-        },
-      }, beforeId);
+      // Two client-built point sources, both empty until the snapshot lands.
+      //
+      // They exist because a POLYGON source cannot carry either of these. A
+      // polygon crossing a vector-tile boundary is clipped into one piece per
+      // tile and MapLibre places a symbol on each piece, so labelling the fill
+      // layer drew a ZIP's number two to four times; and 47 outlier polygons
+      // scattered across the country are invisible at the zoom you would look
+      // for them at. One point per ZIP fixes the first structurally; a
+      // fixed-radius circle fixes the second.
+      map.addSource(LABEL_SOURCE, { type: "geojson", data: EMPTY_FC });
+      map.addSource(OUTLIER_SOURCE, { type: "geojson", data: EMPTY_FC });
 
       painterRef.current = new ChoroplethPainter(map);
       // Debug handle. bench/verify-choropleth.mjs and any console session need
@@ -493,52 +562,78 @@ export function MapLibreMap({
         source: "zips",
         "source-layer": "us_zip_codes",
         paint: {
+          // Three states on one line layer, in priority order: the searched ZIP,
+          // the ZIP under the cursor, and everything else. Hover is drawn here
+          // rather than as a fourth layer because it is the same geometry, and it
+          // is feature-state rather than a paint rewrite for the reason the whole
+          // file exists — rewriting a data-driven paint value reloads every tile.
           "line-color": [
             "case",
-            ["boolean", ["feature-state", "highlighted"], false],
-            "#ff6b35",
+            ["boolean", ["feature-state", "highlighted"], false], "#ff6b35",
+            ["boolean", ["feature-state", "hovered"], false], "#1f2937",
             "rgba(0,0,0,0.15)"
           ],
           "line-width": [
             "interpolate", ["linear"], ["zoom"],
-            3, ["case", ["boolean", ["feature-state", "highlighted"], false], 2, 0.3],
-            6, ["case", ["boolean", ["feature-state", "highlighted"], false], 3, 0.6],
-            10, ["case", ["boolean", ["feature-state", "highlighted"], false], 4, 1.5],
-            12, ["case", ["boolean", ["feature-state", "highlighted"], false], 5, 2]
+            3, ["case",
+                ["boolean", ["feature-state", "highlighted"], false], 2,
+                ["boolean", ["feature-state", "hovered"], false], 1.2, 0.3],
+            6, ["case",
+                ["boolean", ["feature-state", "highlighted"], false], 3,
+                ["boolean", ["feature-state", "hovered"], false], 1.8, 0.6],
+            10, ["case",
+                ["boolean", ["feature-state", "highlighted"], false], 4,
+                ["boolean", ["feature-state", "hovered"], false], 2.5, 1.5],
+            12, ["case",
+                ["boolean", ["feature-state", "highlighted"], false], 5,
+                ["boolean", ["feature-state", "hovered"], false], 3, 2]
           ]
         }
       }, beforeId);
 
-      // ZIP labels layer - visible at high zoom
+      // Price outliers: 47 ZIPs nationally, so this is cheap at any zoom and is
+      // built once rather than per view. Above the borders, below the labels.
+      map.addLayer({
+        id: OUTLIER_LAYER,
+        type: "circle",
+        source: OUTLIER_SOURCE,
+        layout: { visibility: "none" },
+        paint: {
+          "circle-color": outlierColorExpression() as never,
+          "circle-radius": [
+            "interpolate", ["linear"], ["zoom"], 3, 4, 7, 6, 12, 9,
+          ] as never,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1.5,
+          "circle-opacity": 0.95,
+        },
+      });
+
+      // ZIP number, one per ZIP, at the polygon's inner point.
+      //
+      // `text-allow-overlap` stays false so numbers do not stack on top of each
+      // other in dense metros — but it was never what caused the duplicates. The
+      // copies sat at genuinely different screen positions, one per clipped
+      // polygon piece, so they never collided and collision detection never had
+      // anything to suppress. Sourcing from points is the fix; this is only
+      // decluttering.
       map.addLayer({
         id: "zips-labels",
         type: "symbol",
-        source: "zips",
-        "source-layer": "us_zip_codes",
-        minzoom: 9.5,
+        source: LABEL_SOURCE,
+        minzoom: LABEL_MIN_ZOOM,
         layout: {
-          "visibility": "visible",
-          "text-field": ["get", "ZCTA5CE20"],
+          "text-field": ["get", "zip"],
           "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
-          "text-size": [
-            "interpolate", ["linear"], ["zoom"],
-            9, 10,
-            12, 14
-          ],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 9, 10, 12, 14],
           "text-allow-overlap": false,
           "text-padding": 8,
-          "symbol-placement": "point",
-          "symbol-sort-key": ["to-number", ["get", "ZCTA5CE20"]],
-          // Deterministic stacking so the winning duplicate doesn't jitter on pan.
-          "symbol-z-order": "auto",
-          "text-ignore-placement": false,
-          "symbol-avoid-edges": true
         },
         paint: {
           "text-color": "#1E40AF",
           "text-halo-color": "rgba(255,255,255,0.95)",
-          "text-halo-width": 1.5
-        }
+          "text-halo-width": 1.5,
+        },
       });
 
 
@@ -595,39 +690,89 @@ export function MapLibreMap({
     return () => cancelAnimationFrame(id);
   }, [selectedMetric]);
 
-  // 5b. LISA overlay.
+  // 5b. Price outliers.
   //
-  // The `lisa` feature-state is written LAZILY — once, the first time the overlay
-  // is switched on — rather than alongside the class writes. It comes from the
-  // snapshot rather than the paint table, so it is not available at first paint
-  // anyway, and most sessions never open the overlay; paying 33,771 writes for a
-  // layer at zero opacity would be work for nothing. Once written it stays, and
-  // MapLibre re-applies it to every tile that loads or is revived from cache.
-  const lisaWrittenRef = useRef(false);
+  // Built once from the snapshot, not per view: LISA classes 3 and 4 are 47 ZIPs
+  // nationally, so the whole set is smaller than one tile's worth of features and
+  // a viewport filter would cost more than it saves. Toggling only flips layer
+  // visibility — the source is already loaded.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !isMapReady || !map.getLayer("zips-lisa")) return;
+    if (!map || !isMapReady || !store) return;
+    const src = map.getSource(OUTLIER_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    if (!src) return;
 
-    if (showLisa && store && !lisaWrittenRef.current) {
-      const col = store.col("lisa");
-      if (col) {
-        for (let row = 0; row < store.n; row++) {
-          const v = store.valueAt("lisa", row);
-          if (v === null) continue;
-          map.setFeatureState(
-            { source: "zips", sourceLayer: "us_zip_codes", id: store.zips[row] },
-            { lisa: v },
-          );
-        }
-        lisaWrittenRef.current = true;
+    const features: PointFC["features"] = [];
+    for (let row = 0; row < store.n; row++) {
+      const cls = store.valueAt("lisa", row);
+      if (cls !== 3 && cls !== 4) continue;
+      const lng = store.valueAt("lng", row);
+      const lat = store.valueAt("lat", row);
+      if (lng === null || lat === null) continue;
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [lng, lat] },
+        properties: { zip: store.zips[row], cls },
+      });
+    }
+    src.setData({ type: "FeatureCollection", features });
+  }, [isMapReady, store]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReady || !map.getLayer(OUTLIER_LAYER)) return;
+    map.setLayoutProperty(OUTLIER_LAYER, "visibility", showLisa ? "visible" : "none");
+  }, [isMapReady, showLisa]);
+
+  // 5c. ZIP number labels, refreshed on view change above LABEL_MIN_ZOOM.
+  //
+  // The filter is on the ANCHOR POINT, not on the polygon bbox, and that is
+  // deliberate. A label is drawn at the anchor, so "is the anchor in view" is the
+  // question that matters, and it keeps this independent of the bbox columns —
+  // which have had a scale bug and which `ZipTable` will refuse to serve if they
+  // fail their check. A flat scan of two comparisons over 33k rows is ~0.1 ms and
+  // only runs above z9.5, where the set is tens to low hundreds of ZIPs.
+  const labelBuild = useCallback(() => {
+    const map = mapRef.current;
+    const s = propsRef.current.store;
+    if (!map || !s) return;
+    const src = map.getSource(LABEL_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    if (!src) return;
+
+    if (map.getZoom() < LABEL_MIN_ZOOM) {
+      if (labelCountRef.current !== 0) {
+        src.setData(EMPTY_FC);
+        labelCountRef.current = 0;
       }
+      return;
     }
 
-    // `fill-opacity` between two literals. A literal is not a data-driven value,
-    // so this is the one setPaintProperty in the file that does NOT mark the
-    // source for reload.
-    map.setPaintProperty("zips-lisa", "fill-opacity", showLisa ? 0.75 : 0);
-  }, [isMapReady, showLisa, store]);
+    const b = map.getBounds();
+    const west = b.getWest() - LABEL_MARGIN_DEG;
+    const east = b.getEast() + LABEL_MARGIN_DEG;
+    const south = b.getSouth() - LABEL_MARGIN_DEG;
+    const north = b.getNorth() + LABEL_MARGIN_DEG;
+
+    const features: PointFC["features"] = [];
+    for (let row = 0; row < s.n; row++) {
+      const lng = s.valueAt("lng", row);
+      if (lng === null || lng < west || lng > east) continue;
+      const lat = s.valueAt("lat", row);
+      if (lat === null || lat < south || lat > north) continue;
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [lng, lat] },
+        properties: { zip: s.zips[row] },
+      });
+    }
+    src.setData({ type: "FeatureCollection", features });
+    labelCountRef.current = features.length;
+  }, []);
+
+  const labelBuildRef = useRef(labelBuild);
+  useEffect(() => { labelBuildRef.current = labelBuild; }, [labelBuild]);
+  // The snapshot can land after the first moveend, so build once when it does.
+  useEffect(() => { if (isMapReady && store) labelBuild(); }, [isMapReady, store, labelBuild]);
 
   // 6. Fly to Search and Highlight ZIP
   useEffect(() => {

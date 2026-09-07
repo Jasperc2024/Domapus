@@ -29,12 +29,15 @@ export function MetricSelector({ selectedMetric, onMetricChange }: MetricSelecto
   };
 
   return (
-    <div className="flex items-center gap-1">
-      <label className="text-xs font-medium text-dashboard-text-secondary whitespace-nowrap hidden lg:block">
+    <div className="flex items-center gap-1 min-w-0">
+      <label className="text-xs font-medium text-dashboard-text-secondary whitespace-nowrap hidden 2xl:block">
         Metric:
       </label>
       <Select value={selectedMetric} onValueChange={handleMetricChange}>
-        <SelectTrigger className="w-48 h-9 text-sm px-3 justify-between" aria-label="Select visualization metric">
+        <SelectTrigger
+          className="w-36 lg:w-48 h-9 text-sm px-3 justify-between shrink-0"
+          aria-label="Select visualization metric"
+        >
           <div className="flex-1 text-left truncate pr-2">
             <SelectValue placeholder="Select a metric" />
           </div>

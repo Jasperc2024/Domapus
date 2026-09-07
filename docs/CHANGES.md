@@ -1718,3 +1718,280 @@ dispatch.
   that does not depend on the horizon: four identical full-panel fits per run, now one.
 - `forecast.run`'s `index` parameter was never passed and is gone.
 - `_build_dicts` took a `zips` argument it never read.
+
+## 2026-09-06, evening — the six "reviewed but not actioned" items, cleared
+
+None of these was a shipped defect. They were the judgement calls left over from the
+2026-09-06 read of every Python file, and each is now decided rather than deferred.
+Every one was verified against the real 4.93M-row panel in `build/`, not a fixture.
+
+### One dense reshape, not four
+
+`noise._pivot`, `forecast.run`, `zhvi.pooled_yoy` and `history._dense` each turned the long
+parquet panel into a dense matrix, and three of them did it by building a Python dict over
+every key and walking it with `np.fromiter`. They now all call `panel.dense`, which does the
+lookup with `pc.index_in` inside Arrow.
+
+**MEASURED**, `median_sale_price` over 4,930,000 rows: **1.68 s → 0.30 s**, matrices identical
+under `array_equal(equal_nan=True)`. Verified identical for `median_sale_price`, `homes_sold`,
+the ZHVI pivot (319 × 26,269), `history._dense` in its transposed [Z × T] orientation, and
+`pooled_yoy`, which returns the same 6,137,683 cells the diverging bound was derived from.
+
+`panel.dense` raises if the axes do not cover the table. That is the bug the reshape invites:
+`pc.index_in` returns null for a key outside the value set, and `astype(int64)` turns null into
+an arbitrary index rather than an error, so a filtered axis list would silently scatter values
+across the matrix. `history._dense` had carried that hazard unguarded.
+
+Re-indexing per value column rather than hoisting it costs ~0.1 s a column, measured. That buys
+one reshape in the codebase instead of two shapes of the same thing.
+
+### `changes._period_map` read the whole panel three times
+
+Each call wanted ~29k of 4,930,000 rows and read every row group to get them. The filter now
+goes through the dataset API, so it reaches the row-group statistics — and it prunes well,
+because `redfin.ingest` *enforces* that PERIOD END descends, which makes each period sit in one
+or two of the 159 row groups.
+
+**MEASURED: 0.40 s → 0.09 s per call**, output byte-identical. Three calls a run.
+
+### ZHVI was parsed twice and then walked with `iterrows`
+
+`write_panel` (S2) and `process` (S3) each called `read_csv` on the same 123 MB. There is now a
+`zhvi.read` that parses once and returns the frame plus its date columns; `__main__` calls it in
+S2, drops the raw bytes, and hands the frame to S3. `process` is vectorised — the `iterrows`
+loop over ~26k rows is gone.
+
+Equivalence was checked against the old row-at-a-time implementation on 4,000 synthetic ZIPs
+covering every branch it had: null current value (ZIP dropped), null prev, null year-ago, zero
+base on either, and a rounding tie on the level. **0 mismatches.** Two tests were added for the
+zero/missing base and the long-format panel, since `write_panel` had none and its signature
+changed.
+
+### `calibrate_diff_gate.from_panel` built 4.9M dicts
+
+It materialised one three-key dict per (period, ZIP) cell plus three `to_pylist()` copies —
+roughly 3 GB and several minutes. It now uses `panel.dense`, one 47 MB array per metric.
+`from_zhvi` had the same defect in the same file (`list(csv.DictReader(f))` over the 123 MB
+wide file) and now parses through `zhvi.read`, so the script and the pipeline agree on what a
+date column is and how a ZIP is spelled.
+
+**The proof is that the baseline did not move**: re-running the script writes
+`tests/baselines/diff_gate.json` byte-for-byte identical to the committed one, in **3.5 s**.
+
+### `forecast.fit` warned on every run
+
+`RuntimeWarning: Mean of empty slice` and `Degrees of freedom <= 0`, from an all-NaN column —
+a ZIP with no ZHVI history in the window. `np.errstate` never suppressed them, because it
+governs floating-point error states and these are Python warnings numpy raises itself
+(confirmed directly: both messages escape an `errstate(invalid="ignore")` block). Now filtered
+by message inside `warnings.catch_warnings`, so an unrelated `RuntimeWarning` still reaches the
+log. Verified: zero warnings, the all-NaN column still forecasts NaN, real columns unchanged.
+
+### `DIVERGING_BOUND_PCT` is deleted
+
+Exported from `choropleth.generated.ts`, re-exported from `choropleth.ts`, read by nothing. It
+duplicated `classify.DIVERGING_BOUND` on the frontend side — a second authority sitting there
+waiting to be used, which is what `class-source.ts` exists to prevent. Removed from the
+generator and the ramp re-derived; the diff is those three lines and nothing else.
+
+### Measured while here: the forecast tier ladder has two empty rungs
+
+On the shipped ZHVI panel (26,269 ZIPs, 319 months):
+
+| tier | rule | ZIPs |
+|---|---|---|
+| 0 | < 12 obs, no forecast | **0** |
+| 1 | 12-23, metro growth path | **0** |
+| 2 | 24-59, short | 1,250 |
+| 3 | >= 60, full fit | 25,019 |
+
+The shortest ZHVI history is **31 months**, seven clear of tier 2's floor. So todos.md was
+right that tier 1 is dead code, and tier 0 is dead with it. Left in place — deleting a rung is
+a decision about what happens when Zillow adds a new ZIP, not a cleanup.
+
+---
+
+## 2026-09-06 — UI/UX pass. Contrast, the sidebar, the map, and one live bug found by arithmetic
+
+Plan and pre-work measurements: `docs/UIUX-PLAN.md`. Developer reference for everything
+below: `docs/METHODOLOGY.md`.
+
+### The fade was a lightness channel on a lightness ramp
+
+Reliability drove `fill-opacity` — tier 0 at 0.38, the rest at 0.8. On this release tier 0 is
+**24,315 of 33,771 ZIPs (72%) and 78.5% of the drawn land area**, so the ramp was being read
+through it almost everywhere.
+
+The ramp runs light to dark, so lightness IS the value channel; compositing over a near-white
+basemap also moves lightness. The two are one perceptual channel used twice. Measured by
+compositing each ramp colour over Positron's `#FAFAF8` and converting to CIELAB, with the ramp
+averaging 14.0 L* per class step — error on the darkest class, in class-step units:
+
+| alpha | 0.38 | 0.62 | 0.75 | 0.85 | 0.92 | 0.95 |
+|---|---:|---:|---:|---:|---:|---:|
+| class steps | **3.90** | 2.43 | 1.59 | 0.94 | 0.49 | 0.30 |
+
+At the shipped 0.38 an expensive rural ZIP rendered as a colour the eye reads as nearly four
+classes cheaper. Holding it under half a step needs every alpha >= 0.92, which leaves
+0.92-1.00 of range: too little to read as a signal, exactly enough to be misread as a value.
+**No alpha band is both visible as uncertainty and not confusable with value.**
+
+The bias was systematic, not random. Reliability tracks sales volume tracks urban density, and
+`classing.median_sale_price.selection_effect` already measured faded ZIPs as genuinely cheaper
+(median $275,953 against $394,885). Both errors pointed the same way.
+
+**`FULL_OPACITY = 1`, flat.** Reliability moved to the popup, the detail panel and the legend.
+A texture overlay gated to zoom >= 6 is the intended fill-side channel — texture is orthogonal
+to lightness — and is **deferred by the user, not cancelled**.
+
+**CORRECTION TO AN EARLIER RECOMMENDATION IN THIS SESSION.** A graded step (0.62 / 0.78 / 0.90
+/ 0.97) was proposed first, before the artefact was measured. 0.62 is 2.43 class steps of
+error. The proposal was wrong and the measurement is why.
+
+### Break populations: the gate is for sampling error, so it applies only where there is any
+
+Class boundaries were cut over the rankable set (`rel >= 1`) for every metric. Rankability is a
+cut on `K / sqrt(n_sales)`, so for a **count** that means choosing the boundaries for "how many
+sold here" by looking only at where a lot sold. Counts have no sampling error to gate on.
+
+`classify.COUNT_METRICS` now exempts `homes_sold`, `active_listings`, `pending_sales`,
+`new_listings`, `inventory`. Simulated against the shipped snapshot, share in the lowest of
+seven classes:
+
+| metric | gated (old) | ungated (new) |
+|---|---:|---:|
+| homes_sold | 68% | 12% |
+| active_listings | 70% | 13% |
+| pending_sales | 69% | 11% |
+| new_listings | 69% | 10% |
+| inventory | 66% | 10% |
+
+`months_of_supply` and `sold_above_list` stay gated: one is inventory over the sales rate, the
+other is a share OF the sales. **Code landed, NOT published — needs a data run.**
+
+### Live bug found while computing ZCTA areas: every bounding box was 10,000x too large
+
+`geom.offsets` pre-multiplied by 1e4 and `serialize.COLUMNS` applied its declared 1e4 on top,
+so the wire carried degrees x 1e8 under a header saying x 1e4. `ZipTable.boundsOf` honoured the
+header and divided once. Every ZIP claimed a box roughly 1,500 degrees wide.
+
+Confirmed by decoding at 1e8 and recovering exactly **8.3966 degrees** as the widest longitude
+span — the figure `geom.py`'s own docstring cites for Anchorage 99503 as the reason the column
+is int32.
+
+Consequence: a box that size intersects every viewport, so `visibleZipRows` accepted every
+loaded ZIP and **auto-scale silently scaled to loaded tiles rather than to the view**. Nothing
+caught it because that is what auto-scale looks like when it works. The sidecar exists to fix
+the opposite bug — a 0.01-degree box around each centroid — and the correction overshot by
+four orders of magnitude.
+
+Fixed in the pipeline (`offsets` returns degrees; the scale belongs to `COLUMNS` alone), with
+a check on **both** sides against `MAX_SPAN_DEG = 10`: `geom.assert_bbox_scale` refuses to
+build, `ZipTable.checkBounds` logs and makes `boundsOf` answer null so auto-scale degrades to
+the national scale rather than to a wrong viewport. The checked-in golden fixture carried the
+double-scaled values and was rescaled; the checks caught it there too, independently of the
+published data.
+
+**Reaches the site only on a republish.** Until then the client-side check fires — verified in
+the browser, naming ZIP 99503 at 83,966 degrees.
+
+### Cluster overlay reframed around the 47 outliers
+
+Measured area share: ns 80.11%, LL 13.10%, HH 5.93%, LH 0.60%, HL 0.26%. Global Moran's I at
+k=8 is 0.7343, so HH and LL — 2,552 of the 2,599 significant ZIPs — restate the choropleth
+underneath. HH polygons are median 40 km2 against LL's 153 km2, so an overlay painting both laid
+down 2.2x as much blue as red; the reported symptom was "only blue clusters, nothing else",
+which is what the geometry predicts.
+
+The overlay is now LH and HL only — 47 ZIPs — as circle markers on a client-built GeoJSON
+source, choropleth intact underneath, with a plain-English key in the legend that appears when
+the overlay is on. Verified in a production build: 47 features, 20 LH + 27 HL, matching the
+manifest. `map:sourceReload` still 0.
+
+### Duplicate ZIP labels: label points, not polygons
+
+`zips-labels` read `symbol-placement: "point"` off the POLYGON source. A polygon crossing a
+vector-tile boundary is clipped into one piece per tile and gets a symbol on each; multi-part
+ZCTAs get one per part. `text-allow-overlap: false` could not help — the copies sit at
+genuinely different screen positions, so collision detection had nothing to suppress.
+
+Now a client-built GeoJSON point source, one feature per ZIP, rebuilt on `moveend` above z9.5
+from ZIPs whose **anchor** is in view. The anchor is the snapshot's `lat`/`lng`, which
+`geom.py` sets from the mapshaper `-points inner` point, guaranteed inside the polygon.
+Filtering on the anchor rather than the bbox keeps this independent of the bbox columns.
+
+Verified at z10 over Los Angeles: **117 labels for 117 distinct ZIPs, zero duplicates**,
+against 423 polygon instances — 78 of those ZIPs are split across tiles, 90022 into 4 pieces.
+
+No tileset rebuild needed, which matters because the tileset is committed by decision.
+
+### Interaction cost
+
+- `loadedZips()` ran on every `moveend` — a `querySourceFeatures` over every loaded tile,
+  38,077 feature instances at z3 — and its result was discarded whenever auto-scale was off,
+  which is the default. `onMapMove` now takes a **thunk**, so the cost sits at the call site
+  that wants it.
+- The hover popup was torn down and rebuilt via `createMetricPopupContent` + `setDOMContent`
+  on every animation frame the mouse moved, even inside one ZIP. Now rebuilt only when the ZIP
+  under the cursor changes; movement within one is a `setLngLat`.
+- Added a hover outline on `zips-border` via a `hovered` feature-state. Not performance — the
+  only hover feedback was the popup, so the surface never acknowledged the pointer.
+
+### Benchmarks: one fixed, versioned metric set
+
+Metrics were added to `bench/run.mjs` as they became interesting, which is why phase 0 and
+phase 3 share only a handful of comparable fields. Now every key in `METRIC_KEYS` and every id
+in `SCENARIO_IDS` is emitted on every run, as `null` where unavailable — a null and a zero are
+different claims — `SCHEMA_VERSION` (in `scenarios.mjs`, which has no side effects on import)
+bumps on any change, and `compare.mjs` **refuses** to compare across a bump. Verified: it
+refuses a schema-1 against a schema-2 file and still compares two schema-1 files.
+
+Added: TTFB, FCP, Long Animation Frames (Chrome 123+, supersedes Long Tasks by covering the
+whole frame rather than the script task), Event Timing as the lab stand-in for INP, heap after
+interaction as the only leak signal, and `map:sourceReload` as an asserted invariant. Plus 11
+scripted interaction scenarios — pan at z4/z7/z10, zoom in and out, a 200-step hover sweep,
+click to panel, a full metric cycle, search fly-to, and both legend toggles — each reporting
+dropped frames, worst frame, p95 frame and LoAF blocking time.
+
+**Not yet run.** No schema-2 baseline exists, so there is nothing to compare against yet.
+
+### Methodology
+
+The reader-facing page was restructured into eight numbered sections in reader order, each
+opening with plain language and carrying its derivations under a "Statistical detail"
+disclosure. Nothing was deleted. Tables are numbered and captioned with units. New sections:
+**7 Limitations** (not a valuation, ZCTA is not a ZIP, a ZIP is not a neighbourhood, the window
+is three months, coverage is not universal, prices are not quality-adjusted) and **8 Notation
+and glossary**. Table of contents added.
+
+The register was the problem, not the level: the previous text built every section to a
+rhetorical turn, bolded its own verdicts mid-paragraph, used headings that argued rather than
+named, and ordered material the way the pipeline runs. Target register is the BLS Handbook of
+Methods / Eurostat quality reports / a journal Methods section.
+
+`docs/METHODOLOGY.md` is new and is the **developer** reference: stage-to-manifest-key map,
+every constant marked fitted / derived / chosen, the wire-format contract, break-population
+rules, the opacity derivation, the invariant table, and which manifest keys the reader-facing
+page depends on (removing one removes a section).
+
+### Also
+
+- `html, body { overflow: hidden }` in `index.css` was unconditional, so the methodology page
+  rendered its full length inside a body that could not scroll. Now scoped to a body class
+  `Index` adds on mount and removes on unmount.
+- `TopBar` split into `TopBarShell` + the map's controls, so the methodology page gets a header
+  without a metric selector and a ZIP search that drive a map on another route. A Methodology
+  button was added to both. The header degrades by breakpoint rather than by the binary
+  `isMobile` hook — adding the button pushed the minimum width past a 900 px viewport and the
+  wordmark overlapped the search field.
+- Legend: three break labels instead of six (six 5-7 character values across 256 px was ~36 px
+  each at 10 px type, which is why the old markup carried a negative margin to hide the
+  overlap). Per-swatch ranges on hover.
+- Sidebar: fifteen `<Card>`s, one number each, became grouped rows — roughly 1,400 px of scroll
+  down to about a third. A hero block leads with the metric the map is painting. The history
+  chart gained a pointer readout (`Jul 2027 (forecast) - $437,000 - 80% range $391k-$489k`), a
+  y-axis, year ticks and an explicit forecast divider; the confidence slider was demoted to a
+  select.
+- Comparison: green/red good-bad colouring dropped. `isGoodHigher = key !== 'median_dom'` is
+  wrong for `months_of_supply` and meaningless for `homes_sold` — which direction is better
+  depends on whether the reader is buying or selling, which the panel does not know.

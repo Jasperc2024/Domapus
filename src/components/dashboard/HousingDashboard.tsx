@@ -10,7 +10,7 @@ import {
   type ClassSource,
 } from "@/lib/class-source";
 import { CHOROPLETH_COLORS } from "@/lib/choropleth";
-import { boot, fetchManifest, fetchPaint, type Manifest } from "@/lib/manifest";
+import { boot, fetchManifest, fetchPaint, outlierCount, type Manifest } from "@/lib/manifest";
 import { PaintTable } from "@/lib/paint-table";
 import { ZipTable, WIRE_OF } from "@/lib/zip-table";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -43,6 +43,19 @@ export function HousingDashboard() {
 
   const [selectedMetric, setSelectedMetric] = useState<MetricType>((initialUrlStateRef.current.metric as MetricType) || "zhvi");
   const [selectedZip, setSelectedZip] = useState<ZipData | null>(null);
+  // Compare mode lives HERE and not inside `Sidebar`, and that placement is the
+  // whole fix for two bugs that looked unrelated.
+  //
+  // It used to be a `useState` inside `Sidebar`. The dashboard therefore had no
+  // idea compare mode existed, so `handleZipSelect` did the only thing it knew
+  // how to do — replace `selectedZip`, which is the sidebar's `zipData`, which is
+  // the comparison's LEFT-HAND ZIP. Clicking a second ZIP on the map to compare
+  // it against the first silently replaced the first instead. And because
+  // `Sidebar` returns null when closed but stays mounted, that local state
+  // survived a close, so closing the panel in compare mode and clicking a new ZIP
+  // reopened in compare mode rather than showing that ZIP's details.
+  const [mode, setMode] = useState<"detail" | "compare">("detail");
+  const [compareZip, setCompareZip] = useState<ZipData | null>(null);
   const [searchZip, setSearchZip] = useState<string>(initialUrlStateRef.current.zip || "");
   const [searchTrigger, setSearchTrigger] = useState<number>(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -145,12 +158,32 @@ export function HousingDashboard() {
     setUrlState({ zip, metric: selectedMetric });
   }, [selectedMetric, setUrlState]);
 
+  // A map click in compare mode means "compare against this one", not "switch to
+  // this one". The URL keeps naming the primary ZIP: it is what the panel is
+  // about, and a shared link should reopen on it.
   const handleZipSelect = useCallback((zip: ZipData) => {
-    setSelectedZip(zip);
-    setSidebarOpen(true);
     hasUserInteractedRef.current = true;
+    setSidebarOpen(true);
+    if (mode === "compare" && zip.zipCode !== selectedZip?.zipCode) {
+      setCompareZip(zip);
+      return;
+    }
+    setSelectedZip(zip);
     setUrlState({ zip: zip.zipCode, metric: selectedMetric });
-  }, [selectedMetric, setUrlState]);
+  }, [mode, selectedZip, selectedMetric, setUrlState]);
+
+  // Closing the panel ends compare mode. The next ZIP the user clicks opens on
+  // its details, which is what closing a panel means everywhere else.
+  const handleSidebarClose = useCallback(() => {
+    setSidebarOpen(false);
+    setMode("detail");
+    setCompareZip(null);
+  }, []);
+
+  const handleModeChange = useCallback((next: "detail" | "compare") => {
+    setMode(next);
+    if (next === "detail") setCompareZip(null);
+  }, []);
 
   const handleMetricChange = useCallback((metric: MetricType) => {
     setSelectedMetric(metric);
@@ -182,17 +215,21 @@ export function HousingDashboard() {
   // R-tree-plus-readiness-flag machinery existed to amortise a cost that was
   // never there, and three effects used to wait on that flag.
   const recomputeVisible = useCallback((
-    loaded: readonly string[], bounds: maplibregl.LngLatBounds | null,
+    loaded: () => readonly string[], bounds: maplibregl.LngLatBounds | null,
   ) => {
     if (!autoScaleRef.current || !store || !bounds) {
       setVisibleRows(null);
       return;
     }
-    setVisibleRows(visibleZipRows(loaded, store, bounds));
+    // `loaded()` is only called here, on the auto-scale path. It is a
+    // `querySourceFeatures` over every loaded tile — 38,077 feature instances at
+    // z3 — and auto-scale is off by default, so calling it eagerly meant every
+    // pan and zoom allocated and discarded that set for a caller about to return.
+    setVisibleRows(visibleZipRows(loaded(), store, bounds));
   }, [store]);
 
   const handleMapMove = useCallback((
-    loaded: readonly string[],
+    loaded: () => readonly string[],
     bounds: maplibregl.LngLatBounds,
     view?: { lat: number; lng: number; zoom: number },
   ) => {
@@ -301,12 +338,17 @@ export function HousingDashboard() {
       </TopBar>
       <div className="flex flex-1 relative min-h-[400px] overflow-hidden">
         {isMobile && (
-          <MobileBottomSheet isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}>
+          <MobileBottomSheet isOpen={sidebarOpen} onClose={handleSidebarClose}>
             <Sidebar
               isOpen={sidebarOpen}
               zipData={selectedZip}
               store={store}
-              onClose={() => setSidebarOpen(false)}
+              onClose={handleSidebarClose}
+              selectedMetric={selectedMetric}
+              mode={mode}
+              onModeChange={handleModeChange}
+              compareZip={compareZip}
+              onCompareZipChange={setCompareZip}
             />
           </MobileBottomSheet>
         )}
@@ -314,9 +356,14 @@ export function HousingDashboard() {
         <div className="hidden md:flex absolute top-0 bottom-0 left-0 z-20 flex-col">
           <Sidebar
             isOpen={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
+            onClose={handleSidebarClose}
             zipData={selectedZip}
             store={store}
+            selectedMetric={selectedMetric}
+            mode={mode}
+            onModeChange={handleModeChange}
+            compareZip={compareZip}
+            onCompareZipChange={setCompareZip}
           />
         </div>
         <div className="flex-1 relative">
@@ -351,6 +398,9 @@ export function HousingDashboard() {
                   rankableShare: manifest.noise.rankable_zips / manifest.noise.reporting_zips,
                   impliedN: manifest.noise.rankable_n_implied,
                 } : null}
+                outliers={outlierCount(manifest) !== null
+                  ? { total: outlierCount(manifest)! }
+                  : null}
               />
             </div>
           )}

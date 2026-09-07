@@ -1,12 +1,22 @@
-// The per-ZIP history chart (spec Phase 7): a full series, the forecast ribbon, and a
-// confidence slider that reconstructs the band client-side from the published sigma-unit
-// quantile table.
+// The per-ZIP history chart: a full series, the forecast ribbon, and a readout
+// that follows the pointer.
 //
-// Progressive enhancement is the contract. `loadHistory` never throws and returns null on any
-// failure, and this component renders a short explanatory line in that case. The sidebar
-// around it must not depend on anything here.
+// WHAT WAS CONFUSING ABOUT THE OLD VERSION, since the fixes only make sense
+// against it. It drew three series that come from two companies on two different
+// clocks — Zillow's ZHVI is a calendar-month index, Redfin's rows are a rolling
+// three-month window — through one silently rescaling y-axis, so switching tabs
+// changed the units, the axis and the start year with no cue that anything but
+// the line had moved. The forecast was drawn as a dashed line and a ribbon past
+// the last observation but never labelled ON the chart; the only explanation was
+// a 10 px paragraph under a slider that appears for ZHVI alone. `low / latest /
+// high` were the extremes of the series INCLUDING the forecast band, which reads
+// as the ZIP's own range. And the x-axis carried two labels fourteen years apart.
+//
+// Progressive enhancement is still the contract. `loadHistory` never throws and
+// returns null on any failure; this renders a short line in that case and the
+// panel around it must not depend on anything here.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   forecastBand,
   levelsOf,
@@ -18,15 +28,26 @@ import {
 
 type SeriesKey = "zhvi" | "msp" | "hs";
 
-const SERIES: { key: SeriesKey; label: string; axis: "months" | "periods"; money: boolean }[] = [
-  { key: "zhvi", label: "Typical value", axis: "months", money: true },
-  { key: "msp", label: "Median sale price", axis: "periods", money: true },
-  { key: "hs", label: "Homes sold", axis: "periods", money: false },
+const SERIES: {
+  key: SeriesKey;
+  label: string;
+  /** Named on the tab, because the two clocks are genuinely different. */
+  cadence: string;
+  axis: "months" | "periods";
+  money: boolean;
+}[] = [
+  { key: "zhvi", label: "Typical value", cadence: "Zillow · monthly index", axis: "months", money: true },
+  { key: "msp", label: "Sale price", cadence: "Redfin · 3-month window", axis: "periods", money: true },
+  { key: "hs", label: "Homes sold", cadence: "Redfin · 3-month window", axis: "periods", money: false },
 ];
 
-const W = 320;
-const H = 110;
-const PAD = { l: 4, r: 4, t: 8, b: 16 };
+const W = 340;
+const H = 178;
+const PAD = { l: 36, r: 10, t: 18, b: 22 };
+const PLOT_W = W - PAD.l - PAD.r;
+const PLOT_H = H - PAD.t - PAD.b;
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function fmt(v: number, money: boolean): string {
   if (!money) return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v));
@@ -35,8 +56,22 @@ function fmt(v: number, money: boolean): string {
   return `$${Math.round(v)}`;
 }
 
-function yearOf(iso: string): string {
-  return iso.slice(2, 4);
+function fmtFull(v: number, money: boolean): string {
+  return money ? `$${Math.round(v).toLocaleString()}` : Math.round(v).toLocaleString();
+}
+
+/** "2026-07-31" -> "Jul 2026". */
+function monthLabel(iso: string): string {
+  const m = Number(iso.slice(5, 7));
+  return `${MONTHS[m - 1] ?? "?"} ${iso.slice(0, 4)}`;
+}
+
+/** The month `h` steps past `iso`, for labelling forecast points that have no
+ *  entry on the published axis. */
+function monthsAfter(iso: string, h: number): string {
+  const y = Number(iso.slice(0, 4));
+  const m = Number(iso.slice(5, 7)) - 1 + h;
+  return `${MONTHS[((m % 12) + 12) % 12]} ${y + Math.floor(m / 12)}`;
 }
 
 export function Sparkline({ zipCode }: { zipCode: string }) {
@@ -60,7 +95,7 @@ export function Sparkline({ zipCode }: { zipCode: string }) {
   }, [zipCode]);
 
   if (state === "loading") {
-    return <div className="h-[150px] animate-pulse rounded-md bg-muted/40" aria-hidden />;
+    return <div className="h-[190px] animate-pulse rounded-md bg-muted/40" aria-hidden />;
   }
   if (state === "absent" || !data) {
     return (
@@ -81,11 +116,7 @@ export function Sparkline({ zipCode }: { zipCode: string }) {
 }
 
 function Chart({
-  data,
-  series,
-  onSeries,
-  levelIdx,
-  onLevel,
+  data, series, onSeries, levelIdx, onLevel,
 }: {
   data: HistoryResult;
   series: SeriesKey;
@@ -97,6 +128,8 @@ function Chart({
   const meta = SERIES.find((s) => s.key === series)!;
   const levels = useMemo(() => levelsOf(index), [index]);
   const level = levels[Math.min(levelIdx, levels.length - 1)] ?? "0.8";
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [cursor, setCursor] = useState<number | null>(null);
 
   const available = SERIES.filter((s) => Array.isArray(hist[s.key]));
   const geom = useMemo(
@@ -104,11 +137,33 @@ function Chart({
     [index, hist, series, level],
   );
 
+  // A pointer that lands on a series with no forecast must not keep an index
+  // that only existed on the previous one.
+  useEffect(() => { setCursor(null); }, [series]);
+
   if (!geom) {
     return <p className="text-xs text-muted-foreground">No {meta.label.toLowerCase()} history for this ZIP.</p>;
   }
 
   const note = index.notes?.[series];
+  const hover = cursor === null ? null : geom.marks[cursor];
+
+  // Pointer events rather than mouse events, so the same handler serves touch.
+  // The nearest mark wins on x alone: the reader is picking a date, and requiring
+  // them to also be near the line vertically would make a steep series unreadable.
+  const onPointer = (e: React.PointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg || geom.marks.length === 0) return;
+    const box = svg.getBoundingClientRect();
+    const x = ((e.clientX - box.left) / box.width) * W;
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < geom.marks.length; i++) {
+      const d = Math.abs(geom.marks[i].x - x);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    setCursor(best);
+  };
 
   return (
     <div className="space-y-2">
@@ -130,17 +185,95 @@ function Chart({
         ))}
       </div>
 
+      {/* The readout. Fixed height so the chart does not jump when the pointer
+          enters, and it carries the cadence when idle — which is the one thing
+          the old tab strip never said out loud. */}
+      <div className="flex h-8 items-baseline justify-between gap-2">
+        {hover ? (
+          <>
+            <div className="min-w-0">
+              <p className="text-[11px] leading-tight text-muted-foreground">
+                {hover.label}
+                {hover.forecast && " · forecast"}
+              </p>
+              <p className="text-sm font-semibold leading-tight tabular-nums text-foreground">
+                {fmtFull(hover.v, meta.money)}
+              </p>
+            </div>
+            {hover.forecast && hover.lo != null && hover.hi != null && (
+              <p className="shrink-0 text-right text-[11px] leading-tight tabular-nums text-muted-foreground">
+                {Math.round(Number(level) * 100)}% range
+                <br />
+                {fmt(hover.lo, meta.money)}–{fmt(hover.hi, meta.money)}
+              </p>
+            )}
+          </>
+        ) : (
+          <div className="min-w-0">
+            <p className="text-[11px] leading-tight text-muted-foreground">{meta.cadence}</p>
+            <p className="text-sm font-semibold leading-tight tabular-nums text-foreground">
+              {fmtFull(geom.last, meta.money)}
+              <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                {geom.lastLabel}
+              </span>
+            </p>
+          </div>
+        )}
+      </div>
+
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
+        className="w-full touch-none"
         role="img"
+        onPointerMove={onPointer}
+        onPointerDown={onPointer}
+        onPointerLeave={() => setCursor(null)}
         aria-label={`${meta.label} for this ZIP from ${geom.firstYear} to ${geom.lastYear}${
           geom.band ? `, with a ${Math.round(Number(level) * 100)}% forecast band` : ""
         }`}
       >
-        {geom.band && (
-          <path d={geom.band} className="fill-primary/15" />
+        {/* Horizontal gridlines with their values. The chart had no y-axis at
+            all, so a line could rise across the box on a 2% move or a 200% one
+            and look identical. */}
+        {geom.yTicks.map((t) => (
+          <g key={t.v}>
+            <line
+              x1={PAD.l} x2={W - PAD.r} y1={t.y} y2={t.y}
+              className="stroke-border" strokeWidth={0.5} strokeDasharray="2 3"
+            />
+            <text
+              x={PAD.l - 5} y={t.y + 3} textAnchor="end"
+              className="fill-muted-foreground" fontSize={8.5}
+            >
+              {fmt(t.v, meta.money)}
+            </text>
+          </g>
+        ))}
+
+        {/* The forecast region, shaded and separated. A dashed line alone reads
+            as more data; a boundary and a caption make it read as a projection. */}
+        {geom.forecastX != null && (
+          <>
+            <rect
+              x={geom.forecastX} y={PAD.t}
+              width={W - PAD.r - geom.forecastX} height={PLOT_H}
+              className="fill-muted/40"
+            />
+            <line
+              x1={geom.forecastX} x2={geom.forecastX} y1={PAD.t} y2={PAD.t + PLOT_H}
+              className="stroke-muted-foreground/50" strokeWidth={0.75}
+            />
+            <text
+              x={geom.forecastX + 3} y={PAD.t + 7}
+              className="fill-muted-foreground" fontSize={8}
+            >
+              forecast →
+            </text>
+          </>
         )}
+
+        {geom.band && <path d={geom.band} className="fill-primary/20" />}
         {geom.forecastLine && (
           <path
             d={geom.forecastLine}
@@ -152,69 +285,63 @@ function Chart({
         )}
         <path d={geom.line} className="stroke-primary" strokeWidth={1.5} fill="none" />
 
-        {/* A break marker is drawn only where the data actually breaks. `at` is null for
-            both restated series, so today this renders for nothing — see history.py. */}
+        {/* A break marker is drawn only where the data actually breaks. `at` is
+            null for both restated series, so today this renders for nothing. */}
         {geom.breakX != null && (
           <>
             <line
-              x1={geom.breakX}
-              x2={geom.breakX}
-              y1={PAD.t}
-              y2={H - PAD.b}
-              className="stroke-amber-500"
-              strokeWidth={1}
-              strokeDasharray="2 2"
+              x1={geom.breakX} x2={geom.breakX} y1={PAD.t} y2={PAD.t + PLOT_H}
+              className="stroke-amber-500" strokeWidth={1} strokeDasharray="2 2"
             />
             <title>Definition changed at {note?.at}</title>
           </>
         )}
 
         <line
-          x1={PAD.l}
-          x2={W - PAD.r}
-          y1={H - PAD.b}
-          y2={H - PAD.b}
-          className="stroke-border"
-          strokeWidth={1}
+          x1={PAD.l} x2={W - PAD.r} y1={PAD.t + PLOT_H} y2={PAD.t + PLOT_H}
+          className="stroke-border" strokeWidth={1}
         />
-        <text x={PAD.l} y={H - 4} className="fill-muted-foreground" fontSize={9}>
-          ’{geom.firstLabel}
-        </text>
-        <text x={W - PAD.r} y={H - 4} textAnchor="end" className="fill-muted-foreground" fontSize={9}>
-          ’{geom.lastLabel}
-        </text>
+        {geom.xTicks.map((t) => (
+          <text
+            key={t.label + t.x}
+            x={t.x} y={H - 6} textAnchor="middle"
+            className="fill-muted-foreground" fontSize={8.5}
+          >
+            {t.label}
+          </text>
+        ))}
+
+        {hover && (
+          <>
+            <line
+              x1={hover.x} x2={hover.x} y1={PAD.t} y2={PAD.t + PLOT_H}
+              className="stroke-foreground/40" strokeWidth={0.75}
+            />
+            <circle
+              cx={hover.x} cy={hover.y} r={3}
+              className="fill-primary stroke-background" strokeWidth={1.5}
+            />
+          </>
+        )}
       </svg>
 
-      <div className="flex items-baseline justify-between text-[11px] text-muted-foreground tabular-nums">
-        <span>low {fmt(geom.min, meta.money)}</span>
-        <span className="font-semibold text-foreground">
-          latest {fmt(geom.last, meta.money)}
-        </span>
-        <span>high {fmt(geom.max, meta.money)}</span>
-      </div>
-
-      {geom.band && (
-        <div className="space-y-1">
-          <label className="flex items-baseline justify-between text-[11px] text-muted-foreground">
-            <span>Forecast confidence</span>
-            <span className="font-semibold tabular-nums text-foreground">
-              {Math.round(Number(level) * 100)}%
-            </span>
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={levels.length - 1}
-            step={1}
-            value={Math.min(levelIdx, levels.length - 1)}
-            onChange={(e) => onLevel(Number(e.target.value))}
-            className="w-full accent-primary"
-            aria-label="Forecast confidence level"
-          />
+      {geom.band && levels.length > 1 && (
+        <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] leading-snug text-muted-foreground">
-            12-month forecast of the Zillow ZHVI value index, not of the sale price shown
-            above. The band is this ZIP’s own residual spread at the level you pick.
+            12-month forecast of the Zillow index, not of the sale price.
           </p>
+          <label className="flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground">
+            <span className="sr-only">Forecast confidence level</span>
+            <select
+              value={Math.min(levelIdx, levels.length - 1)}
+              onChange={(e) => onLevel(Number(e.target.value))}
+              className="rounded border border-border bg-card px-1 py-0.5 text-[10px] tabular-nums"
+            >
+              {levels.map((l, i) => (
+                <option key={l} value={i}>{Math.round(Number(l) * 100)}% band</option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
 
@@ -227,16 +354,28 @@ function Chart({
   );
 }
 
+/** One addressable point on the chart — what the pointer snaps to. */
+interface Mark {
+  x: number;
+  y: number;
+  v: number;
+  label: string;
+  forecast: boolean;
+  lo?: number;
+  hi?: number;
+}
+
 interface Geometry {
   line: string;
   forecastLine: string | null;
   band: string | null;
   breakX: number | null;
-  min: number;
-  max: number;
+  /** x of the last observation, where the forecast region begins. */
+  forecastX: number | null;
+  marks: Mark[];
+  yTicks: { v: number; y: number }[];
+  xTicks: { x: number; label: string }[];
   last: number;
-  /** Two digits for the axis tick; the full year for the screen-reader label. */
-  firstLabel: string;
   lastLabel: string;
   firstYear: string;
   lastYear: string;
@@ -253,11 +392,14 @@ function buildGeometry(
   const axis = meta.axis === "months" ? index.zhvi_months : index.periods;
   if (!values || values.length !== axis.length) return null;
 
-  const present = values.map((v, i) => [i, v] as const).filter((p): p is readonly [number, number] => p[1] != null);
+  const present = values
+    .map((v, i) => [i, v] as const)
+    .filter((p): p is readonly [number, number] => p[1] != null);
   if (present.length < 2) return null;
 
-  // The forecast only exists for ZHVI. Extending the x-axis past the last observation is what
-  // makes the ribbon read as a projection rather than as more data.
+  // The forecast only exists for ZHVI. Extending the x-axis past the last
+  // observation is what makes the ribbon read as a projection rather than as
+  // more data.
   const bands =
     series === "zhvi"
       ? index.horizons
@@ -282,14 +424,14 @@ function buildGeometry(
     if (b.lo < min) min = b.lo;
     if (b.hi > max) max = b.hi;
   }
-  if (!(max > min)) {
-    max = min + 1;
-  }
+  if (!(max > min)) max = min + 1;
 
-  const sx = (i: number) => PAD.l + ((i - xMin) / Math.max(xMax - xMin, 1)) * (W - PAD.l - PAD.r);
-  const sy = (v: number) => PAD.t + (1 - (v - min) / (max - min)) * (H - PAD.t - PAD.b);
+  const sx = (i: number) => PAD.l + ((i - xMin) / Math.max(xMax - xMin, 1)) * PLOT_W;
+  const sy = (v: number) => PAD.t + (1 - (v - min) / (max - min)) * PLOT_H;
 
-  const line = present.map(([i, v], k) => `${k ? "L" : "M"}${sx(i).toFixed(1)},${sy(v).toFixed(1)}`).join("");
+  const line = present
+    .map(([i, v], k) => `${k ? "L" : "M"}${sx(i).toFixed(1)},${sy(v).toFixed(1)}`)
+    .join("");
 
   let forecastLine: string | null = null;
   let band: string | null = null;
@@ -298,7 +440,9 @@ function buildGeometry(
     forecastLine =
       `M${sx(lastObsIdx).toFixed(1)},${sy(lastV).toFixed(1)}` +
       bands.map((b) => `L${sx(lastObsIdx + b.h).toFixed(1)},${sy(b.point).toFixed(1)}`).join("");
-    const upper = bands.map((b) => `L${sx(lastObsIdx + b.h).toFixed(1)},${sy(b.hi).toFixed(1)}`).join("");
+    const upper = bands
+      .map((b) => `L${sx(lastObsIdx + b.h).toFixed(1)},${sy(b.hi).toFixed(1)}`)
+      .join("");
     const lower = bands
       .slice()
       .reverse()
@@ -307,21 +451,49 @@ function buildGeometry(
     band = `M${sx(lastObsIdx).toFixed(1)},${sy(lastV).toFixed(1)}${upper}${lower}Z`;
   }
 
+  const lastAxis = axis[Math.min(lastObsIdx, axis.length - 1)];
+  const marks: Mark[] = present.map(([i, v]) => ({
+    x: sx(i), y: sy(v), v, label: monthLabel(axis[i]), forecast: false,
+  }));
+  for (const b of bands) {
+    marks.push({
+      x: sx(lastObsIdx + b.h),
+      y: sy(b.point),
+      v: b.point,
+      label: monthsAfter(lastAxis, b.h),
+      forecast: true,
+      lo: b.lo,
+      hi: b.hi,
+    });
+  }
+
+  const yTicks = [min, (min + max) / 2, max].map((v) => ({ v, y: sy(v) }));
+
+  // Four year ticks at most, taken from real axis entries so a tick never names a
+  // date the series does not cover.
+  const span = lastObsIdx - xMin;
+  const wanted = Math.min(4, Math.max(2, Math.floor(span / 12)));
+  const xTicks: { x: number; label: string }[] = [];
+  for (let k = 0; k < wanted; k++) {
+    const i = Math.round(xMin + (span * k) / (wanted - 1));
+    xTicks.push({ x: sx(i), label: axis[i].slice(0, 4) });
+  }
+
   const at = index.notes?.[series]?.at ?? null;
   const breakIdx = at ? axis.indexOf(at) : -1;
-  const breakX = breakIdx >= 0 ? sx(breakIdx) : null;
 
   return {
     line,
     forecastLine,
     band,
-    breakX,
-    min,
-    max,
+    breakX: breakIdx >= 0 ? sx(breakIdx) : null,
+    forecastX: bands.length ? sx(lastObsIdx) : null,
+    marks,
+    yTicks,
+    xTicks,
     last: present[present.length - 1][1],
-    firstLabel: yearOf(axis[xMin]),
-    lastLabel: yearOf(axis[Math.min(lastObsIdx, axis.length - 1)]),
+    lastLabel: monthLabel(lastAxis),
     firstYear: axis[xMin].slice(0, 4),
-    lastYear: axis[Math.min(lastObsIdx, axis.length - 1)].slice(0, 4),
+    lastYear: lastAxis.slice(0, 4),
   };
 }

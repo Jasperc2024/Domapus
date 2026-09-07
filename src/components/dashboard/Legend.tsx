@@ -1,11 +1,13 @@
 import { useMemo } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Checkbox } from "@/components/ui/checkbox";
 import { HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { METRICS, getMetricLabel } from "@/lib/metrics";
 import { computeQuantiles } from "@/lib/quantiles";
 import { CHOROPLETH_COLORS, CHOROPLETH_GRADIENT_STOPS, NO_DATA_COLOR } from "@/lib/choropleth";
+import { OUTLIER_COLORS } from "@/lib/choropleth-painter";
+
+const METHODOLOGY_URL = `${import.meta.env.BASE_URL}methodology`;
 
 interface LegendProps {
   selectedMetric: string;
@@ -18,9 +20,12 @@ interface LegendProps {
   onAutoScaleChange?: (value: boolean) => void;
   showLisa?: boolean;
   onShowLisaChange?: (value: boolean) => void;
-  /** How many ZIPs are faded because their median rests on too few sales, and
-   *  what the threshold is. Null until the manifest lands. */
+  /** How many ZIPs rest on too few sales to rank, and what the threshold is.
+   *  Null until the manifest lands. */
   reliability?: { rankableShare: number; impliedN: number } | null;
+  /** How many ZIPs break their neighbourhood's price pattern. Null until the
+   *  manifest lands, and absent entirely if the spatial stage did not run. */
+  outliers?: { total: number } | null;
 }
 
 // Formatted from the metric registry rather than by sniffing the key name. The
@@ -30,21 +35,25 @@ interface LegendProps {
 function formatLegendValue(value: number, metric: string): string {
   switch (METRICS[metric]?.format) {
     case "price":
-      return value >= 1000 ? `$${(value / 1000).toFixed(0)}k` : `$${value.toFixed(0)}`;
+      return value >= 1_000_000
+        ? `$${(value / 1_000_000).toFixed(1)}M`
+        : value >= 1000
+          ? `$${(value / 1000).toFixed(0)}k`
+          : `$${value.toFixed(0)}`;
     case "percent":
-      return `${value.toFixed(1)}%`;
+      return `${value.toFixed(0)}%`;
     case "months":
       return value.toFixed(1);
     case "days":
       return `${Math.round(value)}d`;
     default:
-      return value.toLocaleString();
+      return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toLocaleString();
   }
 }
 
 export function Legend({
   selectedMetric, metricValues, breaks, autoScale, onAutoScaleChange,
-  showLisa, onShowLisaChange, reliability,
+  showLisa, onShowLisaChange, reliability, outliers,
 }: LegendProps) {
   const isMobile = useIsMobile();
 
@@ -69,9 +78,19 @@ export function Legend({
   // Discrete swatches, one per painted class, labelled with the map's own break
   // values. A continuous gradient implies a continuum the map does not paint.
   const hasBreaks = !!breaks && breaks.length === CHOROPLETH_COLORS.length - 1;
-  const classLabels = hasBreaks
-    ? breaks.map((b) => formatLegendValue(b, selectedMetric))
-    : null;
+
+  // THREE labels, not six. Six 5-to-7 character values across a 256 px panel is
+  // ~36 px per label at 10 px type, which is why they used to overlap and why the
+  // old markup carried a negative margin to hide it. A choropleth key exists to
+  // give a sense of scale, not to be a lookup table — the exact break for any
+  // class is on the swatch's own tooltip, and the value for any ZIP is one hover
+  // away on the map itself.
+  const ticks = useMemo(() => {
+    if (!hasBreaks) return null;
+    const b = breaks!;
+    const at = [0, (b.length - 1) >> 1, b.length - 1];
+    return at.map((i) => ({ i, label: formatLegendValue(b[i], selectedMetric) }));
+  }, [hasBreaks, breaks, selectedMetric]);
 
   // Mobile
   if (isMobile) {
@@ -91,20 +110,17 @@ export function Legend({
         </div>
 
         {onAutoScaleChange && (
-          <div className="flex items-center gap-2 my-3">
-            <Checkbox
-              id="legend-auto-scale-mobile"
-              checked={autoScale}
-              onCheckedChange={(c) => onAutoScaleChange(c === true)}
-              className="h-3.5 w-3.5"
+          <label className="mt-3 flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={!!autoScale}
+              onChange={(e) => onAutoScaleChange(e.target.checked)}
+              className="h-3.5 w-3.5 shrink-0 accent-primary"
             />
-            <label
-              htmlFor="legend-auto-scale-mobile"
-              className="text-[10px] font-medium leading-none cursor-pointer select-none text-muted-foreground"
-            >
-              Auto Scale
-            </label>
-          </div>
+            <span className="text-[10px] font-medium leading-none text-muted-foreground">
+              Scale to this view
+            </span>
+          </label>
         )}
 
         <div className="mt-3 text-[10px] text-muted-foreground text-center italic">
@@ -116,101 +132,53 @@ export function Legend({
 
   // Desktop / default
   return (
-    <div className="border border-border rounded-lg p-4 w-full max-w-xs bg-card/95 backdrop-blur-sm shadow-xl">
-      <h3 className="text-sm font-semibold mb-3 text-foreground">
+    <div className="border border-border rounded-lg px-4 py-3 w-full max-w-xs bg-card/95 backdrop-blur-sm shadow-xl">
+      <h3 className="text-sm font-semibold mb-2.5 text-foreground leading-tight">
         {getMetricLabel(selectedMetric)}
       </h3>
-
-      {onAutoScaleChange && (
-        <div className="flex items-center gap-2 mb-3 px-1">
-          <Checkbox
-            id="legend-auto-scale"
-            checked={autoScale}
-            onCheckedChange={(c) => onAutoScaleChange(c === true)}
-            className="h-3.5 w-3.5"
-          />
-          <label
-            htmlFor="legend-auto-scale"
-            className="text-[10px] font-medium leading-none cursor-pointer select-none text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Adjust contrast to view
-          </label>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <HelpCircle className="h-3 w-3 text-muted-foreground/70 cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p className="w-[180px] text-xs">
-                  When enabled, the color scale automatically adjusts to the range of values currently visible on the map.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      )}
-
-      {onShowLisaChange && (
-        <div className="flex items-center gap-2 mb-3 px-1">
-          <Checkbox
-            id="legend-lisa"
-            checked={showLisa}
-            onCheckedChange={(c) => onShowLisaChange(c === true)}
-            className="h-3.5 w-3.5"
-          />
-          <label
-            htmlFor="legend-lisa"
-            className="text-[10px] font-medium leading-none cursor-pointer select-none text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Show price clusters
-          </label>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <HelpCircle className="h-3 w-3 text-muted-foreground/70 cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p className="w-[220px] text-xs">
-                  Marks ZIPs that sit inside a cluster of similarly priced
-                  neighbours, and the ones that stand apart from theirs. Shown only
-                  for ZIPs with enough sales to rank — below that, the pattern is
-                  sampling noise rather than geography.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      )}
 
       <div className="space-y-2">
         {hasBreaks ? (
           <>
-            <div className="flex" aria-hidden="true">
+            <div className="flex gap-px" aria-hidden="true">
               {CHOROPLETH_COLORS.map((c, i) => (
                 <div
                   key={c + i}
-                  className="h-4 flex-1 border-y border-border first:rounded-l-md first:border-l last:rounded-r-md last:border-r"
+                  className="h-4 flex-1 first:rounded-l-sm last:rounded-r-sm"
                   style={{ background: c }}
+                  title={
+                    i === 0
+                      ? `below ${formatLegendValue(breaks![0], selectedMetric)}`
+                      : i === CHOROPLETH_COLORS.length - 1
+                        ? `${formatLegendValue(breaks![breaks!.length - 1], selectedMetric)} and above`
+                        : `${formatLegendValue(breaks![i - 1], selectedMetric)} to ${formatLegendValue(breaks![i], selectedMetric)}`
+                  }
                 />
               ))}
             </div>
-            <div className="flex text-[10px] text-muted-foreground font-semibold tabular-nums">
-              {classLabels!.map((label, i) => (
-                <span key={i} className="flex-1 text-right -mr-2 last:mr-0">
+            {/* Each tick sits under the boundary it marks: break i is the edge
+                between swatch i and swatch i+1, so its centre is at
+                (i + 1) / CLASSES across the strip. */}
+            <div className="relative h-4">
+              {ticks!.map(({ i, label }) => (
+                <span
+                  key={i}
+                  className="absolute top-0 -translate-x-1/2 text-[10px] font-medium tabular-nums text-muted-foreground whitespace-nowrap"
+                  style={{ left: `${((i + 1) / CHOROPLETH_COLORS.length) * 100}%` }}
+                >
                   {label}
                 </span>
               ))}
-              <span className="flex-1" />
             </div>
           </>
         ) : (
           <>
             <div
-              className="h-4 rounded-md border border-border"
+              className="h-4 rounded-sm border border-border"
               style={{ background: gradient }}
               aria-hidden="true"
             />
-            <div className="flex justify-between text-xs text-muted-foreground font-semibold">
+            <div className="flex justify-between text-xs text-muted-foreground font-medium">
               <span>{legendDisplay.min}</span>
               <span>{legendDisplay.mid}</span>
               <span>{legendDisplay.max}</span>
@@ -223,40 +191,132 @@ export function Legend({
             it gets a solid grey and this entry. "No polygon" (ocean, park) is
             the only legitimately blank state. Painting no-data transparent made
             it identical to both an absent polygon and a genuine zero. */}
-        <div className="flex items-center gap-2 pt-1 text-[10px] text-muted-foreground">
+        <div className="flex items-center gap-2 pt-0.5 text-[11px] text-muted-foreground">
           <span
-            className="inline-block h-3 w-3 rounded-sm border border-border"
+            className="inline-block h-2.5 w-2.5 rounded-[2px] border border-border"
             style={{ background: NO_DATA_COLOR }}
             aria-hidden="true"
           />
           <span>No data reported</span>
         </div>
-
-        {/* The reliability channel, and the selection effect it causes.
-            Restricting the colour scale to ZIPs with enough sales to rank is the
-            honest choice, and it has a measurable cost: those ZIPs are more
-            expensive on average, so thin and rural markets are painted against a
-            scale set without them. Saying so is the point — an unlabelled fade
-            reads as a rendering artifact rather than as uncertainty. */}
-        {reliability && (
-          <div className="flex items-start gap-2 pt-1 text-[10px] text-muted-foreground">
-            <span
-              className="inline-block h-3 w-3 rounded-sm border border-border shrink-0 mt-[1px]"
-              style={{ background: CHOROPLETH_COLORS[4], opacity: 0.38 }}
-              aria-hidden="true"
-            />
-            <span>
-              Faded: fewer than {reliability.impliedN} sales, so the median is
-              too noisy to rank. {Math.round((1 - reliability.rankableShare) * 100)}% of
-              reporting ZIPs. The colour scale is set without them.{" "}
-              <a href="methodology" className="underline hover:text-foreground">
-                How this works
-              </a>
-            </span>
-          </div>
-        )}
       </div>
 
+      <div className="mt-2.5 pt-2.5 border-t border-border/60 space-y-2">
+        {onAutoScaleChange && (
+          <ToggleRow
+            id="legend-auto-scale"
+            checked={!!autoScale}
+            onChange={onAutoScaleChange}
+            label="Scale to this view"
+            help="Recuts the seven colours over the ZIPs currently on screen, so a single metro spreads across the full range instead of sitting in one or two classes."
+          />
+        )}
+
+        {onShowLisaChange && (
+          <ToggleRow
+            id="legend-outliers"
+            checked={!!showLisa}
+            onChange={onShowLisaChange}
+            label={
+              outliers
+                ? `Highlight ${outliers.total} price outliers`
+                : "Highlight price outliers"
+            }
+            help="Marks the ZIPs whose price disagrees with the ZIPs around them — a cheap ZIP ringed by expensive ones, or the reverse. Only ZIPs with enough sales to rank are eligible; below that the disagreement is sampling noise, not geography."
+          />
+        )}
+
+        {showLisa && (
+          <div className="space-y-1 pt-0.5" aria-live="polite">
+            <OutlierKey
+              color={OUTLIER_COLORS.LH}
+              label="Cheap for its surroundings"
+            />
+            <OutlierKey
+              color={OUTLIER_COLORS.HL}
+              label="Expensive for its surroundings"
+            />
+          </div>
+        )}
+
+        {/* The reliability channel is no longer a fill treatment. Fading tier 0
+            moved lightness on a ramp whose meaning IS lightness — measured at up
+            to 3.90 class steps of error on the darkest class — and it fell on
+            rural ZIPs, which the pipeline separately measures as genuinely
+            cheaper. Two errors, same direction. The number now lives where a
+            number can be read: the hover popup and the detail panel. This line
+            says the scale is still cut on the rankable subset, because that part
+            of the selection effect is real and unchanged. */}
+        {reliability && (
+          <p className="text-[11px] leading-snug text-muted-foreground pt-0.5">
+            Colours are cut over the{" "}
+            {Math.round(reliability.rankableShare * 100)}% of ZIPs with at least{" "}
+            {reliability.impliedN} sales. Thinner markets are painted on that
+            scale and show their sale count on hover.{" "}
+            <a
+              href={METHODOLOGY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Methodology
+            </a>
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A checkbox, its label and its explanation as one row. Three copies of this
+ *  markup drifted apart; the tooltip on one was 180 px wide and on another 220. */
+function ToggleRow({
+  id, checked, onChange, label, help,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  help: string;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="checkbox"
+        id={id}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-primary"
+      />
+      <label
+        htmlFor={id}
+        className="text-[11px] font-medium leading-none cursor-pointer select-none text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {label}
+      </label>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <HelpCircle className="h-3 w-3 shrink-0 text-muted-foreground/70 cursor-help" />
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p className="w-[240px] text-xs leading-snug">{help}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  );
+}
+
+function OutlierKey({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+      <span
+        className="inline-block h-2.5 w-2.5 rounded-full border border-white shadow-[0_0_0_1px_rgba(0,0,0,0.25)]"
+        style={{ background: color }}
+        aria-hidden="true"
+      />
+      <span>{label}</span>
     </div>
   );
 }

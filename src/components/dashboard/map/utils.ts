@@ -182,11 +182,16 @@ function uncertaintyFor(data: ZipData, metric: string): number | null {
   return typeof v === "number" && isFinite(v) ? v : null;
 }
 
-/** LISA classes. Descriptive clustering with a permutation screen — NOT a
- *  hypothesis test, so the wording avoids "significant". */
-const LISA_LABELS: Record<number, string> = {
-  1: "In a cluster of higher-priced ZIPs",
-  2: "In a cluster of lower-priced ZIPs",
-  3: "Lower-priced than its neighbours",
-  4: "Higher-priced than its neighbours",
+/** LISA classes 3 and 4 only — the ZIPs that break their neighbourhood's pattern.
+ *
+ *  Classes 1 and 2 (HH, LL) are deliberately absent. Price is strongly clustered
+ *  nationally, so "in a cluster of higher-priced ZIPs" is true of most expensive
+ *  ZIPs and tells the reader nothing the map has not already told them. Only the
+ *  outliers are worth a line in a popup that has four lines to spend.
+ *
+ *  Descriptive clustering with a permutation screen — NOT a hypothesis test, so
+ *  the wording avoids "significant". */
+export const LISA_LABELS: Record<number, string> = {
+  3: "Cheaper than the ZIPs around it",
+  4: "More expensive than the ZIPs around it",
 };

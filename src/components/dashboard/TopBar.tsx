@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Heart, Calendar } from "lucide-react";
+import { Heart, Calendar, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MetricSelector, MetricType } from "./MetricSelector";
 import { SearchBox } from "./SearchBox";
@@ -19,6 +19,105 @@ const GithubIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 const BASE_PATH = import.meta.env.BASE_URL;
+const METHODOLOGY_URL = `${BASE_PATH}methodology`;
+
+/**
+ * The header both routes share: identity on the left, site-wide links on the
+ * right, and whatever the page itself needs in between.
+ *
+ * It was split out of `TopBar` because the methodology page had no header at all.
+ * Giving it the map's header would have handed the reader a metric selector and a
+ * ZIP search that control a map on another route.
+ */
+export function TopBarShell({
+  subtitle, center, actions,
+}: {
+  /** The line under the wordmark. The map says what the site is; a document says
+   *  what the document is. */
+  subtitle: string;
+  /** Page-specific controls. Empty on the methodology page. */
+  center?: React.ReactNode;
+  /** Page-specific actions, placed before the site-wide links. */
+  actions?: React.ReactNode;
+}) {
+  // Breakpoints, not the `isMobile` hook, because the hook is one boolean at
+  // 768 px and this row has to degrade in more than two steps. Adding the
+  // Methodology button pushed the total minimum width past a 900 px viewport and
+  // the wordmark overlapped the search field; between 768 and 1280 the labels are
+  // what has to give, not the layout.
+  return (
+    <header
+      data-top-bar
+      className="flex items-center justify-between gap-3 px-3 sm:px-5 py-2 bg-dashboard-panel border-b border-dashboard-border h-14 sm:h-16"
+    >
+      <div className="flex items-center gap-3 lg:gap-5 min-w-0">
+        <a
+          href={BASE_PATH}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-shrink-0"
+          title="Back to the map"
+        >
+          <img
+            src={`${BASE_PATH}Logo.svg`}
+            alt="Domapus Logo"
+            width="40"
+            height="40"
+            className="w-8 h-8 sm:w-9 sm:h-9"
+          />
+          <div className="flex-col font-logo hidden sm:flex">
+            <h1 className="text-base font-bold text-dashboard-text-primary leading-tight">
+              Domapus
+            </h1>
+            <p className="text-xs text-dashboard-text-secondary leading-tight hidden xl:block">
+              {subtitle}
+            </p>
+          </div>
+        </a>
+        {center}
+      </div>
+
+      <div className="flex items-center justify-end flex-1 min-w-0 gap-2 sm:gap-3">
+        {actions}
+
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <IconLink href={METHODOLOGY_URL} label="Methodology">
+            <BookOpen className="h-4 w-4" />
+          </IconLink>
+          <IconLink href="https://github.com/jasperwchen/Domapus" label="GitHub">
+            <GithubIcon className="h-4 w-4" />
+          </IconLink>
+          <IconLink
+            href="https://buymeacoffee.com/JasperC"
+            label="Sponsor"
+            className="bg-pink-600 hover:bg-pink-700 text-white"
+          >
+            <Heart className="h-4 w-4" />
+          </IconLink>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/** Icon plus a label that appears only when there is room for it. The title
+ *  attribute carries the name at every width, so the icon-only state is still
+ *  identifiable. */
+function IconLink({
+  href, label, className, children,
+}: {
+  href: string;
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Button variant="outline" size="sm" asChild className={className}>
+      <a href={href} target="_blank" rel="noopener noreferrer" title={label}>
+        {children}
+        <span className="hidden xl:inline">{label}</span>
+      </a>
+    </Button>
+  );
+}
 
 interface TopBarProps {
   selectedMetric: MetricType;
@@ -68,105 +167,37 @@ export function TopBar({
 
   return (
     <>
-      {/* === Desktop / Main Header === */}
-      <header data-top-bar className="flex items-center justify-between px-4 sm:px-6 py-2 bg-dashboard-panel border-b border-dashboard-border h-14 sm:h-16 gap-4">
-        {/* Left Section - Logo + Metric Selector */}
-        <div className="flex items-center gap-4 sm:gap-6 flex-shrink-0">
-          <div
-            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-            onClick={() => window.location.assign(BASE_PATH)}
-            title="Click to reload page"
-          >
-            <img
-              src={`${BASE_PATH}Logo.svg`}
-              alt="Domapus Logo"
-              width="40"
-              height="40"
-              className="w-9 h-9 sm:w-10 sm:h-10"
-            />
-            <div className="flex flex-col font-logo">
-              <h1 className="text-base sm:text-lg font-bold text-dashboard-text-primary leading-tight">
-                Domapus
-              </h1>
-              <p className="text-xs sm:text-sm text-dashboard-text-secondary leading-tight hidden sm:block">
-                Housing Market Analysis
-              </p>
-            </div>
-          </div>
-
-          {!isMobile && (
-            <MetricSelector
-              selectedMetric={selectedMetric}
-              onMetricChange={onMetricChange}
-            />
-          )}
-        </div>
-
-        {/* Right Section - Search + Actions */}
-        <div className="flex items-center justify-end flex-1 min-w-0 gap-4">
-          {!isMobile && (
-            <div className="w-full max-w-[300px] min-w-[140px] flex-shrink">
-              <SearchBox onSearch={onSearch} />
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Last Updated */}
+      <TopBarShell
+        subtitle="Housing Market Analysis"
+        center={!isMobile ? (
+          <MetricSelector selectedMetric={selectedMetric} onMetricChange={onMetricChange} />
+        ) : undefined}
+        actions={
+          <>
+            {!isMobile && (
+              <div className="w-full max-w-[260px] min-w-[104px] flex-shrink">
+                <SearchBox onSearch={onSearch} />
+              </div>
+            )}
+            {/* The period is the first thing to go: it is also printed in the
+                detail panel and on every export, so losing it here costs the
+                reader nothing they cannot get one hover away. */}
             {!isMobile && (
               <div
-                className="flex items-center text-dashboard-text-secondary gap-2 mr-2"
+                className="items-center text-dashboard-text-secondary gap-2 hidden 2xl:flex"
                 title={`${sourceLabel} data — ${periodPhrase}. Site last refreshed ${runDate}.`}
               >
                 <Calendar className="h-4 w-4 opacity-80" />
                 <div className="flex flex-col">
                   <span className="text-xs font-medium">{periodLabel}</span>
-                  <span className="text-xs font-medium whitespace-nowrap">
-                    {periodValue}
-                  </span>
+                  <span className="text-xs font-medium whitespace-nowrap">{periodValue}</span>
                 </div>
               </div>
             )}
-
-            {/* Export */}
             {children}
-
-            {/* GitHub button */}
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-            >
-              <a
-                href="https://github.com/jasperwchen/Domapus"
-                target="_blank"
-                rel="noopener noreferrer"
-                title="GitHub"
-              >
-                <GithubIcon className="h-4 w-4" />
-                {!isMobile && <span>GitHub</span>}
-              </a>
-            </Button>
-
-            {/* Sponsor button */}
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-              className="bg-pink-600 hover:bg-pink-700 text-white"
-            >
-              <a
-                href="https://buymeacoffee.com/JasperC"
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Sponsor"
-              >
-                <Heart className="h-4 w-4" />
-                {!isMobile && <span>Sponsor</span>}
-              </a>
-            </Button>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       {/* === Mobile Bottom Bar === */}
       {isMobile && !hideMobileControls && (

@@ -1,6 +1,18 @@
-// Cold-load benchmark: N runs under pinned CPU/network, reported as median + p95.
-// Metrics are browser-native only, so this runs against any build including
-// historical commits that cannot be instrumented.
+// Load AND interaction benchmark: N runs under pinned CPU/network, reported as
+// median + p95. Metrics are browser-native only, so this runs against any build
+// including historical commits that cannot be instrumented.
+//
+// THE METRIC SET IS FIXED AND VERSIONED. Metrics used to be added here whenever
+// one became interesting, and the result files simply gained keys — which is why
+// phase 0 and phase 3 share only a handful of comparable fields and why every
+// before/after claim in this repo has to name its baseline in a footnote. Now:
+//
+//   - every key in METRIC_KEYS and every id in SCENARIO_IDS is emitted on every
+//     run, as `null` where the build or browser cannot supply it. A null and a
+//     zero are different claims;
+//   - adding, removing or redefining one bumps SCHEMA_VERSION;
+//   - `compare.mjs` refuses to compare across a bump rather than lining up two
+//     partially-overlapping sets and calling the difference a regression.
 //
 // Usage:
 //   node bench/run.mjs --url http://localhost:4173/Domapus/ --label era3-head
@@ -17,7 +29,26 @@
 //   --out <dir>      (default bench/results)
 import { chromium } from "playwright";
 import { mkdir, writeFile } from "node:fs/promises";
+import { execSync } from "node:child_process";
 import { join } from "node:path";
+import { COLLECTOR } from "./collector.mjs";
+import { runScenarios, SCENARIO_IDS, SCHEMA_VERSION } from "./scenarios.mjs";
+
+// Every scalar the report carries, always present. Grouped by what they answer.
+const METRIC_KEYS = [
+  // Does it load, and how fast does something appear
+  "ttfb", "fcp", "lcp", "cls", "domContentLoaded", "loadEvent", "wallMs",
+  // Is the main thread blocked while it does
+  "tbt", "maxLongTask", "longTaskCount", "loafCount", "loafBlockingMs",
+  // How much came down, and how much of it had to
+  "transferTotal", "gatingBytes", "gatingBytesLegacy", "requestCount",
+  // Does it stay responsive, and does it leak
+  "worstInteractionMs", "heapBytes", "heapBytesAfterInteraction",
+  // Invariants that must not drift. sourceReloads MUST be 0: any other value
+  // means something wrote a data-driven paint value and paid a full source
+  // reload, which is the 3375 ms regression choropleth-painter.ts exists to stop.
+  "sourceReloads", "featureStateWrites",
+];
 
 // PMTiles fetches by range request, so tile volume depends on the viewport.
 // Unpinned, tile traffic swamps every other signal and runs are not comparable.
@@ -72,26 +103,13 @@ const pin = !flag("no-pin");
 
 const target = pin ? `${url}${url.includes("?") ? "&" : "?"}${PINNED_VIEW}` : url;
 
-// Installed before any app code runs, so no early entries are missed.
-const COLLECTOR = `
-window.__bench = { longTasks: [], lcp: 0, cls: 0, shifts: 0 };
-try {
-  new PerformanceObserver((l) => {
-    for (const e of l.getEntries()) window.__bench.longTasks.push({ start: e.startTime, dur: e.duration });
-  }).observe({ type: "longtask", buffered: true });
-} catch {}
-try {
-  new PerformanceObserver((l) => {
-    const es = l.getEntries();
-    window.__bench.lcp = es[es.length - 1].startTime;
-  }).observe({ type: "largest-contentful-paint", buffered: true });
-} catch {}
-try {
-  new PerformanceObserver((l) => {
-    for (const e of l.getEntries()) if (!e.hadRecentInput) { window.__bench.cls += e.value; window.__bench.shifts++; }
-  }).observe({ type: "layout-shift", buffered: true });
-} catch {}
-`;
+const skipScenarios = flag("no-interaction");
+
+/** The commit under test, so a result can be traced back to a build. */
+function gitSha() {
+  try { return execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim(); }
+  catch { return null; }
+}
 
 /** Median and p95 of a numeric array. */
 function stats(values) {
@@ -176,11 +194,17 @@ async function measureOnce(browser) {
     for (const m of performance.getEntriesByType("measure")) marks[m.name] = m.duration;
 
     return {
+      ttfb: nav.responseStart || null,
+      fcp: b.fcp,
       lcp: b.lcp,
       cls: b.cls,
       tbt,
       maxLongTask,
       longTaskCount: b.longTasks.length,
+      loafCount: b.loafSupported ? b.loafs.length : null,
+      loafBlockingMs: b.loafSupported
+        ? b.loafs.reduce((s, l) => s + l.blocking, 0)
+        : null,
       domContentLoaded: nav.domContentLoadedEventEnd || 0,
       loadEvent: nav.loadEventEnd || 0,
       mainThreadResourceCount: res.length,
@@ -223,25 +247,61 @@ async function measureOnce(browser) {
     /* not always available */
   }
 
-  // Interaction cost: switch the metric and time until the map repaints.
-  let metricSwitchMs = null;
+  // --- The interaction suite ------------------------------------------------
+  const notes = [];
+  const scenarios = skipScenarios
+    ? Object.fromEntries(SCENARIO_IDS.map((id) => [id, null]))
+    : await runScenarios(page, { onNote: (m) => notes.push(m) });
+
+  // `metricSwitchMs` is retained under its old name and old definition — one
+  // switch, wall clock — because every checked-in baseline quotes it. The
+  // scenario suite's `metric.cycle` is the richer measure; this is the bridge.
+  const metricSwitchMs = await page.evaluate(() => {
+    const es = performance.getEntriesByName("map:metricSwitch");
+    if (!es.length) return null;
+    const d = es.map((e) => e.duration).sort((a, b) => a - b);
+    return d[Math.floor(d.length / 2)];
+  });
+
+  // Read after the suite, so this is the interaction path's residue rather than
+  // the load path's. Compared against `heapBytes` it is the only leak signal the
+  // harness has.
+  let heapBytesAfterInteraction = null;
   try {
-    const combo = page.locator("[role=combobox]").first();
-    if (await combo.count()) {
-      const t = Date.now();
-      await combo.click({ timeout: 5_000 });
-      const option = page.locator("[role=option]").nth(2);
-      await option.click({ timeout: 5_000 });
-      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-      metricSwitchMs = Date.now() - t;
-    }
-  } catch {
-    /* control not present in this build */
-  }
+    await page.waitForTimeout(3000);
+    heapBytesAfterInteraction = (await cdp.send("Runtime.getHeapUsage")).usedSize;
+  } catch { /* not always available */ }
+
+  // Invariants the app instruments for itself. Absent on an uninstrumented build,
+  // which is a null and not a pass.
+  const invariants = await page.evaluate(() => {
+    const perf = window.__domapusPerf;
+    if (!perf) return { sourceReloads: null, featureStateWrites: null };
+    let writes = null;
+    try {
+      const es = performance.getEntriesByName("map:applyChoropleth");
+      const last = es[es.length - 1];
+      writes = last?.detail?.writes ?? null;
+    } catch { /* detail not exposed on this build */ }
+    return {
+      sourceReloads: perf.counterValue?.("map:sourceReload") ?? null,
+      featureStateWrites: writes,
+    };
+  });
+
+  const worstInteractionMs = await page.evaluate(() => {
+    const b = window.__bench;
+    if (!b.eventTimingSupported || !b.events.length) return null;
+    return b.events.reduce((m, e) => Math.max(m, e.dur), 0);
+  });
 
   await context.close();
-  return { ...metrics, transferTotal, gatingBytes, gatingBytesLegacy, byKind, requestCount, heapBytes,
-           metricSwitchMs, wallMs, painted };
+  return {
+    ...metrics, ...invariants,
+    transferTotal, gatingBytes, gatingBytesLegacy, byKind, requestCount,
+    heapBytes, heapBytesAfterInteraction, worstInteractionMs,
+    metricSwitchMs, wallMs, painted, scenarios, notes,
+  };
 }
 
 const browser = await chromium.launch();
@@ -264,11 +324,25 @@ for (let i = 0; i <= runs; i++) {
 }
 await browser.close();
 
-const numeric = ["lcp", "tbt", "maxLongTask", "longTaskCount", "domContentLoaded", "loadEvent",
-                 "transferTotal", "gatingBytes", "gatingBytesLegacy", "requestCount", "heapBytes", "metricSwitchMs",
-                 "cls", "wallMs"];
+// The fixed key set, plus the one legacy name every checked-in baseline quotes.
 const summary = {};
-for (const k of numeric) summary[k] = stats(samples.map((s) => s[k]));
+for (const k of [...METRIC_KEYS, "metricSwitchMs"]) {
+  summary[k] = stats(samples.map((s) => s[k]));
+}
+
+// Scenarios: every id present, every field summarised, null where unmeasured.
+summary.scenarios = {};
+for (const id of SCENARIO_IDS) {
+  const rows = samples.map((s) => s.scenarios?.[id]).filter(Boolean);
+  const field = (f) => stats(rows.map((r) => r[f]));
+  summary.scenarios[id] = rows.length === 0 ? null : {
+    durationMs: field("durationMs"),
+    dropped: field("dropped"),
+    longestFrameMs: field("longestFrameMs"),
+    p95FrameMs: field("p95FrameMs"),
+    loafBlockingMs: field("loafBlockingMs"),
+  };
+}
 
 const kinds = new Set(samples.flatMap((s) => Object.keys(s.byKind)));
 summary.byKind = {};
@@ -283,8 +357,10 @@ const paintedAll = samples.every((s) => s.painted);
 const valid = paintedAll && dataBytes > 100_000;
 
 const result = {
+  schemaVersion: SCHEMA_VERSION,
   label,
   url: target,
+  gitSha: gitSha(),
   valid,
   invalidReason: valid ? null
     : !paintedAll ? "map never painted — build is broken or non-functional at this commit"
@@ -295,6 +371,13 @@ const result = {
     dataBytes <= 100_000 && "no housing data was fetched — timings measure a shell, not the app",
     samples.some((s) => !s.pinnedViewApplied) && "view pinning did not apply — tile transfer may vary",
     !markNames.size && "no performance.measure marks — build is uninstrumented (expected for historical builds)",
+    skipScenarios && "--no-interaction: every scenario is null in this result",
+    summary.sourceReloads?.max > 0 &&
+      `map:sourceReload is ${summary.sourceReloads.max}, must be 0 — a data-driven paint ` +
+      "value was rewritten and every loaded tile was re-parsed",
+    summary.loafCount?.n === 0 &&
+      "no Long Animation Frames — browser predates Chrome 123, LoAF columns are null",
+    ...[...new Set(samples.flatMap((s) => s.notes || []))].map((n) => `scenario: ${n}`),
   ].filter(Boolean),
   summary,
   samples,
@@ -314,8 +397,30 @@ console.log(`  gating bytes   ${summary.gatingBytes.median.toLocaleString("en-US
 // two eras are legible side by side rather than only through their baselines.
 console.log(`  (snapshot)     ${summary.gatingBytesLegacy.median.toLocaleString("en-US")} B` +
             ` — fetched, but no longer gates paint`);
-if (summary.heapBytes) console.log(`  JS heap        ${(summary.heapBytes.median / 1048576).toFixed(1)} MB`);
+if (summary.heapBytes) {
+  const after = summary.heapBytesAfterInteraction?.median;
+  console.log(`  JS heap        ${(summary.heapBytes.median / 1048576).toFixed(1)} MB` +
+    (after ? `  ->  ${(after / 1048576).toFixed(1)} MB after interaction` : ""));
+}
 if (summary.metricSwitchMs) console.log(`  metric switch  ${Math.round(summary.metricSwitchMs.median)} ms`);
+if (summary.sourceReloads) {
+  console.log(`  source reloads ${summary.sourceReloads.max}` +
+    `${summary.sourceReloads.max > 0 ? "   *** MUST BE 0" : "   (correct)"}`);
+}
+
+const any = Object.values(summary.scenarios).some(Boolean);
+if (any) {
+  console.log("\n  interaction            ms   dropped   worst frame");
+  for (const id of SCENARIO_IDS) {
+    const r = summary.scenarios[id];
+    if (!r?.durationMs) { console.log(`  ${id.padEnd(20)}    —`); continue; }
+    console.log(
+      `  ${id.padEnd(20)} ${String(Math.round(r.durationMs.median)).padStart(5)}` +
+      `${String(r.dropped?.median ?? "—").padStart(10)}` +
+      `${String(Math.round(r.longestFrameMs?.median ?? 0) || "—").padStart(14)} ms`
+    );
+  }
+}
 for (const w of result.warnings) console.log(`  ! ${w}`);
 if (!valid) console.log(`
   *** INVALID: ${result.invalidReason}`);

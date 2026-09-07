@@ -3,6 +3,7 @@
 //
 //   node bench/compare.mjs results/baseline.json results/candidate.json
 import { readFile } from "node:fs/promises";
+import { SCHEMA_VERSION } from "./scenarios.mjs";
 
 const files = process.argv.slice(2);
 if (files.length < 2) {
@@ -29,7 +30,28 @@ Only ${results.length} valid result(s); nothing to compare.`);
   process.exit(1);
 }
 
+// A result written before the interaction suite has no schemaVersion; that is
+// version 1 by definition.
+const schemaOf = (r) => r.schemaVersion ?? 1;
+const schemas = [...new Set(results.map(schemaOf))];
+if (schemas.length > 1) {
+  console.error(`
+Refusing to compare across metric-set versions: ${schemas.sort().join(" and ")}.
+
+${results.map((r) => `  ${r.label.padEnd(24)} schema ${schemaOf(r)}`).join("\n")}
+
+The two sets do not contain the same measurements, so a table lining them up
+side by side would present "this metric did not exist then" as a change. This is
+the guard the repo lacked when phase 0 and phase 3 stopped being comparable.
+
+Re-run the older build with the current harness to get a schema ${SCHEMA_VERSION}
+result for it, or compare only files that share a version.`);
+  process.exit(1);
+}
+
 const ROWS = [
+  ["TTFB", (s) => s.ttfb?.median, (v) => `${Math.round(v)} ms`, "lower"],
+  ["FCP", (s) => s.fcp?.median, (v) => `${Math.round(v)} ms`, "lower"],
   ["LCP", (s) => s.lcp?.median, (v) => `${Math.round(v)} ms`, "lower"],
   ["Total Blocking Time", (s) => s.tbt?.median, (v) => `${Math.round(v)} ms`, "lower"],
   ["Max long task", (s) => s.maxLongTask?.median, (v) => `${Math.round(v)} ms`, "lower"],
@@ -39,9 +61,35 @@ const ROWS = [
    (v) => `${v.toLocaleString("en-US")} B`, "lower"],
   ["Requests", (s) => s.requestCount?.median, (v) => String(Math.round(v)), "lower"],
   ["JS heap", (s) => s.heapBytes?.median, (v) => `${(v / 1048576).toFixed(1)} MB`, "lower"],
+  ["JS heap after interaction", (s) => s.heapBytesAfterInteraction?.median,
+   (v) => `${(v / 1048576).toFixed(1)} MB`, "lower"],
   ["Metric switch", (s) => s.metricSwitchMs?.median, (v) => `${Math.round(v)} ms`, "lower"],
+  ["Worst interaction", (s) => s.worstInteractionMs?.median, (v) => `${Math.round(v)} ms`, "lower"],
+  ["LoAF blocking", (s) => s.loafBlockingMs?.median, (v) => `${Math.round(v)} ms`, "lower"],
   ["CLS", (s) => s.cls?.median, (v) => v.toFixed(3), "lower"],
+  ["Source reloads (must be 0)", (s) => s.sourceReloads?.max, (v) => String(v), "lower"],
 ];
+
+/** Interaction rows, rendered as their own table so the load numbers stay
+ *  readable. Dropped frames is the headline: it is what "laggy" means. */
+function scenarioTable(results) {
+  const ids = [...new Set(results.flatMap((r) => Object.keys(r.summary.scenarios || {})))];
+  const rows = ids.filter((id) => results.some((r) => r.summary.scenarios?.[id]?.durationMs));
+  if (!rows.length) return;
+  console.log(`\n**Interaction** — dropped frames (a frame over 25 ms), then worst frame\n`);
+  console.log(`| Scenario | ${results.map((r) => esc(r.label)).join(" | ")} |`);
+  console.log(`|---|${results.map(() => "---:").join("|")}|`);
+  for (const id of rows) {
+    const cells = results.map((r) => {
+      const v = r.summary.scenarios?.[id];
+      if (!v?.durationMs) return "—";
+      const dropped = v.dropped?.median;
+      const worst = v.longestFrameMs?.median;
+      return `${dropped ?? "—"} dropped, ${worst == null ? "—" : Math.round(worst) + " ms"}`;
+    });
+    console.log(`| \`${esc(id)}\` | ${cells.join(" | ")} |`);
+  }
+}
 
 const esc = (s) => String(s).replace(/\|/g, "\\|");
 
@@ -92,6 +140,8 @@ if (results.length === 2) {
     console.log(`| ${name} | ${cells.join(" | ")} |`);
   }
 }
+
+scenarioTable(results);
 
 const allWarnings = results.flatMap((r) => (r.warnings || []).map((w) => `${r.label}: ${w}`));
 if (allWarnings.length) {

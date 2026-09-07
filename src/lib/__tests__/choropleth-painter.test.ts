@@ -134,6 +134,15 @@ describe("the paint expression is constant", () => {
     expect(classPaintExpression()).toEqual(classPaintExpression());
     expect(classOpacityExpression()).toEqual(classOpacityExpression());
   });
+
+  it("paints at full opacity, because opacity is not a reliability channel", () => {
+    // Reliability used to drive fill-opacity: tier 0 at 0.38, the rest at 0.8.
+    // On a ramp whose meaning is lightness that is the same perceptual channel
+    // used twice — measured at up to 3.90 class steps of lightness error on the
+    // darkest class, biased against rural ZIPs because reliability tracks sales
+    // volume. Any value below 1 here reintroduces that.
+    expect(classOpacityExpression()).toBe(1);
+  });
 });
 
 describe("ChoroplethPainter", () => {

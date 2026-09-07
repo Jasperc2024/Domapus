@@ -33,8 +33,28 @@ export interface Manifest {
     reporting_zips: number;
     tiers: Record<string, number>;
   };
-  spatial?: Record<string, unknown>;
+  /** ZCTAs by which sources report them. `no_data` areas ARE drawn — in grey —
+   *  and are not the same as an area with a value of zero. */
+  coverage?: {
+    both?: number;
+    redfin_only?: number;
+    zhvi_only?: number;
+    no_data?: number;
+  } & Record<string, unknown>;
+  spatial?: {
+    /** LISA class -> ZIP count. Keys are `ns`, `HH`, `LL`, `LH`, `HL`. Only the
+     *  last two are shown on the map; see `choropleth-painter.OUTLIER_COLORS`. */
+    class_counts?: Record<string, number>;
+  } & Record<string, unknown>;
   forecast?: Record<string, unknown>;
+}
+
+/** How many ZIPs break their neighbourhood's price pattern, or null when the
+ *  spatial stage did not run. The legend labels its own toggle with this. */
+export function outlierCount(mf: Manifest | null): number | null {
+  const c = mf?.spatial?.class_counts;
+  if (!c) return null;
+  return (c.LH ?? 0) + (c.HL ?? 0);
 }
 
 interface BootPayload {

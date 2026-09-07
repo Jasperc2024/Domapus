@@ -106,9 +106,12 @@ deploy footprint (92.6 -> 46.9 MB) and the coverage fix itself.
       50-column column-major snapshot, a manifest with `assets.paint`, and `paint/*.u8`.
       `vite.config.ts` inlines the paint filenames from that manifest at build time and
       `deploy.yml` verifies it with `sha256sum -c`; that path is untested end to end on CI.
-- [ ] **Phase 5's forecast tier-1 rung is dead code against real data.** The metro-growth-path
-      fallback for 12-23 observations is reported in `f_tier` but never exercised — every ZHVI
-      ZIP has >= 24 months. Either find a ZIP that needs it or delete the rung.
+- [ ] **Phase 5's forecast tier-1 rung is dead code against real data. MEASURED 2026-09-06:
+      tier 0 = 0 ZIPs, tier 1 = 0, tier 2 = 1,250, tier 3 = 25,019** over the 26,269 ZIPs in the
+      shipped ZHVI panel. The shortest history is **31 months**, seven clear of tier 2's floor,
+      so both the "no forecast" rung and the metro-growth-path rung are unreachable. Left in
+      place: deleting one is a decision about what a newly-added Zillow ZIP does, not a cleanup.
+      Decide it, do not re-measure it.
 
 ---
 
@@ -119,9 +122,6 @@ deploy footprint (92.6 -> 46.9 MB) and the coverage fix itself.
       (p95 |yoy| = 18.85% over 6,137,683 lag-12 cells, share clamped 4.07%). It has rounded to
       20 on every start window tested. If a release ever produces a different bound, that is a
       regime change worth seeing, not a number to override.
-- [ ] **Realtor.com stays cut** (§6.1a, Phase 8 note). Reopen only if
-      `median_listing_price` over *all* active inventory, `pending_ratio` or `quality_flag`
-      become load-bearing. The freshness argument died with the Redfin feed migration.
 
 ## Kaggle — DEFERRED, not rejected
 
@@ -252,40 +252,66 @@ of the four are step-ordering or `if:` guards that CI cannot exercise:
 
 ## Reviewed but not actioned — pipeline and scripts
 
-Findings from the 2026-09-06 read of every Python file. None is a shipped defect; each is
-a judgement call worth making deliberately rather than by neglect.
+All six items from the 2026-09-06 read are **done** — one shared `panel.dense`, predicate
+pushdown in `changes._period_map`, `zhvi.read` parsing once, the `forecast.fit` warning, the
+calibration script off its 3 GB dict-of-dicts, and `DIVERGING_BOUND_PCT` deleted. Measurements
+and the equivalence proofs are in CHANGES.md under 2026-09-06 evening. Nothing open here.
 
-`[ ]` **`scripts/calibrate_diff_gate.py:from_panel` materialises the whole panel as Python
-objects.** It builds one three-key dict per (period, ZIP) cell over 4.9M rows, plus three
-`to_pylist()` copies of the same data — roughly 3 GB peak and several minutes. It survives
-on a 16 GB runner and it is a manual script, so this is cost, not risk. `noise._pivot`
-already does the same reshape in numpy in a few seconds; reusing that pattern would make it
-a ~10-line function.
+---
 
-`[ ]` **Four near-identical dense-pivot implementations.** `noise._pivot`,
-`forecast.run`, `zhvi.pooled_yoy` and `history._dense` each turn a long parquet panel into
-a dense `[T x Z]` float array, and each does the index-mapping slightly differently
-(`np.fromiter` over a dict in three of them, `pc.index_in` in the fourth). One shared
-helper would remove ~60 lines and one class of index bug.
+## UI/UX pass — IN PROGRESS 2026-09-06
 
-`[ ]` **`zhvi.py` parses the ZHVI CSV twice** — `write_panel` and `process` each call
-`pd.read_csv` on the same bytes — and `process` then walks ~26k rows with `iterrows()`,
-which is the slowest way pandas offers to read a frame. Parsing once and vectorising the
-three columns would cut a few seconds and a copy of a 123 MB file.
+Plan and the measurements behind it: `docs/UIUX-PLAN.md`. User-approved scope is the whole
+plan. Batches, in implementation order:
 
-`[ ]` **`forecast.fit` emits `RuntimeWarning: Mean of empty slice` on every run.** The
-`np.errstate(invalid="ignore")` around it suppresses *floating-point error states*, not the
-`RuntimeWarning` that `nanmean` raises on an all-NaN column. The results are NaN, which the
-tier ladder already handles, so this is log noise — but it is noise that would hide a real
-warning. `warnings.catch_warnings()` is the matching tool.
+All landed on the working tree except where noted. `npx tsc -b`, 86 vitest, 54 pytest and
+eslint are green; verified in a production build in the browser.
 
-`[ ]` **`DIVERGING_BOUND_PCT` in `src/lib/choropleth.generated.ts` is exported and unused.**
-It duplicates `classify.DIVERGING_BOUND` on the frontend side. Nothing reads it today — the
-legend takes its edges from the manifest, which is right — but it is a second authority
-sitting there waiting to be used, which is the exact hazard `class-source.ts` exists to
-prevent. Delete it, or wire it to an assertion against the manifest.
+- `[x]` **B1 contrast + legend + methodology plumbing.**
+- `[x]` **B2 compare-mode state lift.** Both bugs verified fixed in the browser.
+- `[x]` **B3 sidebar layout.**
+- `[x]` **B4 history chart.**
+- `[x]` **B5 map.** Verified: 117 labels for 117 distinct ZIPs at z10, zero duplicates,
+  against 423 polygon instances (78 ZIPs split across tiles, 90022 into 4 pieces).
+- `[x]` **B6 methodology rewrite + `docs/METHODOLOGY.md`.**
+- `[~]` **B7 `classify.py` break population.** CODE LANDED, **NOT PUBLISHED**. Needs a data
+  run and republish before the map changes. Simulated against the shipped snapshot:
+  bottom-class share goes homes_sold 68%->12%, active_listings 70%->13%,
+  pending_sales 69%->11%, new_listings 69%->10%, inventory 66%->10%.
+- `[x]` **B8 cluster reframe.** Verified: 47 markers (20 LH + 27 HL), choropleth intact
+  underneath, `map:sourceReload` still 0.
+- `[x]` **B9 bench.** Fixed versioned metric set, 11 interaction scenarios, LoAF + Event
+  Timing, cross-schema comparison refused. **Not yet run** — no schema-2 baseline exists.
 
-`[ ]` **`changes.py` reads `panel.parquet` three times** (`_period_map` for the base period,
-then twice more inside `_reconcile`), each time loading all 4.9M rows of 14-30 columns and
-filtering to one period in Python. Parquet row-group predicate pushdown via the dataset API
-would read a fraction of that. Measured cost is a few seconds, so this is low priority.
+### Open after this pass
+
+- `[ ]` **Deferred, not cancelled: the reliability texture overlay.** A diagonal hatch on
+  tier-0 ZIPs, gated to zoom >= 6, via a runtime-generated canvas pattern and one extra fill
+  layer whose `fill-opacity` is a constant `case` on the existing `rel` feature-state.
+  Texture is orthogonal to lightness, which is the property that made opacity unusable.
+- `[ ]` **Run the new bench and check in a schema-2 baseline.** Until one exists there is
+  nothing to compare an interaction change against, and `compare.mjs` will refuse to line up
+  a schema-1 file.
+- `[ ]` **B7 needs a publish.** The bbox scale fix in `geom.offsets` also only reaches the
+  site on a republish; until then `ZipTable.checkBounds` logs and auto-scale falls back to
+  the national scale, which is the safe degradation and is confirmed working in the browser.
+
+### Measured facts this pass depends on — do not re-derive
+
+- `noise.tiers` = {0: 24315, 1: 5109, 2: 3515, 3: 832}. Tier 0 is 72.0% by count and
+  **78.5% of drawn land area**.
+- Opacity over Positron `#FAFAF8`, lightness error in class-step units (ramp averages 14.0 L*
+  per step): a=0.38 -> 3.90, 0.62 -> 2.43, 0.75 -> 1.59, 0.92 -> 0.49, 0.95 -> 0.30. No alpha
+  band is both visible as uncertainty and not confusable with value. That is why opacity is
+  1.0 and the channel moved.
+- `classing.median_sale_price.selection_effect`: faded ZIPs median $275,953 vs $394,885
+  ranked. The fade and the class assignment skew the same direction.
+- Bottom-class share: sold_above_list 74%, active_listings 70%, homes_sold 68%. Price and
+  time metrics are 13-21%. This is B7.
+- LISA area share: ns 80.1%, LL 13.1%, HH 5.9%, LH 0.60%, HL 0.26%. HH polygons are median
+  40 km2 against LL's 153 km2, which is why only blue is visible. Moran's I at k=8 is 0.7343,
+  so HH/LL largely restates the choropleth. LH+HL is 47 ZIPs. This is B8.
+- **Bbox decode bug (fixed in B1).** `geom.offsets()` multiplies by 1e4 and `serialize` applies
+  the declared 1e4 scale again, so the wire value is degrees x 1e8. `boundsOf` divided once.
+  Confirmed by decoding at 1e8 and recovering exactly 8.3966 deg max longitude span, the
+  figure `geom.py` cites for Anchorage 99503.

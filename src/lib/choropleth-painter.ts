@@ -49,67 +49,104 @@ export function classPaintExpression(): unknown[] {
   ];
 }
 
-/** Fill opacity for a ZIP whose median rests on too few sales to rank. */
-export const LOW_RELIABILITY_OPACITY = 0.38;
-export const FULL_OPACITY = 0.8;
-
 /**
- * Constant too. Reliability drives opacity, so uncertainty needs no second ramp
- * and no second paint property write.
+ * Every ZIP is painted at full opacity. Reliability is NOT an opacity channel.
  *
- * This is the honesty layer — the one thing separating this from every other
- * choropleth that paints a 2-sale ZIP identically to a 2,000-sale one — and it
- * has no user control. An off switch would be an invitation to turn it off for a
- * screenshot, and it would become another piece of state that has to survive the
- * URL, the export and the archived snapshot, for no gain.
+ * It used to be: tier 0 at 0.38, everything else at 0.8. That is a lightness
+ * channel layered on a ramp whose meaning IS lightness, so the two are the same
+ * perceptual channel used twice, and the reader cannot separate them.
  *
- * THE CARVE-OUT IS NOT IN HERE, AND THAT IS THE POINT. `ACTIVE_LISTINGS` must
- * not be faded — it is a listing-side series that does not depend on sales at all,
- * thousands of ZIPs carry active listings with no sales, and dimming a listings
- * map hardest exactly where there were no sales is a lie the byte layout makes
- * easy. But expressing that as a second expression and swapping between them on a
- * metric change would call `setPaintProperty` on a value MapLibre has seen as
- * data-driven, which marks the source `reload` and re-parses every loaded tile:
- * the exact 3375 ms regression this file exists to prevent.
+ * MEASURED, compositing each ramp colour over Positron's `#FAFAF8` background and
+ * converting to CIELAB. This ramp averages 14.0 L* per class step, so the error
+ * an alpha introduces can be stated in class-step units — how many classes lighter
+ * the fill LOOKS than it is. Worst case is always the darkest class, which is
+ * where the map carries its signal:
  *
- * So the carve-out lives in the DATA instead. A fade-exempt metric's class source
- * reports every ZIP as tier 3 (see `class-source.ts`), the painter writes that
- * into feature-state as it already does, and this expression never changes.
- * `MONTHS_OF_SUPPLY` is deliberately not exempt: it is inventory over the sales
- * rate, so it does derive from homes sold and the fade is correct there.
+ *   a=0.38  3.90 steps   a=0.75  1.59      a=0.92  0.49
+ *   a=0.62  2.43         a=0.85  0.94      a=0.95  0.30
+ *
+ * At the shipped 0.38 an expensive rural ZIP rendered as a colour the eye reads as
+ * nearly four classes cheaper. Holding the artefact under half a step needs every
+ * alpha at 0.92 or above, which leaves 0.92..1.00 of usable range — too little to
+ * read as a deliberate signal and exactly enough to be misread as a value. There
+ * is no alpha band that is both visible as uncertainty and not confusable with
+ * value, so the channel had to go rather than be retuned.
+ *
+ * The bias was systematic, not random. Reliability tracks sales volume, which
+ * tracks urban density, so the fade lightened rural ZIPs specifically — and the
+ * pipeline already measures those ZIPs as genuinely cheaper (median $275,953
+ * against $394,885, `classing.median_sale_price.selection_effect`). Both errors
+ * pointed the same way. Tier 0 is 72% of ZIPs and 78.5% of the drawn land area, so
+ * this was most of the map.
+ *
+ * The honesty layer is not abandoned, it is relocated. Reliability is reported as
+ * a number where a number can be read — the hover popup (`+/-4.6%, 312 sales`),
+ * the detail panel, and the legend — and a texture overlay gated to zoom >= 6 is
+ * the intended fill-side channel, deferred rather than cancelled. Texture is
+ * orthogonal to lightness, which is the property that made opacity unusable.
+ *
+ * Kept as a constant expression set once at `addLayer`. `FADE_EXEMPT` and the
+ * tier-3 reporting in `class-source.ts` are now inert with respect to opacity, and
+ * are retained because the texture layer will read the same `rel` feature-state.
  */
-export function classOpacityExpression(): unknown[] {
-  return [
-    "case",
-    ["<", ["coalesce", ["feature-state", "rel"], 3], 1], LOW_RELIABILITY_OPACITY, // tier 0
-    FULL_OPACITY,
-  ];
+export const FULL_OPACITY = 1;
+
+export function classOpacityExpression(): number {
+  return FULL_OPACITY;
 }
 
 /**
- * The LISA overlay: where a ZIP's price agrees or disagrees with its neighbours.
+ * Price outliers: the ZIPs whose price disagrees with the ZIPs around them.
  *
- * Categorical, not sequential — the five classes are kinds, not amounts, so a
- * ramp would imply an ordering that does not exist. HH/LL are cluster membership;
- * LH/HL are the ZIP standing apart from its neighbourhood.
+ * THIS USED TO PAINT ALL FOUR LISA CLASSES AS A FULL-COVERAGE FILL, and that was
+ * the wrong reading of its own result. Local Moran's I sorts ZIPs into five
+ * classes: not-significant, HH (costly among costly), LL (cheap among cheap), and
+ * the two outlier classes LH and HL. Measured on this release:
  *
- * Constant, like everything else on this layer. Toggling the overlay changes
- * `fill-opacity` between two LITERALS, which is not a data-driven value and so
- * does not mark the source `reload`.
+ *   class   ZIPs   median size   share of drawn area
+ *   ns      6,857    135 km2     80.11%
+ *   LL      1,203    153 km2     13.10%
+ *   HH      1,349     40 km2      5.93%
+ *   LH         20     48 km2      0.60%
+ *   HL         27     78 km2      0.26%
+ *
+ * Two things follow. Global Moran's I at 8 neighbours is 0.7343 — price is
+ * strongly clustered almost everywhere — so HH and LL, which are 2,552 of the
+ * 2,599 significant ZIPs, restate what the choropleth underneath already shows.
+ * And HH polygons are about a quarter the size of LL ones, so an overlay painting
+ * both put down twice as much blue as red and read as "everything is cheap".
+ * The reported symptom was exactly that: only blue clusters visible.
+ *
+ * The informative classes are LH and HL — a ZIP that breaks its neighbourhood's
+ * pattern is something a price map cannot show you. There are 47 of them, 0.86%
+ * of the area, and under the old design they were two of four colours nobody had
+ * a key for. So the overlay is now those 47 only, drawn as markers rather than
+ * fills, with the choropleth left intact underneath.
+ *
+ * Markers, not fill, for a second reason: 47 polygons scattered across the
+ * country are invisible at national zoom, which is where you would look for them.
+ * A fixed-radius circle is legible at every zoom.
  */
-export const LISA_COLORS = [
-  "#B2182B", // 1 HH — high surrounded by high
-  "#2166AC", // 2 LL — low surrounded by low
-  "#92C5DE", // 3 LH — low surrounded by high
-  "#F4A582", // 4 HL — high surrounded by low
-];
+export const OUTLIER_COLORS = {
+  /** LISA class 3 — low value ringed by high. */
+  LH: "#2166AC",
+  /** LISA class 4 — high value ringed by low. */
+  HL: "#B2182B",
+} as const;
 
-export function lisaPaintExpression(): unknown[] {
+/** LISA class code -> which outlier kind, or null for the classes not shown. */
+export const OUTLIER_CLASS: Record<number, keyof typeof OUTLIER_COLORS> = {
+  3: "LH",
+  4: "HL",
+};
+
+export function outlierColorExpression(): unknown[] {
   return [
     "match",
-    ["coalesce", ["feature-state", "lisa"], 0],
-    ...LISA_COLORS.flatMap((c, i) => [i + 1, c]),
-    "rgba(0,0,0,0)", // 0 = not distinguishable from spatial randomness
+    ["get", "cls"],
+    3, OUTLIER_COLORS.LH,
+    4, OUTLIER_COLORS.HL,
+    "rgba(0,0,0,0)",
   ];
 }
 
