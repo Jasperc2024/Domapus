@@ -13,9 +13,19 @@ const PORT = Number(process.argv[4] ?? 4319);
 const MIME = { ".html":"text/html", ".js":"text/javascript", ".css":"text/css",
   ".json":"application/json", ".svg":"image/svg+xml", ".png":"image/png",
   ".ico":"image/x-icon", ".pmtiles":"application/octet-stream",
+  ".u8":"application/octet-stream",
   ".webmanifest":"application/manifest+json", ".xml":"application/xml",
   ".txt":"text/plain", ".csv":"text/csv", ".gz":"application/gzip" };
-const GZIP = new Set([".html",".js",".css",".json",".svg",".xml",".txt",".csv",".webmanifest"]);
+// VERIFIED AGAINST THE LIVE SITE, not assumed. GitHub Pages returns the paint
+// table with `Content-Encoding: gzip` at 24,531 B against 100,000 B raw, which is
+// the "~24 KB on the wire" the whole first-paint design rests on. Omitting ".u8"
+// here made this server report 100,000 B and inflated `gatingBytes` — the one
+// headline number this harness exists to defend — nearly fourfold, as a property
+// of the server rather than of the build.
+//
+// ".pmtiles" stays out on purpose: it is fetched by Range request, and range plus
+// content coding do not mix.
+const GZIP = new Set([".html",".js",".css",".json",".svg",".xml",".txt",".csv",".webmanifest",".u8"]);
 
 createServer((req, res) => {
   const p = decodeURIComponent(new URL(req.url, "http://x").pathname);

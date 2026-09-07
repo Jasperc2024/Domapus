@@ -201,17 +201,19 @@ export function Legend({
         </div>
       </div>
 
+      {/* DO NOT CHANGE TEXT */}
       <div className="mt-2.5 pt-2.5 border-t border-border/60 space-y-2">
         {onAutoScaleChange && (
           <ToggleRow
             id="legend-auto-scale"
             checked={!!autoScale}
             onChange={onAutoScaleChange}
-            label="Scale to this view"
-            help="Recuts the seven colours over the ZIPs currently on screen, so a single metro spreads across the full range instead of sitting in one or two classes."
+            label="Adjust Contrast to View"
+            help="Automatically adjusts the scale to the values currently visible on the map"
           />
         )}
 
+        {/* DO NOT CHANGE TEXT */}
         {onShowLisaChange && (
           <ToggleRow
             id="legend-outliers"
@@ -222,7 +224,7 @@ export function Legend({
                 ? `Highlight ${outliers.total} price outliers`
                 : "Highlight price outliers"
             }
-            help="Marks the ZIPs whose price disagrees with the ZIPs around them — a cheap ZIP ringed by expensive ones, or the reverse. Only ZIPs with enough sales to rank are eligible; below that the disagreement is sampling noise, not geography."
+            help="Highlights ZIP codes where prices are unusually high or low compared to neighboring areas."
           />
         )}
 
@@ -249,10 +251,6 @@ export function Legend({
             of the selection effect is real and unchanged. */}
         {reliability && (
           <p className="text-[11px] leading-snug text-muted-foreground pt-0.5">
-            Colours are cut over the{" "}
-            {Math.round(reliability.rankableShare * 100)}% of ZIPs with at least{" "}
-            {reliability.impliedN} sales. Thinner markets are painted on that
-            scale and show their sale count on hover.{" "}
             <a
               href={METHODOLOGY_URL}
               target="_blank"

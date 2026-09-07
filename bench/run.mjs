@@ -253,9 +253,18 @@ async function measureOnce(browser) {
     ? Object.fromEntries(SCENARIO_IDS.map((id) => [id, null]))
     : await runScenarios(page, { onNote: (m) => notes.push(m) });
 
-  // `metricSwitchMs` is retained under its old name and old definition — one
-  // switch, wall clock — because every checked-in baseline quotes it. The
-  // scenario suite's `metric.cycle` is the richer measure; this is the bridge.
+  // REDEFINED AT SCHEMA 2, AND NOT COMPARABLE TO THE SCHEMA-1 BASELINES.
+  //
+  // Through phase 7 this was wall clock around a Playwright click: it included the
+  // driver round trip and the Radix dropdown opening and closing, so phase 7 quotes
+  // 564 ms. This reads the app's own `map:metricSwitch` measure instead — the two
+  // requestAnimationFrames around the repaint — and reports the median across the
+  // full metric cycle, which is why it lands two orders of magnitude lower. It is a
+  // better number and a different one; quoting it against 564 ms would be a fiction.
+  //
+  // The rename is deliberately NOT done: `compare.mjs` refuses to put a schema-1
+  // and a schema-2 file in the same table, so the guard is the version, not the key
+  // name, and renaming would only hide that the definition moved.
   const metricSwitchMs = await page.evaluate(() => {
     const es = performance.getEntriesByName("map:metricSwitch");
     if (!es.length) return null;

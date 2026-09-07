@@ -9,16 +9,32 @@
 // era comes to look faster than it was.
 
 export const COLLECTOR = `
+// Every buffer is CAPPED. A run under 4x CPU throttling on slow 4G is minutes
+// long, and an uncapped array in a collector that lives that long is a leak that
+// only shows up on the slowest machine — which is exactly the machine the
+// benchmark is meant to model. The caps are far above any real count, so a capped
+// buffer means something is wrong rather than that a number was trimmed; the
+// *Dropped counters say so instead of the array silently lying.
+const CAP = 20000;
+
 window.__bench = {
   longTasks: [],     // { start, dur }        Long Tasks API, Chrome 58+
   loafs: [],         // { start, dur, blocking } Long Animation Frames, Chrome 123+
   events: [],        // { name, dur }         Event Timing, the lab stand-in for INP
+  longTasksDropped: 0,
+  loafsDropped: 0,
+  eventsDropped: 0,
   lcp: 0,
   fcp: null,
   cls: 0,
   shifts: 0,
   frames: null,      // set while a scenario is running
 };
+
+function push(arr, item, counter) {
+  if (arr.length >= CAP) { window.__bench[counter]++; return; }
+  arr.push(item);
+}
 
 function obs(type, fn, extra) {
   try {
@@ -28,7 +44,8 @@ function obs(type, fn, extra) {
   } catch { return false; }
 }
 
-obs("longtask", (e) => window.__bench.longTasks.push({ start: e.startTime, dur: e.duration }));
+obs("longtask", (e) => push(window.__bench.longTasks,
+    { start: e.startTime, dur: e.duration }, "longTasksDropped"));
 
 // LoAF supersedes Long Tasks: it measures the whole frame — script, style, layout
 // and paint — rather than just the script task, so it sees jank that long tasks
@@ -36,11 +53,11 @@ obs("longtask", (e) => window.__bench.longTasks.push({ start: e.startTime, dur: 
 // every baseline in bench/results predates Chrome 123 and TBT is the number those
 // baselines are quoted in.
 window.__bench.loafSupported = obs("long-animation-frame", (e) => {
-  window.__bench.loafs.push({
+  push(window.__bench.loafs, {
     start: e.startTime,
     dur: e.duration,
     blocking: e.blockingDuration || 0,
-  });
+  }, "loafsDropped");
 });
 
 // Event Timing gives per-interaction latency. In the field the Core Web Vital is
@@ -48,7 +65,8 @@ window.__bench.loafSupported = obs("long-animation-frame", (e) => {
 // the honest reading is the worst one observed, so that is what run.mjs reports
 // and it is named worstInteractionMs rather than inp.
 window.__bench.eventTimingSupported =
-  obs("event", (e) => window.__bench.events.push({ name: e.name, dur: e.duration }),
+  obs("event", (e) => push(window.__bench.events,
+        { name: e.name, dur: e.duration }, "eventsDropped"),
       { durationThreshold: 16 });
 
 obs("largest-contentful-paint", (e) => { window.__bench.lcp = e.startTime; });
@@ -62,11 +80,17 @@ obs("layout-shift", (e) => {
 // available on the older builds this harness still has to measure.
 window.__benchFrames = {
   start() {
+    // Stop any loop a previous scenario left running. stop() is skipped when a
+    // scenario throws, and an orphaned rAF loop would keep filling an array
+    // nobody reads for the rest of the run.
+    const prev = window.__bench.frames;
+    if (prev) { prev.stopped = true; cancelAnimationFrame(prev.raf); }
+
     const rec = { t: [], raf: 0, stopped: false };
     window.__bench.frames = rec;
     const tick = (now) => {
       if (rec.stopped) return;
-      rec.t.push(now);
+      if (rec.t.length < CAP) rec.t.push(now);
       rec.raf = requestAnimationFrame(tick);
     };
     rec.raf = requestAnimationFrame(tick);

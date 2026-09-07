@@ -93,8 +93,20 @@ async function drag(page, dx, dy, steps = 20) {
   await page.mouse.up();
 }
 
+/**
+ * EVERY `page.evaluate` THAT DRIVES THE MAP MUST HAVE A BLOCK BODY.
+ *
+ * MapLibre's camera methods return `this` for chaining, and `page.evaluate`
+ * serialises whatever the function returns. A concise arrow body therefore hands
+ * Playwright the entire `Map` — style, every source, every loaded tile, the
+ * canvas and its WebGL context — to walk and stringify over the CDP pipe. The
+ * first run died with `ERR_STRING_TOO_LONG`: the serialised object exceeded
+ * Node's 512 MB string ceiling before it ever produced a number.
+ *
+ * The braces are the fix, and they are load-bearing rather than style.
+ */
 async function setZoom(page, zoom) {
-  await page.evaluate((z) => window.__map?.jumpTo({ zoom: z }), zoom);
+  await page.evaluate((z) => { window.__map?.jumpTo({ zoom: z }); }, zoom);
   await settle(page);
 }
 
@@ -134,12 +146,12 @@ export async function runScenarios(page, { onNote }) {
   try {
     await setZoom(page, 5);
     out["zoom.in"] = await timed(page, async () => {
-      await page.evaluate(() => window.__map?.zoomTo(8, { duration: 800 }));
+      await page.evaluate(() => { window.__map?.zoomTo(8, { duration: 800 }); });
       await page.waitForTimeout(1200);
       await settle(page);
     });
     out["zoom.out"] = await timed(page, async () => {
-      await page.evaluate(() => window.__map?.zoomTo(5, { duration: 800 }));
+      await page.evaluate(() => { window.__map?.zoomTo(5, { duration: 800 }); });
       await page.waitForTimeout(1200);
       await settle(page);
     });
