@@ -6,14 +6,25 @@
   <meta name="robots" content="noindex, nofollow" />
   <title>404 - Page Not Found | Domapus</title>
 
+  <!-- GitHub Pages has no server-side rewrite, so every SPA route below
+       /Domapus/ (currently /methodology) is served this file. Stash the real
+       path, bounce to the app shell, and let App.tsx put the path back with
+       history.replaceState.
+
+       This used to run only when the URL carried a query string or hash, which
+       meant a bare /Domapus/methodology — the form in the sitemap, in search
+       results, and behind the Legend's "How this works" link — stopped here and
+       rendered the 404 body instead of the page. -->
   <script>
     (function () {
+      var path = window.location.pathname;
+      // The app shell exists, so it never lands here; the guard only prevents a
+      // hard redirect loop if a deploy ever ships without index.html.
+      if (path === '/Domapus/' || path === '/Domapus/index.html') return;
       var search = window.location.search;
       var hash   = window.location.hash;
-      if (search || hash) {
-        sessionStorage.setItem('redirectPath', window.location.pathname + search + hash);
-        window.location.replace('/Domapus/' + search + hash);
-      }
+      sessionStorage.setItem('redirectPath', path + search + hash);
+      window.location.replace('/Domapus/' + search + hash);
     })();
   </script>
 

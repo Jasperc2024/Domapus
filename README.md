@@ -103,20 +103,26 @@ See [tree.txt](tree.txt) — regenerated on each commit by `npm run tree`.
 
 ## Metrics Overview
 
-| Metric | Choropleth Support |
+Eight metrics colour the map. The rest are shown in the sidebar and the comparison view
+for whichever ZIP is selected, but are not available as a choropleth.
+
+| Metric | Choropleth |
 | :--- | :---: |
-| **Zillow Housing Value Index** | Yes |
+| **Zillow Home Value Index** | Yes |
 | **Median Sale Price** | Yes |
 | **Median Price per Sq Ft** | Yes |
-| **Median Days on Market** | Yes |
-| **Sale-to-List Ratio** | Yes |
-| **Median List Price** | Yes |
 | **Homes Sold** | Yes |
-| **Pending Sales** | Yes |
-| **New Listings** | Yes |
-| **Inventory** | Yes |
+| **Active Listings** | Yes |
+| **Median Days on Market** | Yes |
 | **% Sold Above List** | Yes |
-| **% Off Market in 2 Weeks** | Yes |
+| **Months of Supply** | Yes |
+| Median New Listing Price | No |
+| Median Listing Price per Sq Ft | No |
+| New Listings | No |
+| Pending Sales | No |
+| Inventory | No |
+| Sale-to-List Ratio | No |
+| % Off Market in 2 Weeks | No |
 
 ---
 
