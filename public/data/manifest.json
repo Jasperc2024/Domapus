@@ -1,7 +1,7 @@
 {
-  "generated_utc": "2026-09-06T18:31:25.146405+00:00",
-  "content_digest": "4483cac7d9265b9db7b8ef206b69eab8482a08f1b6829b6d0215732b253c542c",
-  "previous_content_digest": null,
+  "generated_utc": "2026-09-07T14:31:03.043387+00:00",
+  "content_digest": "5b7643b224140dd9cee15c9a849380a961cfb9dfaa71c00e75076b2bad225b74",
+  "previous_content_digest": "4483cac7d9265b9db7b8ef206b69eab8482a08f1b6829b6d0215732b253c542c",
   "content_changed": true,
   "redfin": {
     "period_end": "2026-07-31",
@@ -23,20 +23,8 @@
       "fill_rate": 0.7705
     }
   },
-  "fingerprints": {
-    "redfin": "fe2e41688ad44739",
-    "zhvi": "ce9e00ebd1721338"
-  },
-  "upstream": {
-    "redfin": {
-      "last_modified": "Wed, 02 Sep 2026 18:51:30 GMT",
-      "content_length": 1331318985
-    },
-    "zhvi": {
-      "last_modified": "Sun, 16 Aug 2026 18:59:06 GMT",
-      "content_length": 123065811
-    }
-  },
+  "fingerprints": {},
+  "upstream": {},
   "panel": {
     "periods": 173,
     "zips": 33952,
@@ -55,17 +43,23 @@
       "total": 33771,
       "added": 0,
       "removed": 0,
-      "changed": 0
+      "changed": 33771
     },
-    "data_points": 0,
-    "by_column": {},
-    "compared_against_built_utc": "2026-09-06T17:25:54.803184+00:00"
+    "data_points": 135084,
+    "by_column": {
+      "be": 33771,
+      "bn": 33771,
+      "bs": 33771,
+      "bw": 33771
+    },
+    "compared_against_built_utc": "2026-09-06T18:30:59.645166+00:00"
   },
   "validation": {
     "period_age_days": {
-      "redfin": 37,
-      "zhvi": 37
+      "redfin": 38,
+      "zhvi": 38
     },
+    "period_gap_months": 0,
     "columns": 50,
     "zips": 33771
   },
@@ -172,8 +166,8 @@
   "snapshot": {
     "zips": 33771,
     "columns": 50,
-    "bytes": 11454530,
-    "payload_digest": "4ee2c48fb2bd15aa5ad6d366d97c5a052275f18fb6a9e6845003296635606f0a"
+    "bytes": 10914184,
+    "payload_digest": "282f202afb9dda9ff3caf8639a0411417f194e80eb38744ebdbeeb994bfae3b7"
   },
   "noise": {
     "K": 0.5598,
@@ -488,6 +482,8 @@
       ],
       "non_null": 26262,
       "break_population": 9452,
+      "break_gate": "rankable",
+      "bottom_class_share": 0.1355,
       "clamped_low": 3559,
       "clamped_high": 583
     },
@@ -513,6 +509,8 @@
       ],
       "non_null": 25602,
       "break_population": 9456,
+      "break_gate": "rankable",
+      "bottom_class_share": 0.1763,
       "clamped_low": 4514,
       "clamped_high": 623,
       "selection_effect": {
@@ -544,6 +542,8 @@
       ],
       "non_null": 25549,
       "break_population": 9456,
+      "break_gate": "rankable",
+      "bottom_class_share": 0.2099,
       "clamped_low": 5363,
       "clamped_high": 461
     },
@@ -551,51 +551,55 @@
       "scheme": "quantile",
       "classes": 7,
       "breaks": [
-        42.0,
-        56.0,
-        74.0,
-        92.0,
-        119.0,
-        164.0
+        2.0,
+        4.0,
+        9.0,
+        23.0,
+        50.0,
+        100.0
       ],
       "class_counts": [
-        17407,
-        1407,
-        1383,
-        1325,
-        1352,
-        1370,
-        1359
+        3086,
+        3408,
+        4108,
+        3981,
+        3678,
+        3678,
+        3664
       ],
       "non_null": 25603,
-      "break_population": 9456,
-      "clamped_low": 17407,
-      "clamped_high": 1359
+      "break_population": 25603,
+      "break_gate": "all_reporting",
+      "bottom_class_share": 0.1205,
+      "clamped_low": 3086,
+      "clamped_high": 3664
     },
     "active_listings": {
       "scheme": "quantile",
       "classes": 7,
       "breaks": [
-        93.0,
-        125.0,
-        160.0,
-        203.0,
-        259.0,
-        370.0
+        3.0,
+        7.0,
+        17.0,
+        41.0,
+        97.0,
+        202.0
       ],
       "class_counts": [
-        20085,
-        1585,
-        1372,
-        1381,
-        1349,
-        1361,
-        1360
+        3661,
+        3887,
+        4428,
+        4250,
+        4081,
+        4085,
+        4101
       ],
       "non_null": 28493,
-      "break_population": 9456,
-      "clamped_low": 20085,
-      "clamped_high": 1360
+      "break_population": 28493,
+      "break_gate": "all_reporting",
+      "bottom_class_share": 0.1285,
+      "clamped_low": 3661,
+      "clamped_high": 4101
     },
     "median_dom": {
       "scheme": "quantile",
@@ -619,6 +623,8 @@
       ],
       "non_null": 25576,
       "break_population": 9456,
+      "break_gate": "rankable",
+      "bottom_class_share": 0.1489,
       "clamped_low": 3809,
       "clamped_high": 6802
     },
@@ -644,6 +650,8 @@
       ],
       "non_null": 25603,
       "break_population": 9456,
+      "break_gate": "rankable",
+      "bottom_class_share": 0.7371,
       "clamped_low": 18873,
       "clamped_high": 651
     },
@@ -669,6 +677,8 @@
       ],
       "non_null": 24220,
       "break_population": 9456,
+      "break_gate": "rankable",
+      "bottom_class_share": 0.1266,
       "clamped_low": 3067,
       "clamped_high": 7356
     },
@@ -694,6 +704,8 @@
       ],
       "non_null": 26260,
       "break_population": null,
+      "break_gate": null,
+      "bottom_class_share": 0.0022,
       "clamped_low": 58,
       "clamped_high": 31
     }
@@ -743,17 +755,17 @@
         "fade_exempt": false
       },
       "homes_sold": {
-        "file": "paint/homes_sold-38692d98.u8",
+        "file": "paint/homes_sold-8af34c0a.u8",
         "bytes": 100000,
-        "sha256": "38692d9863d2e16dc36185df3b55e1629aa2293eda348a0cb17e8936f1965409",
+        "sha256": "8af34c0ab810e907033994d54184ad7895e6ddd07ca73dc04c5e2f9bb7e57d72",
         "zips_set": 25603,
         "max_byte": 55,
         "fade_exempt": false
       },
       "active_listings": {
-        "file": "paint/active_listings-151acce6.u8",
+        "file": "paint/active_listings-3ce7b55c.u8",
         "bytes": 100000,
-        "sha256": "151acce62317f0cd2e7012a1bfe4fca67bfd4e72e57270384ccb95ffcfe9c4c4",
+        "sha256": "3ce7b55c8e676894ad23e823c7e1c85410e95743b4240685cbe50ab010e89322",
         "zips_set": 28493,
         "max_byte": 55,
         "fade_exempt": true
