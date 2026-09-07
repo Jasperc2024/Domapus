@@ -281,7 +281,42 @@ eslint are green; verified in a production build in the browser.
 - `[x]` **B8 cluster reframe.** Verified: 47 markers (20 LH + 27 HL), choropleth intact
   underneath, `map:sourceReload` still 0.
 - `[x]` **B9 bench.** Fixed versioned metric set, 11 interaction scenarios, LoAF + Event
-  Timing, cross-schema comparison refused. **Not yet run** — no schema-2 baseline exists.
+  Timing, cross-schema comparison refused. **Baseline recorded:** `bench/results/uiux.json`,
+  schema 2, gitSha bca751e, slow4g / 4x CPU / 1440x900 / 5 runs, pinned view.
+
+  | | phase7 (schema 1) | uiux (schema 2) |
+  |---|---|---|
+  | LCP | 6224 ms | 6480 ms |
+  | TBT | 2997 ms | 3997 ms |
+  | transfer | 5.52 MB | 5.49 MB |
+  | bytes to first colour | 27,780 B | 28,255 B |
+  | metric switch | 564 ms (wall clock) | 40 ms (app measure) |
+  | map:sourceReload | not measured | 0 |
+
+  **THIS TABLE IS NOT A COMPARISON AND `compare.mjs` WILL REFUSE TO PRINT IT.** Three things
+  moved at once: the metric set (schema 1 -> 2), the definition of `metricSwitchMs` (wall
+  clock -> the app's own `map:metricSwitch` measure, which is why it drops two orders of
+  magnitude), and the server (`serve.mjs` did not gzip `.u8`, so every earlier local run on
+  port 4319 overstated gating bytes ~3.8x). Bytes is the only near-like-for-like row, and
+  the +475 B is the manifest gaining `break_gate` and `bottom_class_share`.
+
+  TBT drifted upward across runs within one session on this host (2804 -> 4426 in the first
+  pass) while LCP stayed flat. That is host load, not the app. Treat TBT from this session
+  as soft.
+
+  Interaction rows, median of 5, as dropped frames / worst frame: pan.z4 60 / 383 ms ·
+  pan.z7 49 / 200 ms · pan.z10 74 / 183 ms · zoom.in 18 / 333 ms · zoom.out 13 / 117 ms ·
+  hover.sweep 54 / 267 ms · click.sidebar 3 / 267 ms · metric.cycle 55 / 633 ms ·
+  search.flyTo 47 / 250 ms · toggle.autoScale 95 / 333 ms · toggle.outliers 89 / 150 ms.
+
+  **pan.z4 and the two legend toggles are the worst rows, and are where an interaction fix
+  should start.** There is no prior number for any of them, so these are the first.
+
+- `[ ]` **`featureStateWrites` reads 0 and that may be spurious.** It is taken from the last
+  `map:applyChoropleth` measure detail after the metric cycle. 0 is a legitimate value — the
+  painter skips a ZIP whose packed (k, rel) is unchanged — but 0 sitting next to
+  `sourceReloads: 0` invites reading it as "the painter did nothing". Confirm it is real or
+  make it report null.
 
 ### Open after this pass
 
