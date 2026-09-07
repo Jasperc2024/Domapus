@@ -15,12 +15,14 @@
 // colour-vision deficiency falls below 10. Re-derive with `--write`; the numbers
 // are in the generated file's header.
 
+// No diverging BOUND here on purpose. The pipeline re-derives it from the pooled
+// ZHVI panel every release and publishes it in the manifest; a constant sitting
+// beside the colours would be a second authority that cannot be wrong loudly.
 export {
   CHOROPLETH_COLORS,
   CLASSES,
   NO_DATA_COLOR,
   DIVERGING_COLORS,
-  DIVERGING_BOUND_PCT,
 } from "./choropleth.generated";
 
 import { CHOROPLETH_COLORS } from "./choropleth.generated";

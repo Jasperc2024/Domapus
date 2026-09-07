@@ -222,9 +222,6 @@ export const NO_DATA_COLOR = "${NO_DATA_COLOR}";
 export const DIVERGING_COLORS = [
 ${DIVERGING_COLORS.map((h) => `  "${h}",`).join("\n")}
 ] as const;
-
-/** Fixed, symmetric, clamped. The end swatch reads ">= +20%", which is true in every regime. */
-export const DIVERGING_BOUND_PCT = 20;
 `;
   const out = join(ROOT, "src", "lib", "choropleth.generated.ts");
   mkdirSync(dirname(out), { recursive: true });

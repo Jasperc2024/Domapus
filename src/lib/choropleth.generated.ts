@@ -41,6 +41,3 @@ export const DIVERGING_COLORS = [
   "#EF8A62",
   "#B2182B",
 ] as const;
-
-/** Fixed, symmetric, clamped. The end swatch reads ">= +20%", which is true in every regime. */
-export const DIVERGING_BOUND_PCT = 20;
