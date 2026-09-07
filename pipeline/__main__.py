@@ -142,7 +142,11 @@ def run(redfin_csv: Path | None, zhvi_csv: Path | None, skip_probe: bool,
         zhvi_panel_path = BUILD / "zhvi-panel.parquet"
         redfin_report, latest_rows = redfin.ingest(redfin_csv, panel_path)
         panel_report = panel.verify(panel_path, redfin_report["rows"])
-        zhvi_panel_report = zhvi.write_panel(zhvi_bytes, zhvi_panel_path)
+        # Parsed once here and carried into S3, which needs three months out of
+        # the same frame. The raw bytes go as soon as the frame exists.
+        zhvi_frame, zhvi_months = zhvi.read(zhvi_bytes)
+        del zhvi_bytes
+        zhvi_panel_report = zhvi.write_panel(zhvi_frame, zhvi_months, zhvi_panel_path)
         _report("s2_ingest", "ok", redfin=redfin_report, panel=panel_report,
                 zhvi_panel=zhvi_panel_report)
     finally:
@@ -152,7 +156,7 @@ def run(redfin_csv: Path | None, zhvi_csv: Path | None, skip_probe: bool,
     # --- S3 ASSEMBLE -------------------------------------------------------
     _require("s2_ingest")
     redfin_records = redfin.latest_records(latest_rows)
-    zhvi_records, zhvi_period = zhvi.process(zhvi_bytes)
+    zhvi_records, zhvi_period = zhvi.process(zhvi_frame, zhvi_months)
     zcta = dim.load(ZCTA_META)
     geometry = geom.load(ZCTA_GEOM)
 

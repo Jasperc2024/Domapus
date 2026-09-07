@@ -31,13 +31,33 @@ each ZIP's own residual sigma, so the client reconstructs any confidence level
 with two multiplies and an `exp`.
 """
 
+import contextlib
 import logging
+import warnings
 
 import numpy as np
 
 from .contracts import PipelineError
 
 log = logging.getLogger(__name__)
+
+
+@contextlib.contextmanager
+def _all_nan_columns_ok():
+    """Silence the two RuntimeWarnings an all-NaN column provokes, and nothing else.
+
+    Some columns are entirely NaN — a ZIP with no ZHVI history in the window. The
+    nan-reductions warn and return NaN there, which the tier ladder already treats
+    as "no forecast", so the warning carries no information. `np.errstate` does not
+    suppress it: that governs floating-point error states, while these are Python
+    warnings raised by numpy itself, which is why they printed on every run despite
+    the errstate blocks. Match on the message so an unrelated RuntimeWarning still
+    reaches the log.
+    """
+    with warnings.catch_warnings(), np.errstate(invalid="ignore"):
+        warnings.filterwarnings("ignore", "Mean of empty slice", RuntimeWarning)
+        warnings.filterwarnings("ignore", "Degrees of freedom <= 0", RuntimeWarning)
+        yield
 
 W = 36                  # months of growth the fit sees
 RHO_SHRINK = 0.5        # James-Stein style pull toward the cross-sectional median
@@ -75,7 +95,7 @@ def fit(LZ: np.ndarray, counts: np.ndarray | None = None) -> dict:
     when they are measuring the estimator rather than the shipped product.
     """
     g = np.diff(LZ, axis=0)[-W:]
-    with np.errstate(invalid="ignore"):
+    with _all_nan_columns_ok():
         mu = np.nanmean(g, axis=0)
         gc = g - mu
         num = np.nansum(gc[1:] * gc[:-1], axis=0)
@@ -87,7 +107,7 @@ def fit(LZ: np.ndarray, counts: np.ndarray | None = None) -> dict:
     if counts is not None:
         rho = np.where(counts >= TIER_FULL, rho, median_rho)
 
-    with np.errstate(invalid="ignore"):
+    with _all_nan_columns_ok():
         res = g[1:] - (mu + rho * (g[:-1] - mu))
         sigma = np.nanstd(res, axis=0, ddof=1)
 
@@ -237,17 +257,17 @@ def run(panel_path, records: dict) -> dict:
     import pyarrow.compute as pc
     import pyarrow.parquet as pq
 
+    from . import panel
+
     tbl = pq.read_table(panel_path, columns=["zip", "month", "zhvi"])
     months = sorted(pc.unique(tbl["month"]).to_pylist())
     zips = sorted(pc.unique(tbl["zip"]).to_pylist())
-    mi = {m: i for i, m in enumerate(months)}
+    A = panel.dense(tbl, "month", "zip", "zhvi", months, zips)
+    # Column j of A is zips[j] — `panel.dense` indexes `cols` by position — so this
+    # is the record loop's way back from a ZIP to its column. `panel.dense` absorbed
+    # the `mi`/`zi` maps the hand-rolled reshape used to build, but the loop below
+    # still needs `zi`, and dropping it raised NameError on every run.
     zi = {z: i for i, z in enumerate(zips)}
-
-    A = np.full((len(months), len(zips)), np.nan)
-    A[
-        np.fromiter((mi[m] for m in tbl["month"].to_pylist()), np.int32, tbl.num_rows),
-        np.fromiter((zi[z] for z in tbl["zip"].to_pylist()), np.int32, tbl.num_rows),
-    ] = tbl["zhvi"].to_numpy(zero_copy_only=False)
 
     with np.errstate(divide="ignore", invalid="ignore"):
         LZ = np.log(np.where(A > 0, A, np.nan))

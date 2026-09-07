@@ -87,21 +87,14 @@ def _dense(tbl, id_col, axis_col, value_cols, ids, axis):
     """[len(ids) x len(axis)] float matrix per value column.
 
     Materialising 4.9M rows as Python lists would cost several GB before any file is
-    written. `index_in` is a vectorised lookup, and the dense result is 33,952 x 173 x
-    8 B = 47 MB per series — smaller than the objects it replaces by two orders.
+    written. The dense result is 33,952 x 173 x 8 B = 47 MB per series — smaller than
+    the objects it replaces by two orders. Re-indexing per column rather than hoisting
+    the lookup costs ~0.1 s a column and keeps one reshape in the codebase.
     """
-    import numpy as np
-    import pyarrow as pa
-    import pyarrow.compute as pc
+    from . import panel
 
-    i = pc.index_in(tbl[id_col], value_set=pa.array(ids)).to_numpy(zero_copy_only=False)
-    j = pc.index_in(tbl[axis_col], value_set=pa.array(axis)).to_numpy(zero_copy_only=False)
-    out = {}
-    for short, col in value_cols:
-        M = np.full((len(ids), len(axis)), np.nan)
-        M[i.astype(np.int64), j.astype(np.int64)] = tbl[col].to_numpy(zero_copy_only=False)
-        out[short] = M
-    return out
+    return {short: panel.dense(tbl, id_col, axis_col, col, ids, axis)
+            for short, col in value_cols}
 
 
 def _row_to_wire(row, scale):

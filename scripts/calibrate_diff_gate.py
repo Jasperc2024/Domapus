@@ -22,11 +22,15 @@ import math
 import sys
 from pathlib import Path
 
+import numpy as np
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "tests" / "baselines" / "diff_gate.json"
+
+sys.path.insert(0, str(ROOT))
+from pipeline import panel, zhvi  # noqa: E402  (needs ROOT on the path first)
 
 PANEL_METRICS = ["median_sale_price", "median_list_price", "median_ppsf"]
 MOVE = 0.25
@@ -52,63 +56,47 @@ def _quantile(values, q):
     return v[lo] * (1 - (idx - lo)) + v[hi] * (idx - lo)
 
 
+def _moved_share(series: np.ndarray) -> list[float]:
+    """Share of ZIPs that moved more than MOVE, per consecutive-period transition.
+
+    `series` is [T x Z], oldest period first, NaN where a ZIP did not report. A
+    cell counts as comparable only where both ends are present and the base is
+    non-zero, which is the same test the row-at-a-time version made per cell.
+    """
+    out = []
+    for i in range(1, len(series)):
+        older, newer = series[i - 1], series[i]
+        ok = np.isfinite(newer) & np.isfinite(older) & (older != 0.0)
+        comparable = int(ok.sum())
+        if comparable < 1000:
+            continue
+        moved = int((np.abs(newer[ok] / older[ok] - 1.0) > MOVE).sum())
+        out.append(moved / comparable)
+    return out
+
+
 def from_panel(panel_path: Path) -> tuple[dict, dict]:
+    """One dense [T x Z] array per metric — 47 MB each, against the ~3 GB the
+    cell-at-a-time dict of dicts cost for the same 4.9M rows."""
     tbl = pq.read_table(panel_path, columns=["zip", "period_end"] + PANEL_METRICS)
-    periods = sorted(set(pc.unique(tbl["period_end"]).to_pylist()), reverse=True)
+    periods = sorted(pc.unique(tbl["period_end"]).to_pylist())
+    zips = sorted(pc.unique(tbl["zip"]).to_pylist())
 
-    by_period: dict[str, dict[str, dict]] = {}
-    zips = tbl["zip"].to_pylist()
-    ends = tbl["period_end"].to_pylist()
-    cols = {m: tbl[m].to_pylist() for m in PANEL_METRICS}
-    for i, period in enumerate(ends):
-        by_period.setdefault(period, {})[zips[i]] = {m: cols[m][i] for m in PANEL_METRICS}
-
-    dists = {m: [] for m in PANEL_METRICS}
-    transitions = 0
-    for newer, older in zip(periods, periods[1:]):
-        a, b = by_period[newer], by_period[older]
-        transitions += 1
-        for m in PANEL_METRICS:
-            moved = comparable = 0
-            for z, row in a.items():
-                prev = b.get(z)
-                if prev is None:
-                    continue
-                x, y = row[m], prev[m]
-                if x is None or y is None or not y or y != y:
-                    continue
-                comparable += 1
-                if abs(x / y - 1.0) > MOVE:
-                    moved += 1
-            if comparable >= 1000:
-                dists[m].append(moved / comparable)
-    return dists, {"transitions": transitions, "periods": len(periods)}
+    dists = {
+        m: _moved_share(panel.dense(tbl, "period_end", "zip", m, periods, zips))
+        for m in PANEL_METRICS
+    }
+    return dists, {"transitions": len(periods) - 1, "periods": len(periods)}
 
 
 def from_zhvi(csv_path: Path) -> list[float]:
-    """ZHVI is not in the panel — calibrate it from its own wide monthly file."""
-    import csv
-    import re
+    """ZHVI is not in the panel — calibrate it from its own wide monthly file.
 
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        rows = list(csv.DictReader(f))
-    date_cols = sorted(c for c in rows[0] if re.match(r"^\d{4}-\d{2}-\d{2}$", c))
-    dist = []
-    for newer, older in zip(date_cols[1:], date_cols):
-        moved = comparable = 0
-        for r in rows:
-            try:
-                x, y = float(r[newer]), float(r[older])
-            except (TypeError, ValueError):
-                continue
-            if not y:
-                continue
-            comparable += 1
-            if abs(x / y - 1.0) > MOVE:
-                moved += 1
-        if comparable >= 1000:
-            dist.append(moved / comparable)
-    return dist
+    Parsed through `zhvi.read`, so this script and the pipeline agree on which
+    columns are date columns and how a ZIP is spelled.
+    """
+    frame, date_cols = zhvi.read(csv_path.read_bytes())
+    return _moved_share(frame[date_cols].to_numpy(dtype="float64").T)
 
 
 def main() -> int:

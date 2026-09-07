@@ -7,6 +7,7 @@ DIVIDE_BY_100 decision rather than asserting it.
 """
 
 import json
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -293,6 +294,30 @@ def test_two_missed_publications_is_fatal(latest):
         serialize.validate(records, "2020-01-01", "2020-01-01")
 
 
+def _recent_month_end(months_back: int) -> str:
+    """A real month end, `months_back` months before this one. Relative to today
+    so these tests do not silently start tripping MAX_PERIOD_AGE_DAYS."""
+    first = date.today().replace(day=1)
+    for _ in range(months_back):
+        first = (first - timedelta(days=1)).replace(day=1)
+    return (first - timedelta(days=1)).isoformat()
+
+
+def test_one_month_apart_warns_but_still_publishes(latest):
+    """Redfin publishes early in the month and ZHVI on the 16th. A run that lands
+    between them sees one feed ahead; fresh Redfin beside a month-old ZHVI still
+    beats republishing last month's everything."""
+    records, _, _ = serialize.assemble(_meta_for(latest), _zhvi_for(latest), latest)
+    report = serialize.validate(records, _recent_month_end(1), _recent_month_end(2))
+    assert report["period_gap_months"] == 1
+
+
+def test_two_months_apart_is_fatal(latest):
+    records, _, _ = serialize.assemble(_meta_for(latest), _zhvi_for(latest), latest)
+    with pytest.raises(PipelineError, match="broken feed, not a late one"):
+        serialize.validate(records, _recent_month_end(1), _recent_month_end(3))
+
+
 # --- ZCTA metadata ---------------------------------------------------------
 
 def test_zcta_meta_loads_and_is_keyed_by_zip():
@@ -310,11 +335,36 @@ def test_zhvi_percent_scale():
         "2026-07-31\n"
         "1,30309," + ",".join(["100"] * 12) + ",110\n"
     ).encode()
-    out, period = zhvi.process(csv)
+    out, period = zhvi.process(*zhvi.read(csv))
     assert period == "2026-07-31"
     assert out["30309"]["zhvi"] == 110
     assert out["30309"]["zhvi_yoy"] == 10.0
     assert out["30309"]["zhvi_mom"] == 10.0
+
+
+def test_zhvi_missing_or_zero_base_reports_no_change():
+    """A missing or zero base is "no change to report", not a division. The
+    vectorised path gets NaN and +/-inf where the row-at-a-time one short-circuited."""
+    months = ["2025-07-31", "2025-08-31", "2025-09-30", "2025-10-31", "2025-11-30",
+              "2025-12-31", "2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30",
+              "2026-05-31", "2026-06-30", "2026-07-31"]
+    csv = ("RegionID,RegionName," + ",".join(months) + "\n"
+           + "1,30309,0," + ",".join(["100"] * 10) + ",,110\n"      # zero yoy base, no prev
+           + "2,601," + ",".join(["100"] * 12) + ",110\n").encode()
+    out, _ = zhvi.process(*zhvi.read(csv))
+    assert out["30309"] == {"zhvi": 110, "zhvi_mom": None, "zhvi_yoy": None}
+    assert out["00601"]["zhvi_yoy"] == 10.0
+
+
+def test_zhvi_panel_is_long_and_drops_nulls(tmp_path):
+    """`read` parses once and both consumers share the frame. The panel keeps only
+    non-null cells, so a ZIP that started reporting late costs no rows."""
+    csv = ("RegionID,RegionName,2026-06-30,2026-07-31\n"
+           "1,601,,100\n"
+           "2,30309,200,210\n").encode()
+    report = zhvi.write_panel(*zhvi.read(csv), tmp_path / "zhvi-panel.parquet")
+    assert report["rows"] == 3 and report["zips"] == 2 and report["months"] == 2
+    assert report["vintage"] == "2026-07-31"
 
 
 # --- The headline bug's regression test ------------------------------------

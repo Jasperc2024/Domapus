@@ -36,6 +36,7 @@ import numpy as np
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
+from . import panel
 from .contracts import PipelineError
 
 log = logging.getLogger(__name__)
@@ -87,20 +88,9 @@ def _pivot(panel_path, column: str, index) -> np.ndarray:
     Reads two key columns plus the value column, so the 1.5 GB table never lands
     in memory — 173 x 33,952 float64 is 47 MB per metric.
     """
-    tbl = pq.read_table(panel_path, columns=["zip", "period_end", column])
     periods, zips = index
-    prow = {p: i for i, p in enumerate(periods)}
-    zcol = {z: i for i, z in enumerate(zips)}
-
-    out = np.full((len(periods), len(zips)), np.nan)
-    ps = tbl["period_end"].to_pylist()
-    zs = tbl["zip"].to_pylist()
-    vs = tbl[column].to_numpy(zero_copy_only=False)
-
-    rows = np.fromiter((prow[p] for p in ps), dtype=np.int32, count=len(ps))
-    cols = np.fromiter((zcol[z] for z in zs), dtype=np.int32, count=len(zs))
-    out[rows, cols] = vs
-    return out
+    tbl = pq.read_table(panel_path, columns=["zip", "period_end", column])
+    return panel.dense(tbl, "period_end", "zip", column, periods, zips)
 
 
 def panel_index(panel_path) -> tuple[list[str], list[str]]:
