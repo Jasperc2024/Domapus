@@ -229,6 +229,25 @@ STALE_WARN_DAYS = 45
 # missed publications plus a month of slack.
 MAX_PERIOD_AGE_DAYS = 120
 
+# Redfin and Zillow publish on different days of the month — Redfin early, ZHVI
+# on the 16th — so a run scheduled between the two sees one feed a month ahead of
+# the other and ships half a release: this month's sale prices beside last
+# month's ZHVI, with the forecast anchored a month behind and nothing on the page
+# saying so. The monthly cron sits on the 18th to clear both. This is the guard
+# for the month that assumption breaks.
+#
+# One month apart WARNS and publishes. Fresh Redfin metrics beside a month-old
+# ZHVI column beat republishing last month's everything, and the cron is monthly,
+# so a hard fail here would strand the site until somebody dispatched a run by
+# hand. Two months apart is a feed that missed a publication outright, which is
+# the same judgement MAX_PERIOD_AGE_DAYS already makes about lateness.
+MAX_PERIOD_GAP_MONTHS = 1
+
+
+def _month_index(period: str) -> int:
+    """Months since year zero, so two period ends can be subtracted."""
+    d = date.fromisoformat(period[:10])
+    return d.year * 12 + d.month
 
 
 def validate(records: dict, redfin_period: str | None, zhvi_period: str | None) -> dict:
@@ -274,8 +293,26 @@ def validate(records: dict, redfin_period: str | None, zhvi_period: str | None) 
             )
         ages[label] = age
 
+    # Both periods parsed cleanly above, so this cannot raise.
+    gap = _month_index(redfin_period) - _month_index(zhvi_period)
+    if abs(gap) > MAX_PERIOD_GAP_MONTHS:
+        behind, ahead = ("zhvi", "redfin") if gap > 0 else ("redfin", "zhvi")
+        raise PipelineError(
+            f"redfin is at {redfin_period} and zhvi at {zhvi_period}, {abs(gap)} "
+            f"months apart (limit {MAX_PERIOD_GAP_MONTHS}). {behind} has missed a "
+            f"publication that {ahead} made; this is a broken feed, not a late one."
+        )
+    if gap:
+        behind = "zhvi" if gap > 0 else "redfin"
+        log.warning(
+            "redfin %s and zhvi %s are a month apart — %s has not published yet. "
+            "Publishing anyway; move the cron later if this repeats.",
+            redfin_period, zhvi_period, behind,
+        )
+
     log.info("Validation passed: %s ZIPs, %s columns", f"{len(records):,}", len(SNAPSHOT_COLUMNS))
-    return {"period_age_days": ages, "columns": len(SNAPSHOT_COLUMNS), "zips": len(records)}
+    return {"period_age_days": ages, "period_gap_months": gap,
+            "columns": len(SNAPSHOT_COLUMNS), "zips": len(records)}
 
 
 def read_live(path: Path) -> dict | None:
@@ -498,6 +535,16 @@ def encode_columns(records: dict) -> tuple[list[str], dict[str, list[str]], list
             columns.append([table.get(records[z].get(key), NULL_SENTINEL) for z in zips])
         else:
             columns.append([_encode(records[z].get(key), scale) for z in zips])
+
+    # The scale has to be applied exactly once between `geom.offsets` and COLUMNS.
+    # It was applied twice for one release; see `geom.assert_bbox_scale`. Checking
+    # the DECODED span here is the point — it is the same arithmetic the frontend
+    # does, so the two cannot disagree about what the wire means.
+    from .geom import assert_bbox_scale
+
+    by_name = dict(zip(SNAPSHOT_COLUMNS, columns))
+    assert_bbox_scale(by_name, SCALES["bw"], NULL_SENTINEL)
+
     return zips, dicts, columns
 
 

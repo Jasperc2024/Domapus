@@ -14,6 +14,9 @@ import type { ZipData } from "@/components/dashboard/map/types";
 import { NULL_SENTINEL, ZIP_SPACE, type SnapshotHeader } from "./snapshot";
 import { mark, measure } from "./perf";
 
+/** Widest plausible ZCTA bounding box, in degrees. See `ZipTable.checkBounds`. */
+export const MAX_BBOX_SPAN_DEG = 10;
+
 /** Wire short name -> the `ZipData` field it populates.
  *
  *  Only names that differ are listed; anything absent keeps its wire name. The
@@ -73,6 +76,8 @@ export class ZipTable {
   /** Perfect hash: the ZIP number IS the index. -1 where no such ZIP. */
   private readonly rowByZip: Int32Array;
   private recordCache: Record<string, ZipData> | null = null;
+  /** False when the bbox columns fail `checkBounds`; `boundsOf` then answers null. */
+  private readonly boundsUsable: boolean;
 
   private constructor(header: SnapshotHeader, cols: Map<string, Int32Array>) {
     this.header = header;
@@ -85,6 +90,8 @@ export class ZipTable {
 
     this.rowByZip = new Int32Array(ZIP_SPACE).fill(-1);
     for (let i = 0; i < this.n; i++) this.rowByZip[+header.z[i]] = i;
+
+    this.boundsUsable = this.checkBounds();
   }
 
   static from(header: SnapshotHeader, buffers: Record<string, ArrayBuffer>): ZipTable {
@@ -153,8 +160,13 @@ export class ZipTable {
    * Real polygon bounds in degrees, or null. The snapshot ships the bbox as four
    * offsets from the anchor so the numbers stay small enough for int32; this is
    * where they become absolute again.
+   *
+   * Returns null for every ZIP when the bbox column failed its scale check, so
+   * auto-scale falls back to the national scale rather than sampling a viewport
+   * it has measured wrongly. See `checkBounds`.
    */
   boundsOf(row: number): { west: number; south: number; east: number; north: number } | null {
+    if (!this.boundsUsable) return null;
     const lng = this.valueAt("lng", row);
     const lat = this.valueAt("lat", row);
     if (lng === null || lat === null) return null;
@@ -164,6 +176,55 @@ export class ZipTable {
     const bn = this.valueAt("bn", row);
     if (bw === null || bs === null || be === null || bn === null) return null;
     return { west: lng + bw, south: lat + bs, east: lng + be, north: lat + bn };
+  }
+
+  /**
+   * One pass over the bbox columns at construction, because a mis-scaled bbox is
+   * silent everywhere it matters.
+   *
+   * The pipeline shipped degrees x1e8 under a header declaring x1e4 for one
+   * release. Decoded, every ZIP claimed a box roughly 1,500 degrees wide. A box
+   * that size intersects every viewport, so `visibleZipRows` accepted every
+   * loaded ZIP and auto-scale silently scaled to loaded tiles rather than to the
+   * view — indistinguishable, from the outside, from auto-scale working.
+   *
+   * The ceiling is a real measurement, not a guess: the widest ZCTA in the
+   * dataset is 99503 (Anchorage) at 8.3966 degrees of longitude, documented in
+   * `pipeline/geom.py`. Ten degrees is that with headroom, and it is two orders
+   * of magnitude below any plausible mis-scaling, so this cannot false-trip on
+   * real data but catches a factor-of-10,000 error on the first row that has one.
+   */
+  private checkBounds(): boolean {
+    const lng = this.cols.get("lng");
+    const bwc = this.cols.get("bw");
+    const bec = this.cols.get("be");
+    const bsc = this.cols.get("bs");
+    const bnc = this.cols.get("bn");
+    if (!lng || !bwc || !bec || !bsc || !bnc) return false;
+
+    let maxSpan = 0;
+    let worstRow = -1;
+    for (let row = 0; row < this.n; row++) {
+      const bw = this.valueAt("bw", row);
+      const be = this.valueAt("be", row);
+      const bs = this.valueAt("bs", row);
+      const bn = this.valueAt("bn", row);
+      if (bw === null || be === null || bs === null || bn === null) continue;
+      const span = Math.max(be - bw, bn - bs);
+      if (span > maxSpan) { maxSpan = span; worstRow = row; }
+    }
+
+    if (maxSpan > MAX_BBOX_SPAN_DEG) {
+      console.error(
+        `[ZipTable] bounding boxes failed the scale check: widest is ${maxSpan.toFixed(1)}` +
+          ` degrees at ZIP ${this.zips[worstRow]}, ceiling is ${MAX_BBOX_SPAN_DEG}. The` +
+          ` widest real ZCTA is 8.4 degrees, so the bw/bs/be/bn columns are on the wrong` +
+          ` scale — likely encoded twice. Auto-scale will use the national scale instead of` +
+          ` the viewport.`,
+      );
+      return false;
+    }
+    return true;
   }
 
   /** Escape hatch: ONE object, on demand. Everything downstream keeps its types. */

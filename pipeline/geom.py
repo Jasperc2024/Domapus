@@ -110,18 +110,75 @@ def _assert_boxes(rows: dict, name: str) -> None:
         raise PipelineError(f"{name}: geometry contract violated.\n" + "\n".join(problems))
 
 
+# Widest plausible ZCTA bounding box, in degrees. The widest real one is 99503
+# (Anchorage) at 8.3966 degrees of longitude, so this is that with headroom and
+# two orders of magnitude below any plausible mis-scaling.
+MAX_SPAN_DEG = 10.0
+
+
+def assert_bbox_scale(columns: dict[str, list[int]], scale: float, null: int) -> float:
+    """Decode the encoded bbox columns and refuse a build whose boxes are absurd.
+
+    This exists because the scale was applied twice for one release — `offsets`
+    pre-multiplied by 1e4 and `serialize.COLUMNS` applied its declared 1e4 on top,
+    so the wire carried degrees x1e8 under a header saying x1e4. The frontend
+    honoured the header, and every ZIP claimed a box ~1,500 degrees wide. A box
+    that size intersects every viewport, so the auto-scale viewport filter accepted
+    everything and scaled to loaded tiles instead of to the view.
+
+    Nothing caught it because the symptom — auto-scale producing a slightly odd
+    scale — is what auto-scale looks like when it works. Checking the DECODED span
+    is what makes the failure loud: it is the same arithmetic the frontend does,
+    so the two cannot disagree about what the wire means.
+
+    Returns the widest decoded span, for the manifest.
+    """
+    bw, bs, be, bn = (columns[k] for k in ("bw", "bs", "be", "bn"))
+    widest = 0.0
+    for i in range(len(bw)):
+        if null in (bw[i], bs[i], be[i], bn[i]):
+            continue
+        span = max((be[i] - bw[i]) / scale, (bn[i] - bs[i]) / scale)
+        if span > widest:
+            widest = span
+    if widest > MAX_SPAN_DEG:
+        raise PipelineError(
+            f"bbox scale check failed: widest decoded box is {widest:,.1f} degrees, "
+            f"ceiling is {MAX_SPAN_DEG}. The widest real ZCTA is 8.3966 degrees "
+            f"(99503, Anchorage), so bw/bs/be/bn are on the wrong scale — check that "
+            f"`geom.offsets` returns DEGREES and that `serialize.COLUMNS` applies the "
+            f"1e4 exactly once between them."
+        )
+    return round(widest, 4)
+
+
 def offsets(rec: dict | None, lon: float | None, lat: float | None) -> tuple:
-    """Bbox as four x1e4 int offsets from (lon, lat), or four Nones.
+    """Bbox as four DEGREE offsets from (lon, lat), or four Nones.
 
     The offsets are relative to the ANCHOR the snapshot ships, not to the
     sidecar's own anchor, so the frontend can reconstruct absolute bounds with
     one add and never needs both numbers.
+
+    DEGREES, NOT x1e4. This used to pre-multiply by 1e4 and `serialize.COLUMNS`
+    then applied its declared scale of 1e4 on top, so the wire carried degrees
+    x1e8 under a header that said x1e4. The frontend honoured the header and
+    divided once, giving every ZIP a bounding box 10,000x too wide — a box
+    spanning ~1,500 degrees intersects every viewport, so auto-scale's viewport
+    filter accepted every loaded ZIP and silently scaled to loaded tiles instead
+    of to the view. The double scaling was invisible because both failure modes
+    look like "auto-scale did something".
+
+    The scale belongs to `COLUMNS` and to nowhere else. With this returning
+    degrees, the widest ZCTA — 99503, Anchorage, 8.3966 degrees of longitude —
+    encodes to 83,966, which is the number the int32 argument in this module's
+    docstring was computed from. That agreement is the check that the two halves
+    now apply the scale exactly once between them.
     """
     if rec is None or lon is None or lat is None:
         return None, None, None, None
     return (
-        round((rec["bw"] - lon) * 1e4),
-        round((rec["bs"] - lat) * 1e4),
-        round((rec["be"] - lon) * 1e4),
-        round((rec["bn"] - lat) * 1e4),
+        rec["bw"] - lon,
+        rec["bs"] - lat,
+        rec["be"] - lon,
+        rec["bn"] - lat,
     )

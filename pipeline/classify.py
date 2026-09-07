@@ -28,9 +28,11 @@ across months — but nobody compares two releases by colour, they compare by
 value, and a frozen scale slowly stops describing the data it paints. Cross-
 release comparison is served by keeping every release's breaks in the manifest.
 
-Breaks are computed over the RANKABLE set only (spec section 6.2's rse < 10%) so
-that a 1-sale ZIP showing $1,500 cannot move the national colour scale for
-everyone else. Low-reliability ZIPs still render, at reduced opacity.
+**The rankable gate applies to ESTIMATES, not to counts.** Breaks for a sample
+statistic are computed over the rankable set only (spec section 6.2's rse < 10%),
+so that a 1-sale ZIP showing $1,500 cannot move the national colour scale for
+everyone else. Counts are exempt, and that exemption is a correction — see
+`BREAK_POPULATION` below. Every ZIP with a value is CLASSED either way.
 """
 
 import logging
@@ -81,6 +83,50 @@ SCHEMES = {
 
     "zhvi_yoy": "diverging",
 }
+
+# Which ZIPs may SET the boundaries, per scheme. Every ZIP with a value is
+# classed regardless; this is only about who votes on where the cuts go.
+#
+# THE GATE EXISTS FOR SAMPLING ERROR, SO IT APPLIES ONLY WHERE THERE IS SAMPLING
+# ERROR. A median over four sales is an estimate and a noisy one, so letting it
+# set a national boundary is letting noise move everyone else's colour. That is
+# the whole argument for the gate, and it is sound for `median_sale_price`,
+# `median_ppsf`, `median_dom` and the share metrics.
+#
+# It is NOT sound for a count. `homes_sold` is not estimated from a sample — it is
+# how many homes sold, measured exactly, with no standard error to gate on. And
+# the gate is `rel >= 1`, which is a cut on the relative standard error of the
+# median sale price, which is K / sqrt(n) in the number of sales. So gating a
+# count's break population on it means: to decide the boundaries for "how many
+# homes sold here", look only at the ZIPs where a lot of homes sold. The ZIPs
+# filtered out then land in the bottom class by construction.
+#
+# MEASURED on the 2026-07 release under the old single-population rule, share of
+# ZIPs falling in the lowest of seven classes:
+#
+#   sold_above_list  74%   active_listings 70%   homes_sold 68%
+#   median_ppsf      21%   median_sale_price 18%   zhvi 14%
+#   median_dom       15%   months_of_supply 13%
+#
+# The three at the top are the three whose breaks were cut on a population
+# selected by the very quantity being classed. The price and time metrics, which
+# are only correlated with it, sit at 13-21%. That gap is the bug.
+#
+# `months_of_supply` is deliberately gated: it is inventory over the sales RATE,
+# so it does derive from a count of sales and inherits their noise. `sold_above_list`
+# is gated for the same reason — it is a share OF the sales, so a ZIP with four
+# sales reports 0%, 25%, 50%, 75% or 100% and nothing between.
+COUNT_METRICS = frozenset({
+    "homes_sold", "active_listings", "pending_sales", "new_listings", "inventory",
+})
+
+
+def break_population(metric: str, records: dict, rankable: list) -> list:
+    """The ZIPs whose values may set `metric`'s class boundaries."""
+    if metric in COUNT_METRICS:
+        return [r for r in records.values() if r.get(metric) is not None]
+    return rankable
+
 
 # The diverging bound, in percent. DERIVED, not chosen:
 #
@@ -204,12 +250,14 @@ def class_of(value, breaks) -> int:
 def compute(records: dict, diverging_bound: float = DIVERGING_BOUND) -> dict:
     """Breaks and class counts for the 9 painted columns.
 
-    The break POPULATION is the rankable set; the CLASSED population is every ZIP
-    with a value. Those are deliberately different, and conflating them is what
-    produced spec section 6.6's unexplained 398-ZIP shortfall: one row of counts
-    was computed over all reporting ZIPs and the other over the break set, so they
-    could not sum to the same total. The assertion below is what makes that class
-    of error impossible to ship rather than merely unlikely.
+    The break POPULATION is per metric — the rankable set for an estimate, every
+    ZIP with a value for an exact count; see `break_population`. The CLASSED
+    population is always every ZIP with a value. Those are deliberately different,
+    and conflating them is what produced spec section 6.6's unexplained 398-ZIP
+    shortfall: one row of counts was computed over all reporting ZIPs and the
+    other over the break set, so they could not sum to the same total. The
+    assertion below is what makes that class of error impossible to ship rather
+    than merely unlikely.
     """
     rankable = [r for r in records.values() if r.get("rel") is not None and r["rel"] >= 1]
     if not rankable:
@@ -227,14 +275,16 @@ def compute(records: dict, diverging_bound: float = DIVERGING_BOUND) -> dict:
         if scheme == "diverging":
             edges = _diverging_breaks(diverging_bound)
             break_n = None
+            population = None
         else:
+            population = break_population(metric, records, rankable)
             sample = np.array(
-                [r[metric] for r in rankable if r.get(metric) is not None], dtype=float
+                [r[metric] for r in population if r.get(metric) is not None], dtype=float
             )
             if sample.size < CLASSES:
                 raise PipelineError(
-                    f"classify: {metric} has only {sample.size} rankable value(s); "
-                    f"cannot cut {CLASSES} classes"
+                    f"classify: {metric} has only {sample.size} value(s) in its break "
+                    f"population; cannot cut {CLASSES} classes"
                 )
             if scheme == "quantile":
                 edges = _quantile_breaks(sample)
@@ -281,6 +331,9 @@ def compute(records: dict, diverging_bound: float = DIVERGING_BOUND) -> dict:
             "class_counts": counts,
             "non_null": classed,
             "break_population": break_n,
+            "break_gate": None if scheme == "diverging"
+                          else ("all_reporting" if metric in COUNT_METRICS else "rankable"),
+            "bottom_class_share": round(counts[0] / classed, 4) if classed else None,
             "clamped_low": sum(1 for r in records.values()
                                if r.get(metric) is not None and r[metric] < edges[0]),
             "clamped_high": sum(1 for r in records.values()
@@ -288,9 +341,12 @@ def compute(records: dict, diverging_bound: float = DIVERGING_BOUND) -> dict:
         }
 
     _log_selection_effect(records, classing)
+    gated = [m for m in PAINTED if SCHEMES[m] != "diverging" and m not in COUNT_METRICS]
     log.info(
-        "Classing: %d painted columns over %s rankable ZIPs, %d classes",
-        len(PAINTED), f"{len(rankable):,}", CLASSES,
+        "Classing: %d painted columns, %d classes. Breaks from %s rankable ZIPs for "
+        "%d estimated columns; from every reporting ZIP for %d exact counts.",
+        len(PAINTED), CLASSES, f"{len(rankable):,}", len(gated),
+        len([m for m in PAINTED if m in COUNT_METRICS]),
     )
     return {"classes": CLASSES, "breaks": breaks, "classing": classing,
             "break_population": len(rankable)}
