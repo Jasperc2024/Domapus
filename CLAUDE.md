@@ -64,6 +64,7 @@ npm run build          # tsc -b, vite build, then scripts/prune-dist.mjs
 npm test               # vitest (frontend)
 npm run lint           # eslint
 npm run tree           # regenerate tree.txt (the pre-commit hook does this)
+npm run data:sync      # restore public/data/history for the manifest's release (needs gh; the post-merge hook does this)
 npm run geometry       # rebuild the ZCTA tileset (Docker + tippecanoe); geometry:verify checks it
 pip install -r requirements-dev.txt   # pipeline + test deps; the data run installs requirements.txt only
 pytest                 # pipeline tests in tests/
@@ -71,7 +72,9 @@ python -m pipeline     # full data run; --redfin-csv / --zhvi-csv reuse a local 
 ```
 
 Enable the repo hooks once: `git config core.hooksPath .githooks`. The pre-commit hook keeps
-`tree.txt` current and refuses a commit whose workflow YAML does not parse.
+`tree.txt` current and refuses a commit whose workflow YAML does not parse. The post-merge
+hook runs `data:sync`, because a pull updates the manifest and snapshot but not the gitignored
+history buckets, and the build refuses that mix.
 
 ## Routes
 
@@ -405,6 +408,7 @@ sides rather than neither.
 `scripts/calibrate_diff_gate.py`. `tests/fixtures/redfin_sample.csv` is the small feed.
 
 Benchmarks measure cold load under pinned conditions:
+Run benchmarks for commits that improves performance
 
 ```bash
 npm run build

@@ -1,0 +1,4 @@
+#!/bin/sh
+# A pull can bring a new manifest and snapshot, but the history buckets are gitignored and
+# arrive only as a release asset. A no-op when they already match. Never fails the merge.
+node scripts/sync-history.mjs || echo "history sync failed; run 'npm run data:sync' before building"

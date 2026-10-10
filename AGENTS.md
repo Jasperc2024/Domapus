@@ -64,6 +64,7 @@ npm run build          # tsc -b, vite build, then scripts/prune-dist.mjs
 npm test               # vitest (frontend)
 npm run lint           # eslint
 npm run tree           # regenerate tree.txt (the pre-commit hook does this)
+npm run data:sync      # restore public/data/history for the manifest's release (needs gh; the post-merge hook does this)
 npm run geometry       # rebuild the ZCTA tileset (Docker + tippecanoe); geometry:verify checks it
 pip install -r requirements-dev.txt   # pipeline + test deps; the data run installs requirements.txt only
 pytest                 # pipeline tests in tests/
@@ -71,7 +72,9 @@ python -m pipeline     # full data run; --redfin-csv / --zhvi-csv reuse a local 
 ```
 
 Enable the repo hooks once: `git config core.hooksPath .githooks`. The pre-commit hook keeps
-`tree.txt` current and refuses a commit whose workflow YAML does not parse.
+`tree.txt` current and refuses a commit whose workflow YAML does not parse. The post-merge
+hook runs `data:sync`, because a pull updates the manifest and snapshot but not the gitignored
+history buckets, and the build refuses that mix.
 
 ## Routes
 
@@ -115,9 +118,8 @@ Do not reintroduce a path where the map waits on the snapshot to show colour.
 ## Rules the code depends on
 
 **The pipeline never writes `public/data/` from a stage.** Every stage writes `build/` plus a
-`build/<stage>_report.json` receipt. The receipts describe this run (`run()` clears old ones
-first); `_require` checks prerequisite receipts for `status: ok`. Exceptions stop the run.
-Publishing is a separate copy of a verified build. This rule exists because
+`build/<stage>_report.json` receipt. The receipts are a log of this run (`run()` clears old ones
+first); `_require` checks prerequisite receipts for `status: ok`. Exceptions stop the run. Publishing is a separate copy of a verified build. This rule exists because
 a bug once let a run that passed weak validators overwrite the last known-good published data.
 
 **The colour ramp has one definition.** `src/lib/choropleth.generated.ts`, re-derived by
@@ -284,7 +286,7 @@ a run when *either* feed moves, a run landing between the two publishes half a r
 `serialize.validate` compares the two period ends: a one-month gap warns and publishes, two
 months fails.
 
-The data run invokes `deploy.yml` through `workflow_call`; Deploy also supports push and dispatch.
+`deploy.yml` is invoked through `workflow_call` from inside the data run, not by `on: push`.
 A push made with the default `GITHUB_TOKEN` does not trigger workflows, so the data commit used
 to sit on `main` unpublished. A miswired `workflow_call` looks exactly like that original bug,
 so verify a Deploy job actually appears in the run graph rather than that the YAML parses.
@@ -292,6 +294,7 @@ so verify a Deploy job actually appears in the run graph rather than that the YA
 ## Docs
 
 - `docs/REVIEW-2026-09-27.md` records the review and verified fixes completed September 28.
+
 - `docs/TODOS.md` — open work only. Read before starting work.
 - `docs/CHANGES.md` — decision history and reference facts moved out of the todos.
 - `docs/METHODOLOGY.md` — developer reference: stage-to-manifest map, constants, wire format,
@@ -377,7 +380,7 @@ transposes it into typed arrays, and transfers them to `src/lib/zip-table.ts`.
 - `class-source.ts` — which authority decides a ZIP's class. Exactly one is live at a time.
 - `choropleth-painter.ts` — turns classes into MapLibre's constant `match` expression.
 - `data-url.ts` — resolves data URLs against `VITE_DATA_BASE`. PR previews point this at
-  production so they don't ship their own 46.9 MB tileset.
+  production so they don't ship their own 92 MB tileset.
 - `history.ts` reads the manifest's versioned history path and validates its index, then fetches one bucket per click and reads the per-ZIP
   series out of it. The bucket carries ~6 neighbouring ZIPs, so panning nearby is free.
   Feeds `Sparkline.tsx` in the sidebar.
@@ -405,6 +408,7 @@ sides rather than neither.
 `scripts/calibrate_diff_gate.py`. `tests/fixtures/redfin_sample.csv` is the small feed.
 
 Benchmarks measure cold load under pinned conditions:
+Run benchmarks for commits that improves performance
 
 ```bash
 npm run build

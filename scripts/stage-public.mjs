@@ -22,7 +22,7 @@ export async function stagePublic(outDir, externalData = false) {
     const snapshot = JSON.parse(await readFile('public/data/zip-data.json', 'utf8'));
     const history = JSON.parse(await readFile('public/data/history/index.json', 'utf8'));
     if (snapshot.release_id !== mf.release_id || history.release_id !== mf.release_id) {
-      throw Error('Snapshot, history, and manifest must belong to one release');
+      throw Error('Snapshot, history, and manifest must belong to one release. Run `npm run data:sync`.');
     }
     await mkdir(root, { recursive: true });
     await cp('public/data/zip-data.json', path.join(root, 'zip-data.json'));

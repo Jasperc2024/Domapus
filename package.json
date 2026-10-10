@@ -10,6 +10,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "tree": "node scripts/generate-tree.mjs",
+    "data:sync": "node scripts/sync-history.mjs",
     "license:year": "node scripts/update_license_year.mjs",
     "preview": "vite preview",
     "test": "vitest",
