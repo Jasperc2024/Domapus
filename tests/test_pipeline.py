@@ -404,6 +404,29 @@ def test_range_violation_is_fatal():
         assert_ranges({"99999": {"avg_sale_to_list_ratio": 1.0134}}, "test")
 
 
+def test_validate_scrubs_sparse_range_outliers(monkeypatch, latest):
+    records, _, _ = serialize.assemble(_meta_for(latest), _zhvi_for(latest), latest)
+    zip_code = next(iter(records))
+    records[zip_code]["median_sale_price"] = 1
+    records[zip_code]["median_ppsf"] = 0
+    monkeypatch.setattr(serialize, "RANGE_SCRUB_MAX_SHARE", 0.2)
+
+    serialize.validate(records, _recent_month_end(0), _recent_month_end(0))
+
+    assert records[zip_code]["median_sale_price"] is None
+    assert records[zip_code]["median_ppsf"] is None
+
+
+def test_validate_still_fails_when_outlier_share_is_not_sparse(monkeypatch, latest):
+    records, _, _ = serialize.assemble(_meta_for(latest), _zhvi_for(latest), latest)
+    zip_code = next(iter(records))
+    records[zip_code]["median_sale_price"] = 1
+    monkeypatch.setattr(serialize, "RANGE_SCRUB_MAX_SHARE", 0.0)
+
+    with pytest.raises(PipelineError, match="range contract violated"):
+        serialize.validate(records, _recent_month_end(0), _recent_month_end(0))
+
+
 def test_bare_zip_is_required():
     """The old `Zip Code: NNNNN` regex matches nothing here and would null the column."""
     with pytest.raises(PipelineError, match="not 5 digits"):

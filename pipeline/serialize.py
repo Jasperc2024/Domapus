@@ -17,7 +17,7 @@ import logging
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from .contracts import PipelineError, assert_ranges
+from .contracts import PipelineError, RANGES, assert_ranges
 from .units import METRICS, coerce
 
 log = logging.getLogger(__name__)
@@ -180,6 +180,30 @@ MAX_PERIOD_AGE_DAYS = 120
 # Redfin publishes before ZHVI (16th); a run between the two ships half a release. One
 # month apart warns and publishes, two fails.
 MAX_PERIOD_GAP_MONTHS = 1
+RANGE_SCRUB_MAX_SHARE = 0.0005
+
+
+def _scrub_sparse_range_outliers(records: dict) -> None:
+    """Null sparse out-of-range values while leaving broad units shifts fatal."""
+    total = max(len(records), 1)
+    scrubbed: dict[str, int] = {}
+    for col, (lo, hi) in RANGES.items():
+        offenders = [
+            z for z, rec in records.items()
+            if rec.get(col) is not None and not (lo <= rec[col] <= hi)
+        ]
+        if not offenders:
+            continue
+        if len(offenders) / total > RANGE_SCRUB_MAX_SHARE:
+            continue
+        for z in offenders:
+            records[z][col] = None
+        scrubbed[col] = len(offenders)
+    if scrubbed:
+        log.warning(
+            "snapshot: scrubbed sparse out-of-range values before contract: %s",
+            ", ".join(f"{k}={v}" for k, v in sorted(scrubbed.items())),
+        )
 
 
 def _month_index(period: str) -> int:
@@ -200,6 +224,7 @@ def validate(records: dict, redfin_period: str | None, zhvi_period: str | None) 
             f"All-null output columns (likely input schema drift): {null_columns}"
         )
 
+    _scrub_sparse_range_outliers(records)
     assert_ranges(records, "snapshot")
 
     ages = {}

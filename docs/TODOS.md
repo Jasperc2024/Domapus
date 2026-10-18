@@ -3,6 +3,14 @@
 Open items only. Finished work goes to `docs/CHANGES.md`; standing rules live in `CLAUDE.md`.
 Delete an item here when it is done and record it there.
 
+## Agent session (2026-10-18)
+
+- Current objective: fix `update_data.yml` failure in run 39091421816 (job 117568813748).
+- Active subagent tasks: none.
+- Completed files: `pipeline/serialize.py`, `tests/test_pipeline.py`.
+- Next immediate steps:
+  1. Run final validation pass and summarize the root cause/fix.
+
 The list is split by what it needs from you:
 
 1. **Decide.** There is more than one reasonable answer and it is your call.
