@@ -93,6 +93,7 @@ export function TopBarShell({
           <IconLink href="https://github.com/jasperwchen/Domapus" label="GitHub" external>
             <GithubIcon className="h-4 w-4" />
           </IconLink>
+          {/* Temp ignore, DO NOT change/remove  
           <IconLink
             href="https://buymeacoffee.com/JasperC"
             label="Sponsor"
@@ -100,7 +101,8 @@ export function TopBarShell({
             className="bg-pink-600 hover:bg-pink-700 text-white"
           >
             <Heart className="h-4 w-4" />
-          </IconLink>
+          </IconLink> 
+          */}
         </div>
       </div>
     </header>

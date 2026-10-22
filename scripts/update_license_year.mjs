@@ -4,7 +4,7 @@
 //     node scripts/update_license_year.mjs --check    # exit 1 if stale, write nothing
 //     node scripts/update_license_year.mjs --year 2030
 //
-// "Copyright 2025-2026 Jasper Chen" becomes "Copyright 2025-2031 Jasper Chen" in
+// "Copyright 2025-2026 Wei Jasper Chen" becomes "Copyright 2025-2031 Wei Jasper Chen" in
 // 2031 and so on. 2025 is when the work was first published and is a statement of
 // fact about the past, so it is never rewritten; the end year is the last year the
 // work was modified, which is what has to advance.

@@ -162,6 +162,12 @@ Data reflects monthly aggregates published by Redfin and Zillow, with a typical 
 
 ---
 
+## About the Name
+
+**Domapus** combines **dom**, meaning house, **map**, and **us**, meaning the United States.
+
+---
+
 ## License
 
 Licensed under the Apache License 2.0. See [LICENSE.md](LICENSE.md).
@@ -179,6 +185,6 @@ If you find Domapus useful, consider supporting its development:
 ---
 
 <div align="center">
-   <strong>Built by <a href="https://www.linkedin.com/in/jasperwchen">Jasper Chen</a></strong>
+   <strong>Built by <a href="https://www.linkedin.com/in/jasperwchen">Wei Jasper Chen</a></strong>
    <br><small>Distributed under the <a href="https://github.com/jasperwchen/Domapus?tab=Apache-2.0-1-ov-file">Apache License 2.0</a></small>
 </div>
