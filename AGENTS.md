@@ -2,6 +2,8 @@
 
 agent: Maintain `docs/TODOS.md` updating your current objective, active subagent tasks, completed files, and next immediate steps. Update this file before launching parallel batches. this is to prevent lost when limit reached and everything shutdown.
 
+Keep updated with AGENTS.md
+
 ## Short, plain, and easy to understand
 
 Terse does not mean stilted. Write like a smart person talking to another smart person, not like an audit report.
@@ -211,6 +213,15 @@ column that vanishes crashes `changes` and `noise` two stages later, where nothi
 why. The 2026-09-18 run died on a renamed `MEDIAN DAYS ON MARKET YOY (%)`, a column whose
 value is discarded before publication.
 
+**Sparse invalid prices become null at ingest, before any calculation.** `redfin.py`
+applies the four price bounds in `contracts.RANGES` to every period. It nulls only the
+invalid price and its feed YoY, preserving other metrics and the ZIP. More than 0.1%
+of observed prices for any metric/month fails ingestion; null inputs do not dilute
+that denominator, and counts span CSV batches. Snapshot validation remains strict.
+The S2 receipt records bounds, counts, periods, and sample ZIPs. The manifest's
+`redfin.price_quality` keeps totals and latest-period details to stay small on first
+load. The cleaned panel feeds history, YoY, and noise estimates.
+
 **The header is bound at S0, off the 1 MB probe, not after the 1.33 GB download.** Same check
 and same message, 25 s and 1.33 GB earlier. `sources.probe_header` parses that line as CSV
 rather than splitting on commas, because Redfin quotes every field and pyarrow strips the
@@ -286,7 +297,8 @@ a run when *either* feed moves, a run landing between the two publishes half a r
 `serialize.validate` compares the two period ends: a one-month gap warns and publishes, two
 months fails.
 
-`deploy.yml` is invoked through `workflow_call` from inside the data run, not by `on: push`.
+The data run invokes `deploy.yml` through `workflow_call`; direct pushes to main also
+trigger deployment.
 A push made with the default `GITHUB_TOKEN` does not trigger workflows, so the data commit used
 to sit on `main` unpublished. A miswired `workflow_call` looks exactly like that original bug,
 so verify a Deploy job actually appears in the run graph rather than that the YAML parses.
@@ -296,7 +308,8 @@ so verify a Deploy job actually appears in the run graph rather than that the YA
 - `docs/REVIEW-2026-09-27.md` records the review and verified fixes completed September 28.
 
 - `docs/TODOS.md` — open work only. Read before starting work.
-- `docs/CHANGES.md` — decision history and reference facts moved out of the todos.
+- `docs/CHANGES.md` preserves change rationale, alternatives, reversals and measured evidence.
+  Keep enough detail to understand a decision; remove repetition, not substance or context.
 - `docs/METHODOLOGY.md` — developer reference: stage-to-manifest map, constants, wire format,
   break populations, invariants and what enforces each.
 - `docs/PIPELINE-WALKTHROUGH.md`: beginner walkthrough of the code, cron to map, with worked examples.
@@ -445,6 +458,9 @@ run the job that would have caught it.
   the shadcn generator.
 - Prose comments explain *why*, usually with the measurement or the bug that forced the
   decision. Match that when editing; do not add comments that restate the code.
+- Keep the operational reason beside the code. Use git for detailed history and ignored
+  build diagnostics for test logs. Record substantive reasoning in `docs/CHANGES.md`
+  without a length quota or an entry for every session. Do not run a separate repository-wide cleanup.
 - `tree.txt` is generated. `src/lib/choropleth.generated.ts` is generated. Never hand-edit
   either.
 - Windows is the primary dev machine. Both PowerShell and Git Bash are in play; watch for path

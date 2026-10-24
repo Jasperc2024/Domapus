@@ -44,10 +44,10 @@ CONSTANTS_ABSENT = ["PROPERTY TYPE", "IS SEASONALLY ADJUSTED"]
 ZIP_RE = re.compile(r"^\d{5}$")
 
 # --- Ranges ----------------------------------------------------------------
-# (lo, hi) inclusive, on non-null latest-period values, in PERCENT scale (the feed ships
-# 101.34, not 1.0134). Measured on the real file 2026-09-04; a units change trips these.
+# Inclusive bounds on non-null snapshot values; percentages use 101.34, not 1.0134.
+# Redfin also uses the four price bounds to quarantine sparse outliers at ingest.
 RANGES = {
-    # latest 3,499..13,247,058 · full file min 1.00 (a real $1 sale, history only)
+    # Nominal transfers below $1,000 are not usable market-price observations.
     "median_sale_price": (1e3, 1e8),
     # latest 6,536..24,261,383 · full file max 999,999,999 — an upstream sentinel,
     # 0 occurrences in the latest period
@@ -66,11 +66,7 @@ RANGES = {
     "inventory": (0, 1e6),              # max 1,948
     "median_dom": (0, 2e4),             # latest max 5,304 · full file max 18,504
     "months_of_supply": (0, 1e4),       # max 1,327.9
-    # The two difference-family YoY columns, as WE compute them in `changes.recompute`:
-    # a change in days and in months. These bounds are what catches the feed's own
-    # column reaching the wire instead of ours — on the x100 scale it still uses for
-    # months of supply, the same columns reach +-654,499 and +-35,608 (measured
-    # 2026-07-31), far outside either bound.
+    # Bound recomputed changes in days/months to catch accidental publication of x100 feed values.
     "median_dom_yoy": (-2e4, 2e4),          # divided range -18,413..18,466
     "months_of_supply_yoy": (-1e4, 1e4),    # divided range -1,715.7..702.7
 }

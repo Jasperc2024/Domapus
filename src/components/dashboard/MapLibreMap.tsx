@@ -6,6 +6,7 @@ import "@/lib/maplibre-worker";
 import { createMetricPopupContent } from "./map/utils";
 import { ZipData } from "./map/types";
 import { dataUrl } from "@/lib/data-url";
+import { BASEMAP_STYLE, withoutTransportation } from "@/lib/basemap";
 import { addPMTilesProtocol } from "@/lib/pmtiles-protocol";
 import { trackError } from "@/lib/analytics";
 import { Fullscreen } from "lucide-react";
@@ -48,7 +49,6 @@ interface MapProps {
   initialZoom?: number;
 }
 
-const BASEMAP_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 /** The ZIP layers need nothing from Carto, so a basemap that fails or hangs past this
  *  gives way to FALLBACK_STYLE instead of holding the whole map on "Loading map...". */
 const BASEMAP_TIMEOUT_MS = 10_000;
@@ -198,7 +198,6 @@ export function MapLibreMap({
 
     const map = new maplibregl.Map({
       container,
-      style: BASEMAP_STYLE,
       // Tiles go to z10; MapLibre overzooms to 12 with ~0.25 px error. Re-tile before raising
       // maxZoom past 14.
       minZoom: zoomFloorFor(container.clientWidth),
@@ -266,6 +265,7 @@ export function MapLibreMap({
       );
     });
 
+    map.setStyle(BASEMAP_STYLE, { transformStyle: withoutTransportation });
     return map;
   }, [applyLabelContrast, getDynamicPadding, recoverMapView]);
 
@@ -524,19 +524,6 @@ export function MapLibreMap({
     if (map.getSource("zips")) return;
 
     try {
-      // Hide transportation layers for cleaner look
-      const style = map.getStyle();
-      if (!style || !style.layers) return;
-      const styleLayers = style.layers;
-      styleLayers.forEach((layer: LayerSpecification) => {
-        if ('source-layer' in layer) {
-          const sourceLayer = layer['source-layer'] as string;
-          if (sourceLayer === "transportation" || sourceLayer === "transportation_name") {
-            map.setLayoutProperty(layer.id, "visibility", "none");
-          }
-        }
-      });
-
       const pmtilesUrl = dataUrl("us_zip_codes.pmtiles");
 
       map.addSource("zips", {

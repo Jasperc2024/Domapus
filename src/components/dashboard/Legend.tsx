@@ -226,8 +226,8 @@ export function Legend({
             onChange={onShowLisaChange}
             label={
               outliers
-                ? `Highlight ${outliers.total} price outliers`
-                : "Highlight price outliers"
+                ? `Highlight ${outliers.total} Price Outliers`
+                : "Highlight Price Outliers"
             }
             help="Highlights ZIP codes where prices are unusually high or low compared to neighboring areas."
           />

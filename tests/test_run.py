@@ -256,12 +256,37 @@ def test_a_first_run_builds_every_stage(site, release):
         "s5b_forecast", "s5c_spatial", "s6_classify", "s7_paint", "s8_history")}
 
     manifest, snap = _built(site)
+    ingest = json.loads((site / "build" / "s2_ingest_report.json").read_text())
+    quality = manifest["redfin"]["price_quality"]
+    assert quality["invalid_cells"] == ingest["redfin"]["price_quality"]["invalid_cells"]
+    assert quality["latest_affected"] == [
+        e for e in ingest["redfin"]["price_quality"]["affected"]
+        if e["period"] == manifest["redfin"]["period_end"]
+    ]
+    assert "affected" not in quality
     # No live release: nothing to compare against, so it publishes.
     assert manifest["content_changed"] is True and manifest["previous_content_digest"] is None
     for asset in manifest["assets"]["paint"].values():
         assert (site / "build" / asset["file"]).exists()
     assert snap["f"] == serialize.SNAPSHOT_COLUMNS
     assert len(snap["z"]) == 60
+
+
+def test_override_reason_reaches_manifest_verbatim(site, release):
+    _, snapshot = _run_and_publish(site, release["previous"])
+    price_column = snapshot["f"].index("msp")
+    snapshot["d"][price_column] = [value // 100 for value in snapshot["d"][price_column]]
+    main.LIVE_SNAPSHOT.write_text(json.dumps(snapshot), encoding="utf-8")
+    reason = '  Fixture correction: "$(printf unsafe)"\nSecond line: \'quoted\' \\ path  '
+
+    assert main.run(release["current"]["redfin"], release["current"]["zhvi"],
+                    skip_probe=True, override_gate=True, override_reason=reason) == 0
+
+    manifest, _ = _built(site)
+    receipt = json.loads((site / "build" / "s4_gate_report.json").read_text())
+    assert manifest["gate"]["failures"]
+    assert manifest["gate"]["overridden"] is True
+    assert manifest["gate"]["reason"] == receipt["reason"] == reason
 
 
 def test_a_same_month_rebuild_keeps_the_holds_and_the_digest(site, release):

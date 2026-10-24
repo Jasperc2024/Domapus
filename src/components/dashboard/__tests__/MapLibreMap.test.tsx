@@ -15,13 +15,13 @@ const mocks = vi.hoisted(() => {
     static autoLoad = true;
     handlers: Record<string, Array<(payload?: unknown) => void>> = {};
 
-    constructor() {
+    constructor(public options: { style?: unknown } = {}) {
       MockMap.lastInstance = this;
       if (MockMap.autoLoad) setTimeout(() => this.emit("load"), 0);
     }
 
-    setStyle(style: unknown) {
-      mockSetStyle(style);
+    setStyle(style: unknown, options?: unknown) {
+      mockSetStyle(style, options);
     }
 
     on(event: string, cb: (payload?: unknown) => void) {
@@ -148,6 +148,24 @@ beforeEach(() => {
 });
 
 describe("MapLibreMap", () => {
+  it("removes roads before the basemap loads, without waiting for ZIP data", () => {
+    mocks.MockMap.autoLoad = false;
+    renderMap();
+    expect(mocks.MockMap.lastInstance?.options.style).toBeUndefined();
+    const [url, options] = mocks.mockSetStyle.mock.calls[0] ?? [];
+    expect(url).toContain("positron-gl-style");
+    expect(options?.transformStyle).toBeTypeOf("function");
+    const style = options.transformStyle(undefined, {
+      version: 8, sources: {}, layers: [
+        { id: "background", type: "background" },
+        { id: "road_mot_fill_noramp", type: "line", source: "carto", "source-layer": "roads", minzoom: 12 },
+        { id: "road_path_areas", type: "line", source: "carto", "source-layer": "landuse" },
+        { id: "boundary_state", type: "line", source: "carto", "source-layer": "boundary" },
+      ],
+    });
+    expect(style.layers.map((layer: { id: string }) => layer.id)).toEqual(["background", "boundary_state"]);
+  });
+
   it("suppresses non-fatal decoding errors", async () => {
     render(
       <MapLibreMap
@@ -170,7 +188,7 @@ describe("MapLibreMap", () => {
       lastMapInstance?.emit("error", { error: { message: "decoding failed" } });
     });
 
-    expect(mocks.mockSetStyle).not.toHaveBeenCalled();
+    expect(mocks.mockSetStyle.mock.calls.filter(([style]) => isFallback(style))).toHaveLength(0);
   });
 
   it("suppresses recoverable context-loss errors", async () => {
@@ -198,7 +216,7 @@ describe("MapLibreMap", () => {
 
     expect(mod.__getMockResize()).toHaveBeenCalled();
     expect(mod.__getMockTriggerRepaint()).toHaveBeenCalled();
-    expect(mocks.mockSetStyle).not.toHaveBeenCalled();
+    expect(mocks.mockSetStyle.mock.calls.filter(([style]) => isFallback(style))).toHaveLength(0);
   });
 
   const renderMap = () => render(
@@ -221,18 +239,18 @@ describe("MapLibreMap", () => {
     await act(async () => {
       mocks.MockMap.lastInstance?.emit("error", { error: { message: "Failed to fetch" } });
     });
-    expect(mocks.mockSetStyle).toHaveBeenCalledTimes(1);
-    expect(isFallback(mocks.mockSetStyle.mock.calls[0][0])).toBe(true);
+    expect(mocks.mockSetStyle).toHaveBeenCalledTimes(2);
+    expect(isFallback(mocks.mockSetStyle.mock.calls[1][0])).toBe(true);
   });
 
   it("draws without the basemap when its style never arrives", async () => {
     mocks.MockMap.autoLoad = false;
     renderMap();
     await act(async () => { vi.advanceTimersByTime(9_000); });
-    expect(mocks.mockSetStyle).not.toHaveBeenCalled();
+    expect(mocks.mockSetStyle.mock.calls.filter(([style]) => isFallback(style))).toHaveLength(0);
     await act(async () => { vi.advanceTimersByTime(2_000); });
-    expect(mocks.mockSetStyle).toHaveBeenCalledTimes(1);
-    expect(isFallback(mocks.mockSetStyle.mock.calls[0][0])).toBe(true);
+    expect(mocks.mockSetStyle).toHaveBeenCalledTimes(2);
+    expect(isFallback(mocks.mockSetStyle.mock.calls[1][0])).toBe(true);
   });
 
   it("keeps the basemap when its style arrived but the first tiles are slow", async () => {
@@ -242,12 +260,12 @@ describe("MapLibreMap", () => {
     renderMap();
     await act(async () => { mocks.MockMap.lastInstance?.emit("styledata"); });
     await act(async () => { vi.advanceTimersByTime(20_000); });
-    expect(mocks.mockSetStyle).not.toHaveBeenCalled();
+    expect(mocks.mockSetStyle.mock.calls.filter(([style]) => isFallback(style))).toHaveLength(0);
   });
 
   it("keeps the basemap once it has loaded", async () => {
     renderMap();
     await act(async () => { vi.advanceTimersByTime(20_000); });
-    expect(mocks.mockSetStyle).not.toHaveBeenCalled();
+    expect(mocks.mockSetStyle.mock.calls.filter(([style]) => isFallback(style))).toHaveLength(0);
   });
 });

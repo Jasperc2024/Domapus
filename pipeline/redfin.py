@@ -5,6 +5,7 @@ the uniqueness check reads back only the two key columns.
 """
 
 import logging
+import math
 from pathlib import Path
 
 import pyarrow as pa
@@ -15,6 +16,7 @@ import pyarrow.parquet as pq
 from .contracts import (
     GRAINS,
     PipelineError,
+    RANGES,
     assert_columns_absent,
     assert_constants,
     assert_unique_key,
@@ -25,6 +27,11 @@ from .units import METRICS, resolve
 log = logging.getLogger(__name__)
 
 BLOCK_SIZE = 8 << 20
+
+PRICE_METRICS = ("median_sale_price", "median_ppsf", "median_list_price", "median_list_ppsf")
+# At most one in 1,000 observed prices per metric/month may be omitted.
+# The cached 2012-2026 panel's worst rate is 8/24,563 (0.033%).
+MAX_INVALID_PRICE_SHARE = 0.001
 
 # String types so "00501" keeps its leading zeros.
 FORCED_TYPES = {
@@ -37,9 +44,7 @@ FORCED_TYPES = {
     "METRO": pa.string(),
 }
 
-# panel.parquet column order. zip + period_end + 14 levels + 14 YoY. Fixed across releases
-# even when the feed stops publishing a YoY column: that column is written all-null, because
-# a column that vanishes crashes `changes` and `noise` instead of reporting a gap.
+# Keep the panel schema fixed across releases; absent feed YoY columns stay null.
 PANEL_LEVELS = list(METRICS)
 PANEL_YOY = [f"{k}_yoy" for k in PANEL_LEVELS]
 PANEL_COLUMNS = ["zip", "period_end"] + PANEL_LEVELS + PANEL_YOY
@@ -57,11 +62,7 @@ def read_header(path: Path) -> list[str]:
 
 
 def _rename_batch(batch: pa.RecordBatch, binding) -> pa.RecordBatch:
-    """Redfin headers -> our keys, keeping only the panel columns.
-
-    A YoY column the feed no longer publishes is written as an all-null float, so the panel
-    schema in PANEL_COLUMNS holds whatever the release looked like.
-    """
+    """Map feed headers to the fixed panel schema, filling absent YoY columns with null."""
     def col(header):
         return batch.column(batch.schema.get_field_index(header)).cast(pa.float64())
 
@@ -78,6 +79,70 @@ def _rename_batch(batch: pa.RecordBatch, binding) -> pa.RecordBatch:
                 nulls = pa.nulls(batch.num_rows, type=pa.float64())
             cols.append(nulls)
     return pa.RecordBatch.from_arrays(cols, schema=PANEL_SCHEMA)
+
+
+def _clean_prices(tbl: pa.Table, binding, quality: dict) -> pa.Table:
+    """Null unusable prices before either the snapshot or panel can consume them."""
+    for metric in PRICE_METRICS:
+        header = binding.level[metric]
+        values = tbl[header].cast(pa.float64())
+        lo, hi = RANGES[metric]
+        valid = pc.and_(pc.is_finite(values),
+                        pc.and_(pc.greater_equal(values, lo), pc.less_equal(values, hi)))
+        invalid = pc.fill_null(pc.invert(valid), False)
+        counts = pa.table({
+            "period": tbl["PERIOD END"],
+            "observed": pc.cast(pc.is_valid(values), pa.int64()),
+            "invalid": pc.cast(invalid, pa.int64()),
+        }).group_by("period").aggregate([("observed", "sum"), ("invalid", "sum")])
+        for row in counts.to_pylist():
+            entry = quality.setdefault((metric, row["period"]),
+                                       {"observed": 0, "invalid": 0, "samples": []})
+            entry["observed"] += row["observed_sum"]
+            entry["invalid"] += row["invalid_sum"]
+        if not pc.any(invalid).as_py():
+            continue
+        for row in tbl.select(["PERIOD END", "REGION NAME", header]).filter(invalid).to_pylist():
+            samples = quality[metric, row["PERIOD END"]]["samples"]
+            if len(samples) < 3:
+                value = row[header]
+                samples.append({"zip": row["REGION NAME"],
+                                "value": value if math.isfinite(value) else str(value)})
+        tbl = tbl.set_column(tbl.schema.get_field_index(header), header,
+                             pc.if_else(invalid, None, values))
+        yoy_header = binding.yoy[metric]
+        if yoy_header is not None:
+            tbl = tbl.set_column(tbl.schema.get_field_index(yoy_header), yoy_header,
+                                 pc.if_else(invalid, None, tbl[yoy_header]))
+    return tbl
+
+
+def _price_quality_report(quality: dict) -> dict:
+    """Check complete months, so CSV batch boundaries cannot change acceptance."""
+    affected = []
+    failures = []
+    for (metric, period), entry in sorted(quality.items()):
+        if not entry["invalid"]:
+            continue
+        affected.append({"metric": metric, "period": period, **entry})
+        if entry["invalid"] > MAX_INVALID_PRICE_SHARE * entry["observed"]:
+            failures.append(
+                f"  {metric} {period}: {entry['invalid']}/{entry['observed']} observed "
+                f"prices outside {RANGES[metric]}; sample {entry['samples']}"
+            )
+    if failures:
+        raise PipelineError(
+            f"redfin_raw: price quarantine exceeds {MAX_INVALID_PRICE_SHARE:.1%} "
+            "per metric/month; possible units change or widespread corruption.\n"
+            + "\n".join(failures)
+        )
+    total = sum(e["invalid"] for e in affected)
+    if total:
+        log.warning("Redfin: quarantined %s price cells across %s metric/month groups; "
+                    "levels and their YoY are null; details in price_quality", total, len(affected))
+    return {"max_invalid_share": MAX_INVALID_PRICE_SHARE,
+            "ranges": {m: list(RANGES[m]) for m in PRICE_METRICS},
+            "invalid_cells": total, "affected": affected}
 
 
 def ingest(csv_path: Path, panel_path: Path) -> tuple[dict, list[dict]]:
@@ -111,6 +176,7 @@ def ingest(csv_path: Path, panel_path: Path) -> tuple[dict, list[dict]]:
     zips: set[str] = set()
     latest_period = None
     latest_rows: list[dict] = []
+    quality: dict = {}
     writer = None
 
     try:
@@ -150,6 +216,7 @@ def ingest(csv_path: Path, panel_path: Path) -> tuple[dict, list[dict]]:
                 prev_period = last
                 periods.update(pc.unique(ends).to_pylist())
 
+                tbl = _clean_prices(tbl, binding, quality)
                 if latest_period is None:
                     latest_period = first
                 if first == latest_period:
@@ -157,7 +224,7 @@ def ingest(csv_path: Path, panel_path: Path) -> tuple[dict, list[dict]]:
                     if keep.num_rows:
                         latest_rows.extend(keep.to_pylist())
 
-                out = _rename_batch(batch, binding)
+                out = _rename_batch(tbl.to_batches()[0], binding)
                 if writer is None:
                     writer = pq.ParquetWriter(panel_path, PANEL_SCHEMA, compression="zstd")
                 writer.write_batch(out)
@@ -176,6 +243,7 @@ def ingest(csv_path: Path, panel_path: Path) -> tuple[dict, list[dict]]:
 
     keys = pq.read_table(panel_path, columns=["zip", "period_end"])
     assert_unique_key(keys, GRAINS["panel"], "redfin_panel")
+    price_quality = _price_quality_report(quality)
 
     report = {
         "rows": rows,
@@ -189,6 +257,7 @@ def ingest(csv_path: Path, panel_path: Path) -> tuple[dict, list[dict]]:
         "frequency": frequency.pop(),
         "panel_bytes": panel_path.stat().st_size,
         "binding": binding.report(),
+        "price_quality": price_quality,
     }
     log.info(
         "Redfin: %s rows, %s periods (%s..%s), %s ZIPs; latest %s has %s ZIPs",
@@ -199,12 +268,7 @@ def ingest(csv_path: Path, panel_path: Path) -> tuple[dict, list[dict]]:
 
 
 def latest_records(latest_rows: list[dict]) -> dict:
-    """Latest-period rows -> {zip: {our_key: raw value}}. Raw: `serialize.assemble` is the one
-    place `units.coerce` runs (coercing twice once divided two columns by 10,000).
-
-    The binding is re-derived from the rows' own keys rather than threaded through from
-    `ingest`, so the rows stay self-describing and there is one way to map a header.
-    """
+    """Key latest rows by ZIP; defer wire rounding to `serialize.assemble`."""
     if not latest_rows:
         return {}
     binding = resolve(latest_rows[0].keys(), PipelineError)

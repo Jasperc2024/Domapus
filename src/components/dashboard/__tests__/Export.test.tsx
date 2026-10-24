@@ -15,6 +15,7 @@ import { ExportSidebar } from "../export/ExportSidebar";
 import { PrintStage, PrintStageRef, ExportRender } from "../export/PrintStage";
 import * as maplibregl from "maplibre-gl";
 import { ZipData } from "../map/types";
+import { BASEMAP_STYLE, withoutTransportation } from "@/lib/basemap";
 
 // ---------------------------------------------------------------------------
 // maplibre-gl mock — WebGL-free, simulates source loading correctly
@@ -66,6 +67,7 @@ vi.mock("maplibre-gl", () => {
     }
 
     resize() {}
+    setStyle = vi.fn();
     remove() { this.removed = true; }
     loaded() { return this._loaded; }
     isStyleLoaded() { return this._styleLoaded; }
@@ -232,6 +234,7 @@ const CONUS_ZIP_DATA: Record<string, ZipData> = {
 };
 
 interface RecordedMap {
+  setStyle: ReturnType<typeof vi.fn>;
   _loaded: boolean;
   emit: (event: string, payload?: unknown) => void;
   options: Record<string, unknown>;
@@ -769,6 +772,10 @@ describe("PrintStage colour", () => {
     render(<PrintStage {...defaultProps} />);
     await advanceToMapReady();
     expect(mapMock.__getMaps()[0].options.pixelRatio).toBe(3);
+    for (const map of mapMock.__getMaps()) {
+      expect(map.options.style).toBeUndefined();
+      expect(map.setStyle).toHaveBeenCalledWith(BASEMAP_STYLE, { transformStyle: withoutTransportation });
+    }
   }, 10_000);
 });
 

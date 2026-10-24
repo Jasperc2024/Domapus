@@ -1,4 +1,5 @@
 import { captureMapCanvas } from "@/lib/map-capture";
+import { BASEMAP_STYLE, withoutTransportation } from "@/lib/basemap";
 import { useEffect, useRef, useMemo, forwardRef, useImperativeHandle, useState, useCallback } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -662,7 +663,6 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
       let map: maplibregl.Map;
       try { map = new maplibregl.Map({
         container,
-        style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
         // Sized so each map backs onto exactly the export pixels (was a 1.51x upscale).
         pixelRatio: key === "main" ? EXPORT_SCALE : 1,
         interactive: false,
@@ -819,6 +819,7 @@ export const PrintStage = forwardRef<PrintStageRef, PrintStageProps>(({
           fail(`Could not prepare the ${key} map.`);
         }
       });
+      map.setStyle(BASEMAP_STYLE, { transformStyle: withoutTransportation });
     };
 
     if (regionScope === "national") {

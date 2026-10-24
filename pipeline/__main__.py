@@ -76,7 +76,7 @@ def run(redfin_csv: Path | None, zhvi_csv: Path | None, skip_probe: bool,
         override_gate: bool = False, override_reason: str = "",
         force: bool = False) -> int:
     BUILD.mkdir(parents=True, exist_ok=True)
-    # Receipts are this run's log. Old ones beside new ones made the uploaded artifact mix runs.
+    # Receipts must describe only this run.
     for old in BUILD.glob("*_report.json"):
         old.unlink()
 
@@ -104,8 +104,7 @@ def run(redfin_csv: Path | None, zhvi_csv: Path | None, skip_probe: bool,
                 "Redfin header drift seen at probe: aliased=%s missing_yoy=%s",
                 binding.aliased, binding.missing_yoy,
             )
-    # A local file is not what upstream serves now. Stamping upstream's fingerprint on it made
-    # the next scheduled run believe it already had the current release; none means changed.
+    # Local inputs must not inherit fingerprints that would suppress the next upstream update.
     if redfin_csv is not None:
         fingerprints.pop("redfin", None)
     if zhvi_csv is not None:
@@ -184,8 +183,7 @@ def run(redfin_csv: Path | None, zhvi_csv: Path | None, skip_probe: bool,
     )
 
     # --- S4 GATE ------------------------------------------------------------
-    # Runs BEFORE anything is written, so a refused build leaves no artifact a
-    # later step could mistake for a good one.
+    # Gate before generating publishable artifacts; earlier stages write working files only.
     _require("s3_assemble")
     live_manifest = _live_manifest()
     live_coverage = live_manifest.get("coverage")
@@ -211,9 +209,7 @@ def run(redfin_csv: Path | None, zhvi_csv: Path | None, skip_probe: bool,
     # LISA over the rankable set only; needs `rel` from S5. Fills `lisa`.
     _require("s5_noise")
     live_lisa = {z: r["lisa"] for z, r in live.items() if r.get("lisa") is not None}
-    # Which of those classes the last run was HOLDING, so the hold expires after one
-    # release instead of republishing itself as `previous` forever. Absent key (a manifest
-    # older than this rule) is unknown, not empty — `spatial.run` then holds nothing.
+    # Previous holds must expire; absent hold metadata disables carry-forward.
     previous_lisa, previously_held = spatial.hysteresis_inputs(
         live_lisa, live_manifest.get("spatial", {}).get("held"),
         live_manifest.get("redfin", {}).get("period_end"), redfin_period,
@@ -264,8 +260,7 @@ def run(redfin_csv: Path | None, zhvi_csv: Path | None, skip_probe: bool,
                      for m, c in class_report["classing"].items()},
     }, encoded)
 
-    # The publish decision: a content digest, not a count. A missing live digest means
-    # publish; a redundant deploy is cheap, a skipped one is the original bug.
+    # Compare content digests for publication; absent prior identity means changed.
     live_digest = live_manifest.get("content_digest")
 
     manifest = {
@@ -276,6 +271,11 @@ def run(redfin_csv: Path | None, zhvi_csv: Path | None, skip_probe: bool,
             "period_begin": period_begin,
             "vintage": redfin_report["last_updated"],
             "rows": redfin_report["rows"],
+            "price_quality": {
+                **{k: v for k, v in redfin_report["price_quality"].items() if k != "affected"},
+                "latest_affected": [e for e in redfin_report["price_quality"]["affected"]
+                                    if e["period"] == redfin_period],
+            },
         },
         "zhvi": {"period_end": zhvi_period, "zips": len(zhvi_records),
                  "panel": zhvi_panel_report},

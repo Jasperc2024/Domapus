@@ -2,6 +2,8 @@
 
 agent: Maintain `docs/TODOS.md` updating your current objective, active subagent tasks, completed files, and next immediate steps. Update this file before launching parallel batches. this is to prevent lost when limit reached and everything shutdown.
 
+Keep updated with AGENTS.md
+
 ## Short, plain, and easy to understand
 
 Terse does not mean stilted. Write like a smart person talking to another smart person, not like an audit report.
@@ -296,7 +298,8 @@ so verify a Deploy job actually appears in the run graph rather than that the YA
 - `docs/REVIEW-2026-09-27.md` records the review and verified fixes completed September 28.
 
 - `docs/TODOS.md` — open work only. Read before starting work.
-- `docs/CHANGES.md` — decision history and reference facts moved out of the todos.
+- `docs/CHANGES.md` preserves change rationale, alternatives, reversals and measured evidence.
+  Keep enough detail to understand a decision; remove repetition, not substance or context.
 - `docs/METHODOLOGY.md` — developer reference: stage-to-manifest map, constants, wire format,
   break populations, invariants and what enforces each.
 - `docs/PIPELINE-WALKTHROUGH.md`: beginner walkthrough of the code, cron to map, with worked examples.
